@@ -235,6 +235,35 @@ ENDPOINTS = (
         allowed_status=404,
     ),
     Endpoint("GET", "/api/v1/admin/reports", COORDINATOR_AND_ADMIN),
+    # Step 11: the facility catalogue is public to signed-in users; managing
+    # it needs facility:manage, approving bookings needs booking:approve.
+    Endpoint("GET", "/api/v1/facilities", frozenset(ALL_ROLES)),
+    Endpoint("GET", "/api/v1/equipment", frozenset(ALL_ROLES)),
+    # Admin only here: a coordinator holds facility:manage but must create
+    # inside the department they oversee, and this generic fixture's
+    # coordinator has no scope -- so they legitimately get 403 too. The
+    # scoped coordinator path is covered in tests/test_facilities.py.
+    Endpoint(
+        "POST",
+        "/api/v1/facilities",
+        frozenset({UserRole.ADMIN}),
+        body={"name": "Matrix Lab"},
+        allowed_status=201,
+    ),
+    Endpoint(
+        "POST",
+        "/api/v1/bookings",
+        frozenset(ALL_ROLES),
+        body={
+            "equipment_id": "00000000-0000-0000-0000-000000000001",
+            "starts_at": "2099-01-01T09:00:00+00:00",
+            "ends_at": "2099-01-01T10:00:00+00:00",
+            "purpose": "Matrix",
+        },
+        allowed_status=404,
+    ),
+    Endpoint("GET", "/api/v1/me/bookings", frozenset(ALL_ROLES)),
+    Endpoint("GET", "/api/v1/coordinator/booking-queue", COORDINATOR_AND_ADMIN),
     # Students must not be able to browse other students.
     Endpoint(
         "GET",

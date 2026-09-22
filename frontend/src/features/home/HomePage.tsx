@@ -22,10 +22,10 @@ export function HomePage() {
     <div className="space-y-10">
       <section className="max-w-3xl">
         <p className="text-sm font-medium text-brand-700">
-          Development status: Step 10 · MVP complete
+          Lovely Professional University · Development status: Step 11
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-          Make research expertise, projects and facilities discoverable.
+          Make LPU research expertise, projects and facilities discoverable.
         </h1>
         <p className="mt-4 text-ink-muted">
           Faculty expertise, ongoing projects and lab facilities are often invisible across

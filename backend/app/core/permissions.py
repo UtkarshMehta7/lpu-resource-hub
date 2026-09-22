@@ -38,6 +38,8 @@ class Permission(StrEnum):
     APPLICATION_SUBMIT = "application:submit"
     COLLABORATION_SEND = "collaboration:send"
     REPORT_MODERATE = "report:moderate"
+    FACILITY_MANAGE = "facility:manage"
+    BOOKING_APPROVE = "booking:approve"
 
 
 # A role inherits everything its parent can do. ADMIN's powers are listed
@@ -69,6 +71,8 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.PROFILE_VERIFY,
             Permission.PROJECT_REVIEW,
             Permission.REPORT_MODERATE,
+            Permission.FACILITY_MANAGE,
+            Permission.BOOKING_APPROVE,
         }
     ),
     UserRole.ADMIN: frozenset(
@@ -86,6 +90,8 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.STUDENT_DISCOVER,
             Permission.PROJECT_REVIEW,
             Permission.REPORT_MODERATE,
+            Permission.FACILITY_MANAGE,
+            Permission.BOOKING_APPROVE,
         }
     ),
 }

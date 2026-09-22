@@ -31,7 +31,9 @@ from app.modules.analytics.router import router as analytics_router
 from app.modules.applications.router import router as applications_router
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
+from app.modules.bookings.router import router as bookings_router
 from app.modules.collaborations.router import router as collaborations_router
+from app.modules.facilities.router import router as facilities_router
 from app.modules.health.router import router as health_router
 from app.modules.opportunities.router import router as opportunities_router
 from app.modules.profiles.router import router as profiles_router
@@ -130,4 +132,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(recommendations_router, prefix=API_V1_PREFIX)
     app.include_router(reports_router, prefix=API_V1_PREFIX)
     app.include_router(analytics_router, prefix=API_V1_PREFIX)
+    app.include_router(facilities_router, prefix=API_V1_PREFIX)
+    app.include_router(bookings_router, prefix=API_V1_PREFIX)
     return app

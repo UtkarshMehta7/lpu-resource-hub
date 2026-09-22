@@ -271,12 +271,16 @@ def test_past_deadline_openings_are_dropped(
     client: TestClient, world: World, db_settings: Settings
 ) -> None:
     stale = _opportunity(client, world, title="Yesterday's opening")
+    # Deadlines are compared against the UTC date in the service, so the test
+    # must use a UTC date too -- CURRENT_DATE follows the server's timezone
+    # and can be a day ahead of UTC.
+    yesterday = datetime.now(UTC).date() - timedelta(days=1)
     engine = create_engine(str(db_settings.database_url))
     try:
         with engine.begin() as connection:
             connection.execute(
-                text("UPDATE opportunities SET deadline = CURRENT_DATE - 1 WHERE id = :id"),
-                {"id": stale},
+                text("UPDATE opportunities SET deadline = :deadline WHERE id = :id"),
+                {"deadline": yesterday, "id": stale},
             )
     finally:
         engine.dispose()

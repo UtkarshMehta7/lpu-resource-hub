@@ -16,6 +16,13 @@ import { ProjectDetailPage } from "@/features/projects/ProjectDetailPage";
 import { ProjectFormPage } from "@/features/projects/ProjectFormPage";
 import { ProjectsPage } from "@/features/projects/ProjectsPage";
 import { ReviewQueuePage } from "@/features/projects/ReviewQueuePage";
+import { BookingQueuePage } from "@/features/facilities/BookingQueuePage";
+import { EquipmentDetailPage } from "@/features/facilities/EquipmentDetailPage";
+import { EquipmentFormPage } from "@/features/facilities/EquipmentFormPage";
+import { FacilityFormPage } from "@/features/facilities/FacilityFormPage";
+import { FacilitiesPage } from "@/features/facilities/FacilitiesPage";
+import { FacilityDetailPage } from "@/features/facilities/FacilityDetailPage";
+import { MyBookingsPage } from "@/features/facilities/MyBookingsPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ModerationQueuePage } from "@/features/reports/ModerationQueuePage";
 import { SavedPage } from "@/features/saved/SavedPage";
@@ -63,6 +70,10 @@ export const router = createBrowserRouter([
           { path: "recommendations", element: <RecommendationsPage /> },
           { path: "dashboard", element: <DashboardPage /> },
           { path: "me/saved", element: <SavedPage /> },
+          { path: "facilities", element: <FacilitiesPage /> },
+          { path: "facilities/:facilityId", element: <FacilityDetailPage /> },
+          { path: "equipment/:equipmentId", element: <EquipmentDetailPage /> },
+          { path: "me/bookings", element: <MyBookingsPage /> },
           { path: "publications/mine", element: <PublicationsPage mine /> },
           { path: "publications/:publicationId", element: <PublicationDetailPage /> },
           { path: "publications/:publicationId/edit", element: <PublicationFormPage /> },
@@ -73,6 +84,12 @@ export const router = createBrowserRouter([
               { path: "coordinator/verification-queue", element: <VerificationQueuePage /> },
               { path: "coordinator/review-queue", element: <ReviewQueuePage /> },
               { path: "admin/reports", element: <ModerationQueuePage /> },
+              { path: "coordinator/booking-queue", element: <BookingQueuePage /> },
+              { path: "facilities/new", element: <FacilityFormPage /> },
+              {
+                path: "facilities/:facilityId/equipment/new",
+                element: <EquipmentFormPage />,
+              },
             ],
           },
           {
