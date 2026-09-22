@@ -138,3 +138,61 @@ class UserResearchArea(Base):
     is_expertise: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
+
+
+class SavedItem(Base):
+    """A user's bookmark. Exactly one target column is set.
+
+    Personal collections live under /me/... (docs/architecture.md), so saved
+    items belong to the profiles module rather than a module of their own.
+    Step 12 adds funding_id here.
+    """
+
+    __tablename__ = "saved_items"
+    __table_args__ = (
+        CheckConstraint(
+            "num_nonnulls(project_id, opportunity_id, researcher_id) = 1",
+            name="exactly_one_target",
+        ),
+        # One bookmark per user per thing, per kind.
+        Index(
+            "uq_saved_items_project",
+            "user_id",
+            "project_id",
+            unique=True,
+            postgresql_where=text("project_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_saved_items_opportunity",
+            "user_id",
+            "opportunity_id",
+            unique=True,
+            postgresql_where=text("opportunity_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_saved_items_researcher",
+            "user_id",
+            "researcher_id",
+            unique=True,
+            postgresql_where=text("researcher_id IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=True
+    )
+    opportunity_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("opportunities.id", ondelete="CASCADE"), nullable=True
+    )
+    researcher_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
