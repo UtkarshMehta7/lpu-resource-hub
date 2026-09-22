@@ -199,6 +199,16 @@ ENDPOINTS = (
         allowed_status=404,
     ),
     Endpoint("GET", "/api/v1/me/applications", frozenset(ALL_ROLES)),
+    # Step 8: collaboration requests. Admins can't send; the random recipient
+    # doesn't exist, so allowed senders get 404.
+    Endpoint(
+        "POST",
+        "/api/v1/collaborations",
+        frozenset({UserRole.STUDENT, UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR}),
+        body={"recipient_id": "00000000-0000-0000-0000-000000000001", "message": "Matrix"},
+        allowed_status=404,
+    ),
+    Endpoint("GET", "/api/v1/me/collaborations", frozenset(ALL_ROLES)),
     # Students must not be able to browse other students.
     Endpoint(
         "GET",
