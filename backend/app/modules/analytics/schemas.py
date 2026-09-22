@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -22,9 +23,13 @@ from app.modules.users.models import UserRole
 
 
 class DeadlineItem(BaseModel):
-    opportunity_id: uuid.UUID
+    """Something the viewer saved or applied to that is closing soon."""
+
+    kind: Literal["opportunity", "funding"]
+    item_id: uuid.UUID
     title: str
     deadline: date
+    # Only meaningful for opportunities: saved-but-not-applied still shows up.
     applied: bool
 
 

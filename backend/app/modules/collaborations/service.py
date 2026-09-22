@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.events import EVENT_BUS, Event, EventName
 from app.modules.collaborations.models import CollaborationRequest, CollaborationStatus
 from app.modules.collaborations.policies import Actor, assert_transition, can_contact
 from app.modules.collaborations.schemas import Box, CollaborationCreate, CollaborationRead, Party
@@ -119,6 +120,19 @@ def send_request(db: Session, sender: User, data: CollaborationCreate) -> Collab
     )
     db.add(request)
     try:
+        db.flush()
+        EVENT_BUS.publish(
+            db,
+            Event(
+                name=EventName.COLLABORATION_REQUESTED,
+                actor_id=sender.id,
+                payload={
+                    "recipient_id": request.recipient_id,
+                    "request_id": request.id,
+                    "sender_name": sender.full_name,
+                },
+            ),
+        )
         # The partial unique index is the duplicate guard, so two concurrent
         # sends can't both create a pending request.
         db.commit()
@@ -154,6 +168,21 @@ def respond(
     assert_transition(request.status, target, party)
     request.status = target
     request.responded_at = datetime.now(UTC)
+    # Tell the other party what happened.
+    other_party = request.sender_id if party == "recipient" else request.recipient_id
+    EVENT_BUS.publish(
+        db,
+        Event(
+            name=EventName.COLLABORATION_RESPONDED,
+            actor_id=actor.id,
+            payload={
+                "recipient_id": other_party,
+                "request_id": request.id,
+                "responder_name": actor.full_name,
+                "status": target.value,
+            },
+        ),
+    )
     db.commit()
     db.refresh(request)
     return _to_reads(db, actor, [request])[0]

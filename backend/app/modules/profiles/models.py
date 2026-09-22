@@ -145,13 +145,13 @@ class SavedItem(Base):
 
     Personal collections live under /me/... (docs/architecture.md), so saved
     items belong to the profiles module rather than a module of their own.
-    Step 12 adds funding_id here.
+    Step 12 added funding_id.
     """
 
     __tablename__ = "saved_items"
     __table_args__ = (
         CheckConstraint(
-            "num_nonnulls(project_id, opportunity_id, researcher_id) = 1",
+            "num_nonnulls(project_id, opportunity_id, researcher_id, funding_id) = 1",
             name="exactly_one_target",
         ),
         # One bookmark per user per thing, per kind.
@@ -176,6 +176,13 @@ class SavedItem(Base):
             unique=True,
             postgresql_where=text("researcher_id IS NOT NULL"),
         ),
+        Index(
+            "uq_saved_items_funding",
+            "user_id",
+            "funding_id",
+            unique=True,
+            postgresql_where=text("funding_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -192,6 +199,11 @@ class SavedItem(Base):
     )
     researcher_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
+    funding_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("funding_opportunities.id", ondelete="CASCADE"),
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

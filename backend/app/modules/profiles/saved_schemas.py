@@ -14,6 +14,7 @@ from typing import Self
 
 from pydantic import BaseModel, model_validator
 
+from app.modules.funding.schemas import FundingRead
 from app.modules.opportunities.schemas import OpportunityCard
 from app.modules.projects.schemas import ProjectCard
 from app.modules.researchers.search_schemas import ResearcherCard
@@ -23,18 +24,22 @@ class SavedType(StrEnum):
     PROJECT = "project"
     OPPORTUNITY = "opportunity"
     RESEARCHER = "researcher"
+    FUNDING = "funding"
 
 
 class SavedCreate(BaseModel):
     project_id: uuid.UUID | None = None
     opportunity_id: uuid.UUID | None = None
     researcher_id: uuid.UUID | None = None
+    funding_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def _exactly_one(self) -> Self:
-        targets = (self.project_id, self.opportunity_id, self.researcher_id)
+        targets = (self.project_id, self.opportunity_id, self.researcher_id, self.funding_id)
         if sum(target is not None for target in targets) != 1:
-            raise ValueError("save exactly one of project_id, opportunity_id or researcher_id")
+            raise ValueError(
+                "save exactly one of project_id, opportunity_id, researcher_id or funding_id"
+            )
         return self
 
 
@@ -42,4 +47,4 @@ class SavedEntry(BaseModel):
     id: uuid.UUID
     saved_type: SavedType
     created_at: datetime
-    item: ProjectCard | OpportunityCard | ResearcherCard
+    item: ProjectCard | OpportunityCard | ResearcherCard | FundingRead

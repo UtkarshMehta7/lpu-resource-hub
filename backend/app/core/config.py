@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     rec_weight_skill: float = Field(default=0.40, ge=0.0, le=1.0)
     rec_weight_area: float = Field(default=0.35, ge=0.0, le=1.0)
     rec_weight_text: float = Field(default=0.25, ge=0.0, le=1.0)
+    # Deadline-reminder scheduler (Step 12). Off in tests; on in a real run.
+    enable_scheduler: bool = False
+    reminder_interval_minutes: int = Field(default=60, ge=5, le=1440)
 
     @field_validator("database_url", "test_database_url")
     @classmethod

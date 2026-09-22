@@ -29,7 +29,7 @@ action in general — the resource policy layer (loaded-resource ownership +
 scope match, `docs/architecture.md` §6 layer 2) is what enforces *this
 specific* department/project/etc., introduced per-module starting Step 3.
 
-## Implemented (Steps 2–11)
+## Implemented (Steps 2–12)
 
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
@@ -53,6 +53,7 @@ specific* department/project/etc., introduced per-module starting Step 3.
 | `report:moderate` | | | ✅ | ✅ | 10 |
 | `facility:manage` | | | ✅ (own dept) | ✅ (any) | 11 |
 | `booking:approve` | | | ✅ (own dept) | ✅ (any) | 11 |
+| `funding:manage` | | | ✅ (university-wide) | ✅ | 12 |
 
 Every authenticated, active user (any role) can read their own profile via
 `GET /api/v1/me`, read their own `GET/PUT /me/profile`, set their own
@@ -80,7 +81,6 @@ picking it up automatically via inheritance wherever `FACULTY` has it.
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
 | `project:archive` | | ✅ (own) | | ✅ | 5 |
-| `funding:manage` | | | ✅ | ✅ | 12 |
 
 ## Status codes
 

@@ -16,7 +16,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 11: facilities, equipment and booking.** What exists today:
+**Step 12: funding, notifications and deadline reminders.** What exists today:
 
 | Area | Status |
 |---|---|
@@ -44,7 +44,8 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Browser end-to-end tests (Playwright) covering the four MVP flows | Done |
 | Facility and equipment catalogue with a week calendar, booking requests, approvals, and double-booking prevented by the database | Done |
 | Lovely Professional University branding across the frontend (full name, LPU shortform in tight spaces) | Done |
-| Funding, notifications and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Funding calls (fictional demo data), saveable, with in-app notifications from domain events and 7/1-day deadline reminders | Done |
+| Semantic search, analytics and deployment | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
 
@@ -339,6 +340,10 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `POST /api/v1/projects/{id}/review` | `project:review` | `{decision: approve\|reject, comment}` — comment required to reject. Own-department only; never your own project. Audited. |
 | `GET/POST /api/v1/projects/{id}/members`, `DELETE …/members/{user_id}` | owner for writes | Team members can see the project even while it's a draft. |
 | `GET /api/v1/coordinator/review-queue` | `project:review` | Pending projects in your department (admin: all). |
+| `GET/POST /api/v1/funding`, `GET/PATCH/DELETE /api/v1/funding/{id}` | any signed-in user reads / `funding:manage` writes | Filters `q`, `status`, `open_only`, `research_area_id`, `deadline_before`. Seeded calls are fictional and flagged `is_demo`. |
+| `GET /api/v1/me/notifications` | any signed-in user | Your own notifications plus the unread count. Others' are never visible (`404` on a foreign id). |
+| `POST /api/v1/me/notifications/{id}/read`, `POST /api/v1/me/notifications/read-all` | any signed-in user | |
+| `POST /api/v1/me/saved` | any signed-in user | Now also takes `funding_id` (still exactly one target per row). |
 | `GET/POST /api/v1/facilities`, `GET/PATCH/DELETE /api/v1/facilities/{id}` | any signed-in user reads / `facility:manage` writes | Filters `q`, `department_id`. A coordinator manages only facilities in the department they oversee (`403` outside it); admins manage any. |
 | `GET/POST /api/v1/equipment`, `GET/PATCH/DELETE /api/v1/equipment/{id}` | same | Each item carries its own booking rules: `students_allowed`, `requires_approval`, `max_hours`, `min_lead_hours`, `maintenance_status`. |
 | `GET /api/v1/equipment/{id}/availability?from&to` | any signed-in user | Approved bookings in the window plus the equipment's rules. Only the periods are returned — who holds a slot isn't public. |
@@ -484,8 +489,8 @@ project and opportunity, so they can be run repeatedly.
 | 8 | Collaboration requests |
 | 9 | Explainable tag + TF-IDF recommendations with an evaluation set |
 | 10 | Role-specific dashboards, saved items, moderation and UI polish: MVP complete |
-| **11** | **Facilities, equipment and booking calendar, double-booking prevented in the database (this commit)** |
-| 12 | Funding opportunities, notifications, deadline reminders |
+| 11 | Facilities, equipment and booking calendar, double-booking prevented in the database |
+| **12** | **Funding calls, event-driven notifications, deadline reminders (this commit)** |
 | 13 | Embeddings, pgvector, hybrid semantic search |
 | 14 | Research analytics, collaboration network, audit-log UI, moderation |
 | 15 | Optional Docker, CI/CD, free-tier deployment, hardening |
