@@ -16,7 +16,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 2: RBAC core & audit log.** What exists today:
+**Step 3: organisation, taxonomy, profiles & faculty verification.** What exists today:
 
 | Area | Status |
 |---|---|
@@ -29,7 +29,12 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Frontend auth UI (register/login, protected `/account` page, silent session restore) | Done |
 | Permission map + `require_permission`, admin user management, append-only audit log | Done |
 | Admin Users page (role changes, activate/deactivate) behind a role-gated route | Done |
-| Profiles, projects and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Schools/departments, shared skill + research-area taxonomy with aliases and suggestions | Done |
+| Student/researcher profiles, skills, research areas, onboarding-completeness tracking | Done |
+| Faculty verification: department-scoped coordinator queue, verify/reject, audited | Done |
+| Onboarding wizard, profile page, tag picker, coordinator verification queue (UI) | Done |
+| Fictional demo seed data (`scripts/seed_demo_data.py`) | Done |
+| Directory/search, projects, publications and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
 
@@ -284,17 +289,50 @@ CLI argument or environment variable that could end up in shell history).
 Backend-enforced role-based access control: `require_permission("resource:action")`
 checks the caller's role against a permission map (`app/core/permissions.py`,
 full design in [`docs/rbac-matrix.md`](docs/rbac-matrix.md)). `401` = not
-authenticated, `403` = authenticated but not allowed. `RESEARCH_COORDINATOR`
-inherits everything `FACULTY` can do; today neither has any permissions yet
-(no domain resources exist), so only `ADMIN` can call these endpoints.
+authenticated, `403` = authenticated but not allowed, `404` = you must not
+learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
+`FACULTY` can do, plus `taxonomy:manage` and `profile:verify` of its own.
 
 | Endpoint | Notes |
 |---|---|
 | `GET /api/v1/admin/users` | Paginated, filter by `role`/`is_active`. |
-| `PATCH /api/v1/admin/users/{id}` | `full_name`, `coordinator_scope_type`, `coordinator_scope_id` only — role and activation are never mass-assignable here. |
+| `PATCH /api/v1/admin/users/{id}` | `full_name`, `coordinator_scope_type`, `coordinator_scope_id` only — role and activation are never mass-assignable here. A `department` scope id must name a real department. |
 | `POST /api/v1/admin/users/{id}/role` | `{role}`. Rejects changing your own role, and rejects any change that would leave zero active admins. |
 | `POST /api/v1/admin/users/{id}/activate` / `/deactivate` | Deactivating revokes every refresh token for that user. Rejects removing the last active admin. |
-| `GET /api/v1/admin/audit-logs` | Paginated, filter by `entity_type`/`entity_id`/`actor_id`/`action`. Role and activation changes are recorded here. |
+| `GET /api/v1/admin/audit-logs` | Paginated, filter by `entity_type`/`entity_id`/`actor_id`/`action`. Role/activation changes and verification decisions are recorded here. |
+| `GET/POST /api/v1/admin/schools`, `PATCH/DELETE .../{id}` | Admin only. Deleting a school cascades to its departments. |
+| `GET/POST /api/v1/admin/departments`, `PATCH/DELETE .../{id}` | Admin only. Deleting a department clears its users' `department_id`. |
+
+## Profiles, taxonomy & verification API
+
+| Endpoint | Auth | Notes |
+|---|---|---|
+| `GET/PUT /api/v1/me/profile` | any signed-in user | Shape depends on your role (student vs researcher); responses carry a `profile_type` discriminator. `GET` is `404` until you create one. Saving a *researcher* profile submits it for verification. |
+| `PUT /api/v1/me/skills` | any signed-in user | `[{skill_id, proficiency}]`, replaces the whole set. |
+| `PUT /api/v1/me/research-areas` | any signed-in user | `[{research_area_id, is_expertise}]`, replaces the whole set. |
+| `GET /api/v1/skills?q=`, `GET /api/v1/research-areas?q=&parent_id=` | any signed-in user | Name search; an exact alias hit (`ML`) also returns its canonical tag. |
+| `POST /api/v1/tags/suggestions` | any signed-in user | Suggest a new skill/area for coordinator review. |
+| `POST /api/v1/taxonomy/skills` / `research-areas` / `aliases` | `taxonomy:manage` | Coordinator or admin. Research areas nest at most two levels. |
+| `GET /api/v1/admin/tag-suggestions`, `POST .../{id}/approve` / `/reject` | `taxonomy:manage` | Approving creates the real skill/research area. |
+| `GET /api/v1/coordinator/verification-queue` | `profile:verify` | Coordinators see only their own department; admins see everything. |
+| `POST /api/v1/researchers/{id}/verify` | `profile:verify` | `{decision: verified\|rejected, comment}`. Outside your department scope returns `404`. You can never verify yourself. |
+
+Setting `>= 3` skills and `>= 3` research areas flips
+`onboarding_complete` on `GET /api/v1/me`, which is what gates
+recommendations later (Step 9).
+
+### Demo data
+
+```bash
+cd backend && source .venv/bin/activate
+python -m scripts.seed_demo_data     # prompts for a password, or set SEED_DEMO_PASSWORD
+```
+
+Creates fictional demo data — 3 schools, 8 departments, 60 skills, 40
+research areas (with aliases such as `ML` → Machine Learning), 1 admin, 2
+coordinators, 25 faculty and 80 students, every account named
+`Demo Faculty 07`-style and flagged `is_demo`. Re-running it creates
+nothing new.
 
 ## Quality checks and tests
 
@@ -327,10 +365,13 @@ lpu-research-hub/
 │   │       ├── health/          # /health and /health/ready
 │   │       ├── auth/            # register, login, refresh, logout, change-password
 │   │       ├── users/           # /me
-│   │       ├── admin/           # admin user management
-│   │       └── audit/           # append-only audit log
-│   ├── alembic/                 # migration environment + versions/ (0001 baseline, 0002 users/refresh_tokens, 0003 coordinator scope + audit_logs)
-│   ├── scripts/                 # create_admin.py
+│   │       ├── admin/           # admin user management, schools, departments
+│   │       ├── audit/           # append-only audit log
+│   │       ├── taxonomy/        # skills, research areas, aliases, suggestions
+│   │       ├── profiles/        # student/researcher profiles, skills, areas
+│   │       └── researchers/     # verification queue and decisions
+│   ├── alembic/                 # migration environment + versions/ (0001 baseline … 0004 org/taxonomy/profiles)
+│   ├── scripts/                 # create_admin.py, seed_demo_data.py
 │   ├── tests/                   # pytest suite (db tests marked `db`)
 │   ├── alembic.ini
 │   ├── pyproject.toml
@@ -339,7 +380,7 @@ lpu-research-hub/
 │   ├── src/
 │   │   ├── app/                 # App, router, layouts
 │   │   ├── components/          # layout/ (header, banner), ui/ (primitives)
-│   │   ├── features/            # home/, system-status/, auth/, admin/ (one folder per feature)
+│   │   ├── features/            # home/, system-status/, auth/, admin/, taxonomy/, profiles/, onboarding/, researchers/
 │   │   ├── test/                # Vitest setup
 │   │   └── lib/                 # config, api client + error normalisation
 │   ├── index.html
@@ -350,7 +391,7 @@ lpu-research-hub/
 │   ├── architecture.md          # approved architecture (source of truth)
 │   ├── development.md           # day-to-day workflow and conventions
 │   ├── rbac-matrix.md           # full role -> permission design
-│   └── adr/0001-foundation-decisions.md, 0002-authentication.md, 0003-rbac-core.md
+│   └── adr/0001-foundation-decisions.md … 0004-profiles-and-taxonomy.md
 ├── CLAUDE.md
 ├── lpu-roadmap-prompts.md
 ├── .editorconfig
@@ -365,8 +406,8 @@ lpu-research-hub/
 |---|---|
 | 0 | Project foundation |
 | 1 | Users, authentication, JWT with rotating refresh tokens |
-| **2** | **RBAC core: permission map, policies, audit hook, authorization test scaffold (this commit)** |
-| 3 | Schools, departments, taxonomy, student and researcher profiles, faculty verification, demo seed data |
+| 2 | RBAC core: permission map, policies, audit hook, authorization test scaffold |
+| **3** | **Schools, departments, taxonomy, student and researcher profiles, faculty verification, demo seed data (this commit)** |
 | 4 | Researcher directory and full-text search |
 | 5 | Research projects with coordinator review workflow and team members |
 | 6 | Publications |

@@ -56,6 +56,7 @@ def verify_researcher(
     target_user_id: uuid.UUID,
     decision: VerificationStatus,
     *,
+    comment: str | None = None,
     ip: str | None,
 ) -> tuple[User, ResearcherProfile]:
     target_user, profile = _load_researcher(db, target_user_id)
@@ -69,6 +70,9 @@ def verify_researcher(
     profile.verified_at = datetime.now(UTC)
     db.flush()
 
+    # researcher_profiles has no comment column by design (see ADR 0004):
+    # the reviewer's reasoning lives in the audit record, which is where the
+    # rest of the decision's provenance already is.
     audit_service.record(
         db,
         actor_id=reviewer.id,
@@ -76,7 +80,7 @@ def verify_researcher(
         entity_type="researcher_profile",
         entity_id=target_user.id,
         before=before,
-        after={"verification_status": profile.verification_status.value},
+        after={"verification_status": profile.verification_status.value, "comment": comment},
         ip=ip,
     )
     db.commit()

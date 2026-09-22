@@ -64,7 +64,12 @@ def verify_researcher_route(
 ) -> VerificationQueueItem:
     try:
         target_user, profile = verify_researcher(
-            db, reviewer, user_id, VerificationStatus(data.decision), ip=client_ip(request)
+            db,
+            reviewer,
+            user_id,
+            VerificationStatus(data.decision),
+            comment=data.comment,
+            ip=client_ip(request),
         )
     except (ResearcherNotFoundError, OutOfScopeError) as exc:
         raise HTTPException(

@@ -294,7 +294,7 @@ def test_verification_decision_is_audited(
     client.post(
         f"/api/v1/researchers/{faculty.id}/verify",
         headers=_auth_headers(admin),
-        json={"decision": "verified"},
+        json={"decision": "verified", "comment": "Confirmed with the department."},
     )
 
     audit_response = client.get(
@@ -305,5 +305,10 @@ def test_verification_decision_is_audited(
     logs = audit_response.json()["items"]
     assert len(logs) == 1
     assert logs[0]["before"] == {"verification_status": "pending"}
-    assert logs[0]["after"] == {"verification_status": "verified"}
+    # The reviewer's comment is kept in the audit record: researcher_profiles
+    # has no comment column (ADR 0004).
+    assert logs[0]["after"] == {
+        "verification_status": "verified",
+        "comment": "Confirmed with the department.",
+    }
     assert logs[0]["actor_id"] == str(admin.id)

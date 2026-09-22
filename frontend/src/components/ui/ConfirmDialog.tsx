@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -9,6 +9,8 @@ interface ConfirmDialogProps {
   isConfirming?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Extra content between the description and the buttons, e.g. a comment field. */
+  children?: ReactNode;
 }
 
 /** A native <dialog>-backed confirmation modal. */
@@ -21,6 +23,7 @@ export function ConfirmDialog({
   isConfirming = false,
   onConfirm,
   onCancel,
+  children,
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -46,6 +49,7 @@ export function ConfirmDialog({
       <div className="w-80 max-w-full p-5">
         <h2 className="text-base font-semibold">{title}</h2>
         <p className="mt-2 text-sm text-ink-muted">{description}</p>
+        {children ? <div className="mt-4">{children}</div> : null}
         <div className="mt-5 flex justify-end gap-3">
           <button
             type="button"
