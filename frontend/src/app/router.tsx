@@ -8,6 +8,9 @@ import { RegisterPage } from "@/features/auth/RegisterPage";
 import { RoleRoute } from "@/features/auth/RoleRoute";
 import { HomePage } from "@/features/home/HomePage";
 import { NotFoundPage } from "@/features/home/NotFoundPage";
+import { OnboardingPage } from "@/features/onboarding/OnboardingPage";
+import { ProfilePage } from "@/features/profiles/ProfilePage";
+import { VerificationQueuePage } from "@/features/researchers/VerificationQueuePage";
 
 import { AppLayout } from "./layouts/AppLayout";
 
@@ -22,6 +25,14 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute />,
         children: [
           { path: "account", element: <AccountPage /> },
+          { path: "onboarding", element: <OnboardingPage /> },
+          { path: "profile", element: <ProfilePage /> },
+          {
+            element: <RoleRoute allow={["research_coordinator", "admin"]} />,
+            children: [
+              { path: "coordinator/verification-queue", element: <VerificationQueuePage /> },
+            ],
+          },
           {
             element: <RoleRoute allow={["admin"]} />,
             children: [{ path: "admin/users", element: <AdminUsersPage /> }],
