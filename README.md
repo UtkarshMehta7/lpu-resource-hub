@@ -16,7 +16,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 5: research projects & review workflow.** What exists today:
+**Step 6: publications.** What exists today:
 
 | Area | Status |
 |---|---|
@@ -36,7 +36,8 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Fictional demo seed data (`scripts/seed_demo_data.py`) | Done |
 | Researcher directory (full-text + typo-tolerant search, filters), researcher detail, opt-in student discovery, unified search | Done |
 | Research projects: draft → coordinator review → active → completed/archived, team members, visibility rules, review queue | Done |
-| Publications, opportunities and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Publications: ordered internal/external author lists, DOI de-duplication, project links, shown on researcher and project pages | Done |
+| Opportunities and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
 
@@ -331,8 +332,10 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `POST /api/v1/projects/{id}/review` | `project:review` | `{decision: approve\|reject, comment}` — comment required to reject. Own-department only; never your own project. Audited. |
 | `GET/POST /api/v1/projects/{id}/members`, `DELETE …/members/{user_id}` | owner for writes | Team members can see the project even while it's a draft. |
 | `GET /api/v1/coordinator/review-queue` | `project:review` | Pending projects in your department (admin: all). |
+| `GET/POST /api/v1/publications` | any signed-in user / `publication:create` | List with `q`, `author_id` (authored or created), `year`, `project_id`, `research_area_id` (via linked projects). Linked projects you can't see are omitted. |
+| `GET/PATCH/DELETE /api/v1/publications/{id}` | creator for edits; creator or admin for delete | Authors are an ordered list of `{user_id}` or `{external_name}`. Duplicate DOI (case/prefix-insensitive) is `409`. Admin deletes are audited. |
 
-Directory, project list and search endpoints are rate-limited to 60 requests/minute per IP. `/search` now covers researchers and projects.
+Directory, project list and search endpoints are rate-limited to 60 requests/minute per IP. `/search` now covers researchers, projects and publications.
 
 Setting `>= 3` skills and `>= 3` research areas flips
 `onboarding_complete` on `GET /api/v1/me`, which is what gates

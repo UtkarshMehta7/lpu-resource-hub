@@ -29,7 +29,7 @@ action in general — the resource policy layer (loaded-resource ownership +
 scope match, `docs/architecture.md` §6 layer 2) is what enforces *this
 specific* department/project/etc., introduced per-module starting Step 3.
 
-## Implemented (Steps 2–5)
+## Implemented (Steps 2–6)
 
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
@@ -46,6 +46,7 @@ specific* department/project/etc., introduced per-module starting Step 3.
 | `student:discover` | | ✅ | ✅ (inherited) | ✅ | 4 |
 | `project:create` | | ✅ | ✅ (inherited) | | 5 |
 | `project:review` | | | ✅ (own dept, never own project) | ✅ (never own project) | 5 |
+| `publication:create` | | ✅ | ✅ (inherited) | | 6 |
 
 Every authenticated, active user (any role) can read their own profile via
 `GET /api/v1/me`, read their own `GET/PUT /me/profile`, set their own
@@ -69,7 +70,6 @@ picking it up automatically via inheritance wherever `FACULTY` has it.
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
 | `project:archive` | | ✅ (own) | | ✅ | 5 |
-| `publication:create` | | ✅ | ✅ | | 6 |
 | `opportunity:create` | | ✅ (own active project) | ✅ | | 7 |
 | `application:decide` | | ✅ (own opportunity) | ✅ | | 7 |
 | `application:submit` | ✅ | | | | 7 |
