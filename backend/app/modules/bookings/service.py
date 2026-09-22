@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql.ranges import Range
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.events import EVENT_BUS, Event, EventName
 from app.modules.audit import service as audit_service
 from app.modules.bookings.models import Booking, BookingStatus
 from app.modules.bookings.policies import (
@@ -258,6 +259,37 @@ def _decide(
         booking.decided_by = user.id
         booking.decided_at = _now()
         booking.decision_note = note
+
+    try:
+        # Flush the status change on its own first: approving is where the
+        # EXCLUDE constraint bites, and it has to fail here -- before any
+        # notification or audit row is written for a decision that didn't
+        # happen -- so the conflict surfaces as 409 rather than a 500 from
+        # deeper inside an event handler.
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        if _is_overlap(exc):
+            raise OverlapError from exc
+        raise
+
+    if actor == "approver":
+        equipment = db.get(Equipment, booking.equipment_id)
+        EVENT_BUS.publish(
+            db,
+            Event(
+                name=EventName.BOOKING_DECIDED,
+                actor_id=user.id,
+                payload={
+                    "recipient_id": booking.user_id,
+                    "booking_id": booking.id,
+                    "equipment_id": booking.equipment_id,
+                    "equipment_name": equipment.name if equipment else "",
+                    "status": target.value,
+                    "note": note,
+                },
+            ),
+        )
         audit_service.record(
             db,
             actor_id=user.id,
@@ -268,15 +300,7 @@ def _decide(
             after={"status": target.value, "note": note},
             ip=ip,
         )
-    try:
-        # Approving is where the EXCLUDE constraint bites: several pending
-        # requests may overlap, but only one of them can become approved.
-        db.commit()
-    except IntegrityError as exc:
-        db.rollback()
-        if _is_overlap(exc):
-            raise OverlapError from exc
-        raise
+    db.commit()
     db.refresh(booking)
     return _to_reads(db, [booking])[0]
 

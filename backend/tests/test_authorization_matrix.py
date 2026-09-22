@@ -264,6 +264,28 @@ ENDPOINTS = (
     ),
     Endpoint("GET", "/api/v1/me/bookings", frozenset(ALL_ROLES)),
     Endpoint("GET", "/api/v1/coordinator/booking-queue", COORDINATOR_AND_ADMIN),
+    # Step 12: funding is public to signed-in users, managed by coordinator
+    # and admin; notifications are strictly personal.
+    Endpoint("GET", "/api/v1/funding", frozenset(ALL_ROLES)),
+    Endpoint(
+        "POST",
+        "/api/v1/funding",
+        COORDINATOR_AND_ADMIN,
+        body={
+            "organization": "Matrix Council",
+            "title": "Matrix demo call",
+            "description": "Matrix demo call description.",
+            "deadline": "2099-01-01",
+        },
+        allowed_status=201,
+    ),
+    Endpoint("GET", "/api/v1/me/notifications", frozenset(ALL_ROLES)),
+    Endpoint(
+        "POST",
+        "/api/v1/me/notifications/read-all",
+        frozenset(ALL_ROLES),
+        body={},
+    ),
     # Students must not be able to browse other students.
     Endpoint(
         "GET",

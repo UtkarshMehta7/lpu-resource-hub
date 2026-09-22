@@ -24,6 +24,7 @@ from app.core.rate_limit import (
     create_search_rate_limiter,
 )
 from app.db.session import check_database_connection, create_db_engine, create_session_factory
+from app.jobs.scheduler import start_scheduler
 from app.modules.admin.router import org_router as admin_org_router
 from app.modules.admin.router import public_org_router
 from app.modules.admin.router import router as admin_router
@@ -34,7 +35,10 @@ from app.modules.auth.router import router as auth_router
 from app.modules.bookings.router import router as bookings_router
 from app.modules.collaborations.router import router as collaborations_router
 from app.modules.facilities.router import router as facilities_router
+from app.modules.funding.router import router as funding_router
 from app.modules.health.router import router as health_router
+from app.modules.notifications.handlers import register_notification_handlers
+from app.modules.notifications.router import router as notifications_router
 from app.modules.opportunities.router import router as opportunities_router
 from app.modules.profiles.router import router as profiles_router
 from app.modules.projects.router import router as projects_router
@@ -76,10 +80,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         logger.info("Database connection OK (%s)", settings.database_summary())
 
+    # Handlers turn domain events into notifications (Step 12). Registered
+    # here, once per app, rather than at import time.
+    register_notification_handlers()
+
+    scheduler = None
+    if settings.enable_scheduler:
+        scheduler = start_scheduler(
+            app.state.session_factory, interval_minutes=settings.reminder_interval_minutes
+        )
+
     logger.info("%s started (env=%s)", settings.app_name, settings.app_env.value)
     try:
         yield
     finally:
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
         engine.dispose()
 
 
@@ -134,4 +150,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(analytics_router, prefix=API_V1_PREFIX)
     app.include_router(facilities_router, prefix=API_V1_PREFIX)
     app.include_router(bookings_router, prefix=API_V1_PREFIX)
+    app.include_router(funding_router, prefix=API_V1_PREFIX)
+    app.include_router(notifications_router, prefix=API_V1_PREFIX)
     return app
