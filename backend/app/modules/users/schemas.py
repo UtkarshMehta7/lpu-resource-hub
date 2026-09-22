@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from app.modules.users.models import UserRole
+from app.modules.users.models import CoordinatorScopeType, UserRole
 
 
 class UserRead(BaseModel):
@@ -18,4 +18,8 @@ class UserRead(BaseModel):
     full_name: str
     role: UserRole
     is_active: bool
+    department_id: uuid.UUID | None
+    coordinator_scope_type: CoordinatorScopeType | None
+    coordinator_scope_id: uuid.UUID | None
+    onboarding_complete: bool
     created_at: datetime

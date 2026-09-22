@@ -38,3 +38,39 @@ class AdminUserUpdate(BaseModel):
 
 class RoleChangeRequest(BaseModel):
     role: UserRole
+
+
+class SchoolRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class SchoolCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
+class SchoolUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class DepartmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    school_id: uuid.UUID
+    name: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class DepartmentCreate(BaseModel):
+    school_id: uuid.UUID
+    name: str = Field(min_length=1, max_length=200)
+
+
+class DepartmentUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)

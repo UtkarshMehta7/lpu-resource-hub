@@ -105,12 +105,16 @@ def db_settings(migrated_test_database_url: str) -> Settings:
     return make_settings(database_url=migrated_test_database_url)
 
 
-TABLES_TO_CLEAN = "refresh_tokens, audit_logs, users"
+TABLES_TO_CLEAN = (
+    "refresh_tokens, audit_logs, tag_suggestions, tag_aliases, user_skills, "
+    "user_research_areas, student_profiles, researcher_profiles, research_areas, "
+    "skills, departments, schools, users"
+)
 
 
 @pytest.fixture
 def clean_db(migrated_test_database_url: str) -> Iterator[None]:
-    """Truncates the auth/admin tables before and after each test, for isolation."""
+    """Truncates every domain table before and after each test, for isolation."""
     engine = create_engine(migrated_test_database_url)
     try:
         with engine.begin() as connection:
