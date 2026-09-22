@@ -136,6 +136,27 @@ ENDPOINTS = (
     # Read-only org lists for directory filters: any signed-in user.
     Endpoint("GET", "/api/v1/schools", frozenset(ALL_ROLES)),
     Endpoint("GET", "/api/v1/departments", frozenset(ALL_ROLES)),
+    # Step 5: projects. project:create is a FACULTY grant (coordinator
+    # inherits it); admin deliberately doesn't author projects.
+    Endpoint("GET", "/api/v1/projects", frozenset(ALL_ROLES)),
+    Endpoint(
+        "POST",
+        "/api/v1/projects",
+        frozenset({UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR}),
+        body={"title": "Matrix", "summary": "Matrix", "description": "Matrix"},
+        allowed_status=201,
+    ),
+    Endpoint("GET", "/api/v1/coordinator/review-queue", COORDINATOR_AND_ADMIN),
+    # The generic target id isn't a project, so an authorized reviewer gets
+    # 404; everyone else must get 403 before any lookup.
+    Endpoint(
+        "POST",
+        "/api/v1/projects/{id}/review",
+        COORDINATOR_AND_ADMIN,
+        needs_target=True,
+        body={"decision": "approve"},
+        allowed_status=404,
+    ),
     # Students must not be able to browse other students.
     Endpoint(
         "GET",
