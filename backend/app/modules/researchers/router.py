@@ -17,6 +17,7 @@ from app.core.pagination import Page, PageParams
 from app.core.permissions import Permission, require_permission
 from app.core.rate_limit import client_ip, enforce_search_rate_limit
 from app.db.session import get_db
+from app.modules.opportunities.service import list_opportunities
 from app.modules.profiles.models import (
     ResearcherAvailability,
     ResearcherProfile,
@@ -180,10 +181,10 @@ def unified_search(
     viewer: Annotated[User, Depends(get_current_user)],
     params: Annotated[PageParams, Depends()],
     q: str,
-    types: str = "researchers,projects,publications",
+    types: str = "researchers,projects,publications,opportunities",
 ) -> SearchResults:
-    """Unified search over researchers, projects and publications; later steps
-    add opportunities behind the same `types` filter."""
+    """Unified search over researchers, projects, publications and
+    opportunities, selected with the `types` filter."""
     wanted = {t.strip() for t in types.split(",") if t.strip()}
     researchers = list_researchers(db, params, q=q).items if "researchers" in wanted else []
     # Projects go through the same visibility filter as /projects, so search
@@ -192,6 +193,13 @@ def unified_search(
     publications = (
         list_publications(db, viewer, params, q=q).items if "publications" in wanted else []
     )
+    opportunities = (
+        list_opportunities(db, viewer, params, q=q).items if "opportunities" in wanted else []
+    )
     return SearchResults(
-        query=q, researchers=researchers, projects=projects, publications=publications
+        query=q,
+        researchers=researchers,
+        projects=projects,
+        publications=publications,
+        opportunities=opportunities,
     )
