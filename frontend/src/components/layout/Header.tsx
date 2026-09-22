@@ -1,14 +1,56 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/authContext";
+import type { Role } from "@/features/auth/types";
+
+interface NavItem {
+  to: string;
+  label: string;
+  /** Omitted means "every signed-in role". */
+  roles?: Role[];
+}
+
+/** One list drives both the desktop bar and the mobile menu, so a role can
+ * never see a link on one and not the other. */
+const NAV: NavItem[] = [
+  { to: "/dashboard", label: "Dashboard" },
+  { to: "/recommendations", label: "For you" },
+  { to: "/researchers", label: "Researchers" },
+  { to: "/projects", label: "Projects" },
+  { to: "/publications", label: "Publications" },
+  { to: "/opportunities", label: "Opportunities" },
+  { to: "/students", label: "Students", roles: ["faculty", "research_coordinator", "admin"] },
+  {
+    to: "/collaborations",
+    label: "Requests",
+    roles: ["student", "faculty", "research_coordinator"],
+  },
+  { to: "/me/saved", label: "Saved" },
+  {
+    to: "/coordinator/verification-queue",
+    label: "Verification",
+    roles: ["research_coordinator", "admin"],
+  },
+  { to: "/coordinator/review-queue", label: "Reviews", roles: ["research_coordinator", "admin"] },
+  { to: "/admin/reports", label: "Reports", roles: ["research_coordinator", "admin"] },
+  { to: "/admin/users", label: "Admin", roles: ["admin"] },
+  { to: "/profile", label: "Profile" },
+];
+
+const LINK = "text-sm font-medium hover:underline aria-[current=page]:text-brand-700";
 
 export function Header() {
   const { isAuthenticated, isLoading, user, logout } = useAuth();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = () => {
+    setMenuOpen(false);
     void logout().then(() => navigate("/"));
   };
+
+  const items = NAV.filter((item) => !item.roles || (user && item.roles.includes(user.role)));
 
   return (
     <header className="border-b border-line bg-surface">
@@ -29,82 +71,33 @@ export function Header() {
         </Link>
 
         {isLoading ? null : isAuthenticated && user ? (
-          <div className="flex items-center gap-3">
-            <Link to="/recommendations" className="text-sm font-medium hover:underline">
-              For you
-            </Link>
-            <Link
-              to="/researchers"
-              className="hidden text-sm font-medium hover:underline sm:inline"
-            >
-              Researchers
-            </Link>
-            <Link to="/projects" className="hidden text-sm font-medium hover:underline sm:inline">
-              Projects
-            </Link>
-            <Link
-              to="/publications"
-              className="hidden text-sm font-medium hover:underline sm:inline"
-            >
-              Publications
-            </Link>
-            <Link
-              to="/opportunities"
-              className="hidden text-sm font-medium hover:underline sm:inline"
-            >
-              Opportunities
-            </Link>
-            {user.role !== "admin" ? (
-              <Link
-                to="/collaborations"
-                className="hidden text-sm font-medium hover:underline sm:inline"
+          <>
+            <nav aria-label="Main" className="hidden items-center gap-3 lg:flex">
+              {items.slice(0, 6).map((item) => (
+                <NavLink key={item.to} to={item.to} className={LINK}>
+                  {item.label}
+                </NavLink>
+              ))}
+              <button
+                type="button"
+                aria-expanded={menuOpen}
+                aria-controls="more-menu"
+                onClick={() => setMenuOpen((open) => !open)}
+                className="rounded-md border border-line px-3 py-1.5 text-sm font-medium"
               >
-                Requests
-              </Link>
-            ) : null}
-            {user.role !== "student" ? (
-              <Link to="/students" className="hidden text-sm font-medium hover:underline sm:inline">
-                Students
-              </Link>
-            ) : null}
-            {user.role === "research_coordinator" || user.role === "admin" ? (
-              <Link
-                to="/coordinator/verification-queue"
-                className="hidden text-sm font-medium hover:underline sm:inline"
-              >
-                Verification
-              </Link>
-            ) : null}
-            {user.role === "research_coordinator" || user.role === "admin" ? (
-              <Link
-                to="/coordinator/review-queue"
-                className="hidden text-sm font-medium hover:underline sm:inline"
-              >
-                Reviews
-              </Link>
-            ) : null}
-            {user.role === "admin" ? (
-              <Link
-                to="/admin/users"
-                className="hidden text-sm font-medium hover:underline sm:inline"
-              >
-                Admin
-              </Link>
-            ) : null}
-            <Link to="/profile" className="hidden text-sm font-medium hover:underline sm:inline">
-              Profile
-            </Link>
-            <Link to="/account" className="hidden text-sm font-medium hover:underline sm:inline">
-              {user.full_name}
-            </Link>
+                More
+              </button>
+            </nav>
             <button
               type="button"
-              onClick={handleLogout}
-              className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium hover:bg-canvas"
+              aria-expanded={menuOpen}
+              aria-controls="more-menu"
+              onClick={() => setMenuOpen((open) => !open)}
+              className="rounded-md border border-line px-3 py-1.5 text-sm font-medium lg:hidden"
             >
-              Log out
+              Menu
             </button>
-          </div>
+          </>
         ) : (
           <div className="flex items-center gap-3 text-sm font-medium">
             <Link to="/login" className="hover:underline">
@@ -119,6 +112,34 @@ export function Header() {
           </div>
         )}
       </div>
+
+      {isAuthenticated && user && menuOpen ? (
+        <nav
+          id="more-menu"
+          aria-label="All pages"
+          className="border-t border-line bg-surface px-4 py-3"
+        >
+          <ul className="mx-auto grid max-w-5xl gap-2 sm:grid-cols-3">
+            {items.map((item) => (
+              <li key={item.to}>
+                <NavLink to={item.to} onClick={() => setMenuOpen(false)} className={LINK}>
+                  {item.label}
+                </NavLink>
+              </li>
+            ))}
+            <li>
+              <Link to="/account" className={LINK} onClick={() => setMenuOpen(false)}>
+                {user.full_name}
+              </Link>
+            </li>
+            <li>
+              <button type="button" onClick={handleLogout} className={LINK}>
+                Log out
+              </button>
+            </li>
+          </ul>
+        </nav>
+      ) : null}
     </header>
   );
 }

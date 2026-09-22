@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 
-import { loginRequest, logoutRequest, refreshRequest, registerRequest } from "./api";
+import { refreshAccessToken } from "@/lib/api/client";
+
+import { loginRequest, logoutRequest, registerRequest } from "./api";
 import { AuthContext, type AuthContextValue } from "./authContext";
 import { clearAuthState, getAuthState, setAuthState, subscribeAuthState } from "./tokenStore";
 
@@ -11,18 +13,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    refreshRequest()
-      .then((result) => {
-        if (cancelled) return;
-        setAuthState({ accessToken: result.access_token, user: result.user });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        clearAuthState();
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
+    // Single-flight: StrictMode runs this effect twice in development, and
+    // a second concurrent refresh would look like a reused token to the
+    // backend and revoke the session.
+    void refreshAccessToken().finally(() => {
+      if (!cancelled) setIsLoading(false);
+    });
 
     return () => {
       cancelled = true;

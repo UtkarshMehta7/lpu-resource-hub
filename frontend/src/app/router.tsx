@@ -16,6 +16,9 @@ import { ProjectDetailPage } from "@/features/projects/ProjectDetailPage";
 import { ProjectFormPage } from "@/features/projects/ProjectFormPage";
 import { ProjectsPage } from "@/features/projects/ProjectsPage";
 import { ReviewQueuePage } from "@/features/projects/ReviewQueuePage";
+import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { ModerationQueuePage } from "@/features/reports/ModerationQueuePage";
+import { SavedPage } from "@/features/saved/SavedPage";
 import { RecommendationsPage } from "@/features/recommendations/RecommendationsPage";
 import { CollaborationsPage } from "@/features/collaborations/CollaborationsPage";
 import { ApplicantsPage } from "@/features/opportunities/ApplicantsPage";
@@ -58,6 +61,8 @@ export const router = createBrowserRouter([
           { path: "me/applications", element: <MyApplicationsPage /> },
           { path: "collaborations", element: <CollaborationsPage /> },
           { path: "recommendations", element: <RecommendationsPage /> },
+          { path: "dashboard", element: <DashboardPage /> },
+          { path: "me/saved", element: <SavedPage /> },
           { path: "publications/mine", element: <PublicationsPage mine /> },
           { path: "publications/:publicationId", element: <PublicationDetailPage /> },
           { path: "publications/:publicationId/edit", element: <PublicationFormPage /> },
@@ -67,6 +72,7 @@ export const router = createBrowserRouter([
             children: [
               { path: "coordinator/verification-queue", element: <VerificationQueuePage /> },
               { path: "coordinator/review-queue", element: <ReviewQueuePage /> },
+              { path: "admin/reports", element: <ModerationQueuePage /> },
             ],
           },
           {

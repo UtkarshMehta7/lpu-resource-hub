@@ -50,6 +50,24 @@ def test_cors_preflight_allows_configured_origin(client: TestClient) -> None:
     assert response.headers["access-control-allow-origin"] == TEST_ORIGIN
 
 
+def test_cors_preflight_allows_the_csrf_header(client: TestClient) -> None:
+    """Every browser request carries X-Requested-With (the CSRF guard), so a
+    preflight that asks for it must succeed -- otherwise the whole frontend
+    fails with a network error."""
+    response = client.options(
+        "/api/v1/auth/login",
+        headers={
+            "Origin": TEST_ORIGIN,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,x-requested-with",
+        },
+    )
+
+    assert response.status_code == 200
+    allowed = response.headers["access-control-allow-headers"].lower()
+    assert "x-requested-with" in allowed
+
+
 def test_cors_preflight_rejects_foreign_origin(client: TestClient) -> None:
     response = client.options(
         "/health",

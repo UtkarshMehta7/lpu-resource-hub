@@ -16,7 +16,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 9: explainable recommendations.** What exists today:
+**Step 10: MVP complete.** What exists today:
 
 | Area | Status |
 |---|---|
@@ -40,7 +40,9 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Opportunity board (draft → open → closed/filled) and application workflow with status timeline, applicant review, auto-add to project team | Done |
 | Direct collaboration requests (send/accept/decline/cancel) with inbox/sent, privacy rules and a per-user send limit | Done |
 | Explainable recommendations (skills + research areas + TF-IDF text) with per-suggestion reasons, cold start and an offline evaluation | Done |
-| Dashboards, facilities, funding and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Role dashboards (student, faculty, coordinator, admin), saved items, content reports with a moderation queue | Done |
+| Browser end-to-end tests (Playwright) covering the four MVP flows | Done |
+| Facilities, funding and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
 
@@ -335,6 +337,10 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `POST /api/v1/projects/{id}/review` | `project:review` | `{decision: approve\|reject, comment}` — comment required to reject. Own-department only; never your own project. Audited. |
 | `GET/POST /api/v1/projects/{id}/members`, `DELETE …/members/{user_id}` | owner for writes | Team members can see the project even while it's a draft. |
 | `GET /api/v1/coordinator/review-queue` | `project:review` | Pending projects in your department (admin: all). |
+| `GET /api/v1/me/dashboard` | any signed-in user | Role-specific sections: a student's applications, deadlines and matches; a faculty member's projects, openings and pending applications; a coordinator's queues and department activity; an admin's platform counts and recent audit entries. Coordinators get the faculty section too. Every count is scoped like the matching list endpoint. |
+| `GET/POST /api/v1/me/saved`, `DELETE /api/v1/me/saved/{id}` | any signed-in user | Bookmarks of a project, opportunity or researcher (exactly one per row). Saving something you can't see is `404`; a bookmark never widens visibility, so an item that later becomes private simply stops appearing. |
+| `POST /api/v1/reports` | any signed-in user | Report content you can see (`404` otherwise, so reports can't probe for hidden items). One open report per person per item. |
+| `GET /api/v1/admin/reports`, `POST /api/v1/admin/reports/{id}/resolve` | `report:moderate` (coordinator, admin) | Moderation queue; resolving is audited. |
 | `GET /api/v1/recommendations?type=&limit=` | any signed-in user | `type` is `opportunities` (default), `projects`, `researchers` or `collaborators`. Returns cards with a match score and the reasons behind it. Business filters (visibility, eligibility, deadlines, already applied, self) run in SQL before scoring. A sparse profile returns the newest items with `cold_start: true`. |
 | `POST /api/v1/collaborations` | `collaboration:send` (student, faculty, coordinator) | `{recipient_id, project_id?, message}`. Researchers are always reachable; students only if discoverable; admins never (`404`). One pending request per person per project (`409`). Limited to 10 sends per hour per user. |
 | `GET /api/v1/me/collaborations?box=inbox\|sent&status=` | any signed-in user | Your own requests, either direction. |
@@ -438,6 +444,21 @@ lpu-research-hub/
 └── README.md
 ```
 
+## End-to-end tests
+
+Playwright drives the four MVP flows (faculty → coordinator → student →
+admin) in a real browser against the development stack and the seeded demo
+accounts:
+
+```bash
+cd backend && python -m scripts.seed_demo_data      # once, if not already seeded
+cd frontend && E2E_PASSWORD='<seed password>' npx playwright test
+```
+
+The config starts the Vite dev server and the API for you (and reuses them
+if they're already running). The flows create their own timestamp-suffixed
+project and opportunity, so they can be run repeatedly.
+
 ## Development roadmap
 
 | Step | Scope |
@@ -447,12 +468,12 @@ lpu-research-hub/
 | 2 | RBAC core: permission map, policies, audit hook, authorization test scaffold |
 | 3 | Schools, departments, taxonomy, student and researcher profiles, faculty verification, demo seed data |
 | 4 | Researcher directory and full-text search |
-| **5** | **Research projects with coordinator review workflow and team members (this commit)** |
+| 5 | Research projects with coordinator review workflow and team members |
 | 6 | Publications |
 | 7 | Research opportunities and applications |
 | 8 | Collaboration requests |
 | 9 | Explainable tag + TF-IDF recommendations with an evaluation set |
-| 10 | Role-specific dashboards and UI polish: **MVP complete** |
+| **10** | **Role-specific dashboards, saved items, moderation and UI polish: MVP complete (this commit)** |
 | 11 | Facilities, equipment and booking calendar (double-booking prevented in the database) |
 | 12 | Funding opportunities, notifications, deadline reminders |
 | 13 | Embeddings, pgvector, hybrid semantic search |

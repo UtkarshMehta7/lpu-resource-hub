@@ -34,6 +34,7 @@ def test_coordinator_inherits_faculty_grants_on_top_of_its_own() -> None:
             Permission.TAXONOMY_MANAGE,
             Permission.PROFILE_VERIFY,
             Permission.PROJECT_REVIEW,
+            Permission.REPORT_MODERATE,
             Permission.STUDENT_DISCOVER,  # inherited from FACULTY
             Permission.PROJECT_CREATE,  # inherited from FACULTY
             Permission.PUBLICATION_CREATE,  # inherited from FACULTY
@@ -59,6 +60,7 @@ def test_admin_has_exactly_its_own_grants() -> None:
             Permission.PROFILE_VERIFY,
             Permission.STUDENT_DISCOVER,
             Permission.PROJECT_REVIEW,
+            Permission.REPORT_MODERATE,
         }
     )
 

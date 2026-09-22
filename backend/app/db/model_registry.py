@@ -13,6 +13,7 @@ from app.modules.collaborations.models import CollaborationRequest  # noqa: F401
 from app.modules.opportunities.models import Opportunity, OpportunitySkill  # noqa: F401
 from app.modules.profiles.models import (  # noqa: F401
     ResearcherProfile,
+    SavedItem,
     StudentProfile,
     UserResearchArea,
     UserSkill,
@@ -28,5 +29,6 @@ from app.modules.publications.models import (  # noqa: F401
     Publication,
     PublicationAuthor,
 )
+from app.modules.reports.models import ContentReport  # noqa: F401
 from app.modules.taxonomy.models import ResearchArea, Skill, TagAlias, TagSuggestion  # noqa: F401
 from app.modules.users.models import User  # noqa: F401

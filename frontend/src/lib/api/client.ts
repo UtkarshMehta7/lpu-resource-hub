@@ -47,10 +47,13 @@ function isAuthEndpoint(url: string | undefined): boolean {
 }
 
 // Deduplicates concurrent refresh attempts: several requests failing with a
-// 401 at once should trigger exactly one POST /auth/refresh.
+// 401 at once -- or React StrictMode invoking the bootstrap effect twice --
+// must trigger exactly one POST /auth/refresh. Refresh tokens rotate and the
+// backend treats a reused one as theft and revokes the whole family, so a
+// second concurrent call would sign the user out.
 let refreshPromise: Promise<string | null> | null = null;
 
-function refreshAccessToken(): Promise<string | null> {
+export function refreshAccessToken(): Promise<string | null> {
   refreshPromise ??= (async () => {
     try {
       const response = await apiClient.post<AccessTokenResponse>("/api/v1/auth/refresh");
