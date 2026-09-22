@@ -121,6 +121,24 @@ ENDPOINTS = (
         body={"decision": "verified"},
         allowed_status=404,
     ),
+    # Step 4: directory and search
+    Endpoint("GET", "/api/v1/researchers", frozenset(ALL_ROLES)),
+    Endpoint("GET", "/api/v1/search?q=test", frozenset(ALL_ROLES)),
+    # The generic target is a student, so there is no researcher profile to
+    # show: an authorized caller legitimately gets 404.
+    Endpoint(
+        "GET",
+        "/api/v1/researchers/{id}",
+        frozenset(ALL_ROLES),
+        needs_target=True,
+        allowed_status=404,
+    ),
+    # Students must not be able to browse other students.
+    Endpoint(
+        "GET",
+        "/api/v1/students",
+        frozenset({UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR, UserRole.ADMIN}),
+    ),
 )
 
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.orm import Session
 
 from app.modules.profiles.models import (
@@ -89,6 +89,8 @@ def upsert_researcher_profile(
     profile.bio = data.bio
     profile.availability = data.availability
     profile.links = links
+    db.flush()
+    rebuild_search_document(db, user.id)
     db.commit()
     db.refresh(profile)
     return profile
@@ -109,6 +111,7 @@ def set_skills(db: Session, user_id: uuid.UUID, entries: list[SkillEntry]) -> li
     db.add_all(rows)
     db.flush()
     _recompute_onboarding_complete(db, user_id)
+    rebuild_search_document(db, user_id)
     db.commit()
     return rows
 
@@ -136,8 +139,37 @@ def set_research_areas(
     db.add_all(rows)
     db.flush()
     _recompute_onboarding_complete(db, user_id)
+    rebuild_search_document(db, user_id)
     db.commit()
     return rows
+
+
+# Weighted document: name (A) beats designation/skills/areas (B), which beat
+# bio (C). Built in one statement so the inputs never round-trip to Python.
+_REBUILD_SEARCH_DOCUMENT = text("""
+    UPDATE researcher_profiles AS rp
+    SET search_document =
+           setweight(to_tsvector('english', coalesce(u.full_name, '')), 'A')
+        || setweight(to_tsvector('english',
+               coalesce(rp.designation, '') || ' '
+            || coalesce((SELECT string_agg(s.name, ' ')
+                           FROM user_skills us
+                           JOIN skills s ON s.id = us.skill_id
+                          WHERE us.user_id = rp.user_id), '') || ' '
+            || coalesce((SELECT string_agg(ra.name, ' ')
+                           FROM user_research_areas ura
+                           JOIN research_areas ra ON ra.id = ura.research_area_id
+                          WHERE ura.user_id = rp.user_id), '')
+           ), 'B')
+        || setweight(to_tsvector('english', coalesce(rp.bio, '')), 'C')
+    FROM users u
+    WHERE u.id = rp.user_id AND rp.user_id = :user_id
+""")
+
+
+def rebuild_search_document(db: Session, user_id: uuid.UUID) -> None:
+    """Refreshes a researcher's full-text document. No-op for non-researchers."""
+    db.execute(_REBUILD_SEARCH_DOCUMENT, {"user_id": user_id})
 
 
 def _recompute_onboarding_complete(db: Session, user_id: uuid.UUID) -> None:
