@@ -13,7 +13,7 @@ ruff check . && ruff format --check . && mypy && pytest
 # Frontend
 cd frontend
 npm run dev
-npm run typecheck && npm run lint && npm run format:check && npm run build
+npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build
 ```
 
 Auto-fix formatting: `ruff format .` and `ruff check --fix .` in the backend, `npm run format` in the frontend.
@@ -64,7 +64,8 @@ Rules:
 
 - Backend tests build `Settings` explicitly, so they don't depend on your `.env`.
 - Tests marked `db` need `TEST_DATABASE_URL`, pointing at the separate `lpu_research_hub_test` database. They are skipped, with the reason printed, when it isn't set. `pytest -m "not db"` runs everything else.
-- Frontend component tests (Vitest + React Testing Library) arrive with the first real components in Step 1.
+- The `migrated_test_database_url` fixture (session-scoped) runs `alembic upgrade head` against `TEST_DATABASE_URL` once per test run, so `db`-marked tests exercise the real migration pipeline. The `clean_db` fixture truncates `users`/`refresh_tokens` before and after each test that needs them, for isolation.
+- Frontend component tests (Vitest + React Testing Library) arrive with the auth feature in Step 1.
 
 ## Troubleshooting
 

@@ -16,16 +16,18 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 0: project foundation.** What exists today:
+**Step 1: users, authentication, JWT with rotating refresh tokens.** What exists today:
 
 | Area | Status |
 |---|---|
 | FastAPI backend skeleton with settings, logging, error envelope and CORS | Done |
 | PostgreSQL connection (SQLAlchemy 2.0 + psycopg 3) | Done |
-| Alembic migrations with an empty baseline revision | Done |
+| Alembic migrations (baseline, then `users` and `refresh_tokens`) | Done |
 | `GET /health` (liveness) and `GET /health/ready` (readiness) | Done |
 | React + TypeScript + Vite + Tailwind shell with a backend status card | Done |
-| Authentication, RBAC, profiles, projects and all other features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Registration, login, silent-refresh, logout with Argon2id + rotating refresh tokens | Done |
+| Frontend auth UI (register/login, protected `/account` page, silent session restore) | Done |
+| RBAC, profiles, projects and all other features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
 
@@ -123,6 +125,16 @@ Each app has a committed `.env.example` with safe placeholders. Copy it to `.env
 | `LOG_LEVEL` | no | `INFO` | `DEBUG` … `CRITICAL` |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | no | `5` / `5` | Connection pool size |
 | `DB_CONNECT_TIMEOUT` | no | `5` | Seconds before a connection attempt fails |
+| `JWT_SECRET_KEY` | yes | (generate one, see below) | Signs access-token JWTs. At least 32 characters. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | no | `15` | Access token lifetime |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | no | `7` | Refresh token (cookie) lifetime |
+| `REFRESH_COOKIE_SAMESITE` | no | `lax` | `lax`, `strict` or `none` (`none` needs HTTPS; for a cross-domain deploy) |
+
+Generate `JWT_SECRET_KEY` with:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+```
 
 The backend refuses to start with a clear message naming the variable when a required value is missing or invalid. With `APP_ENV=production` it also rejects wildcard or `localhost` CORS origins, disables `/docs`, and exits if the database is unreachable at startup.
 
@@ -220,6 +232,51 @@ curl -i http://localhost:8000/health     # still 200: liveness never touches the
 | `GET /health` | Liveness: the process is up | No |
 | `GET /health/ready` | Readiness: API → PostgreSQL chain works | Yes (`SELECT 1`) |
 
+## Authentication API
+
+All business APIs live under `/api/v1`. Self-registration is limited to
+`student` and `faculty` (`admin` and `research_coordinator` accounts are
+created later, by an administrator — see the roadmap). The refresh token is
+never returned in a JSON body: it travels only as an `httpOnly` cookie scoped
+to `/api/v1/auth`, rotated on every use, with reuse detection that revokes
+the whole token family (see [ADR 0002](docs/adr/0002-authentication.md)).
+
+| Endpoint | Auth | Notes |
+|---|---|---|
+| `POST /api/v1/auth/register` | none | `{email, password, full_name, role}`, `role` is `student` or `faculty`. Password: 10+ characters, not a common password. Sets the refresh cookie. |
+| `POST /api/v1/auth/login` | none | `{email, password}`. Sets the refresh cookie. |
+| `POST /api/v1/auth/refresh` | refresh cookie + `X-Requested-With` header | Rotates the refresh token, returns a new access token. |
+| `POST /api/v1/auth/logout` | refresh cookie + `X-Requested-With` header | Revokes the session and clears the cookie. |
+| `POST /api/v1/auth/change-password` | `Authorization: Bearer` | `{current_password, new_password}`. Revokes every existing session. |
+| `GET /api/v1/me` | `Authorization: Bearer <access_token>` | Current user's profile. |
+
+`/auth/register` and `/auth/login` are rate-limited (5 requests/minute per
+IP+email, in-memory). `/auth/refresh` and `/auth/logout` require a
+`X-Requested-With` header (any non-empty value) as CSRF defence, since a
+cross-site HTML form cannot set custom headers.
+
+```bash
+curl -s -c cookies.txt -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com","password":"correcthorsebattery","full_name":"Jane Doe","role":"student"}'
+
+curl -s -b cookies.txt -c cookies.txt -X POST http://localhost:8000/api/v1/auth/refresh \
+  -H "X-Requested-With: XMLHttpRequest"
+```
+
+### Creating the first admin account
+
+`admin` and `research_coordinator` accounts can't self-register. Create the
+first admin from the command line:
+
+```bash
+cd backend && source .venv/bin/activate
+python -m scripts.create_admin
+```
+
+It prompts for email, full name and password (never pass the password as a
+CLI argument or environment variable that could end up in shell history).
+
 ## Quality checks and tests
 
 ```bash
@@ -234,6 +291,7 @@ pytest -m "not db"        # skip tests that need PostgreSQL
 npm run typecheck
 npm run lint
 npm run format:check
+npm run test
 npm run build
 ```
 
@@ -244,11 +302,13 @@ lpu-research-hub/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py              # create_app() factory, lifespan, middleware
-│   │   ├── core/                # config, logging, error envelope
-│   │   ├── db/                  # declarative base, engine/session
+│   │   ├── core/                # config, logging, error envelope, security, deps, rate_limit
+│   │   ├── db/                  # declarative base, engine/session, model_registry
 │   │   └── modules/
-│   │       └── health/          # /health and /health/ready
-│   ├── alembic/                 # migration environment + versions/0001_baseline.py
+│   │       ├── health/          # /health and /health/ready
+│   │       ├── auth/            # register, login, refresh, logout
+│   │       └── users/           # /me
+│   ├── alembic/                 # migration environment + versions/ (0001 baseline, 0002 users/refresh_tokens)
 │   ├── tests/                   # pytest suite (db tests marked `db`)
 │   ├── alembic.ini
 │   ├── pyproject.toml
@@ -257,7 +317,7 @@ lpu-research-hub/
 │   ├── src/
 │   │   ├── app/                 # App, router, layouts
 │   │   ├── components/          # layout/ (header, banner), ui/ (primitives)
-│   │   ├── features/            # home/, system-status/ (one folder per feature)
+│   │   ├── features/            # home/, system-status/, auth/ (one folder per feature)
 │   │   └── lib/                 # config, api client + error normalisation
 │   ├── index.html
 │   ├── package.json
@@ -266,7 +326,7 @@ lpu-research-hub/
 ├── docs/
 │   ├── architecture.md          # approved architecture (source of truth)
 │   ├── development.md           # day-to-day workflow and conventions
-│   └── adr/0001-foundation-decisions.md
+│   └── adr/0001-foundation-decisions.md, 0002-authentication.md
 ├── .editorconfig
 ├── .gitignore
 ├── LICENSE
@@ -277,8 +337,8 @@ lpu-research-hub/
 
 | Step | Scope |
 |---|---|
-| **0** | **Project foundation (this commit)** |
-| 1 | Users, authentication, JWT with rotating refresh tokens |
+| 0 | Project foundation |
+| **1** | **Users, authentication, JWT with rotating refresh tokens (this commit)** |
 | 2 | RBAC core: permission map, policies, audit hook, authorization test scaffold |
 | 3 | Schools, departments, taxonomy, student and researcher profiles, faculty verification, demo seed data |
 | 4 | Researcher directory and full-text search |

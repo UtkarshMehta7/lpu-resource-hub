@@ -10,7 +10,15 @@ from pydantic import ValidationError
 from app.core.config import Environment, Settings
 
 DB_URL = "postgresql+psycopg://user:secret@localhost:5432/example"
-ENV_VARS = ("APP_ENV", "DATABASE_URL", "TEST_DATABASE_URL", "CORS_ORIGINS", "LOG_LEVEL")
+JWT_SECRET = "unit-test-jwt-signing-key-at-least-32-characters-long"
+ENV_VARS = (
+    "APP_ENV",
+    "DATABASE_URL",
+    "TEST_DATABASE_URL",
+    "CORS_ORIGINS",
+    "LOG_LEVEL",
+    "JWT_SECRET_KEY",
+)
 
 
 @pytest.fixture(autouse=True)
@@ -24,6 +32,7 @@ def build(**values: Any) -> Settings:
         "app_env": "development",
         "database_url": DB_URL,
         "cors_origins": "http://localhost:5173",
+        "jwt_secret_key": JWT_SECRET,
     }
     base.update(values)
     return Settings(_env_file=None, **base)
@@ -34,6 +43,7 @@ def test_loads_from_environment_variables(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setenv("DATABASE_URL", DB_URL)
     monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173, http://127.0.0.1:5173/")
     monkeypatch.setenv("LOG_LEVEL", "debug")
+    monkeypatch.setenv("JWT_SECRET_KEY", JWT_SECRET)
 
     settings = Settings(_env_file=None)
 
@@ -43,12 +53,13 @@ def test_loads_from_environment_variables(monkeypatch: pytest.MonkeyPatch) -> No
     assert settings.docs_enabled is True
 
 
-@pytest.mark.parametrize("missing", ["app_env", "database_url", "cors_origins"])
+@pytest.mark.parametrize("missing", ["app_env", "database_url", "cors_origins", "jwt_secret_key"])
 def test_required_values_fail_clearly_when_missing(missing: str) -> None:
     values: dict[str, Any] = {
         "app_env": "development",
         "database_url": DB_URL,
         "cors_origins": "http://localhost:5173",
+        "jwt_secret_key": JWT_SECRET,
     }
     del values[missing]
 
@@ -61,6 +72,11 @@ def test_required_values_fail_clearly_when_missing(missing: str) -> None:
 def test_rejects_non_psycopg_driver() -> None:
     with pytest.raises(ValidationError, match="postgresql\\+psycopg"):
         build(database_url="postgresql://user:secret@localhost:5432/example")
+
+
+def test_rejects_short_jwt_secret_key() -> None:
+    with pytest.raises(ValidationError):
+        build(jwt_secret_key="too-short")
 
 
 def test_rejects_malformed_cors_origin() -> None:

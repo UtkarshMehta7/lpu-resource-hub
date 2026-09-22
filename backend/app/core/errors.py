@@ -8,6 +8,7 @@ Every error response has the shape::
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from http import HTTPStatus
 from typing import Any
 
@@ -37,7 +38,7 @@ def error_response(
     code: str,
     message: str,
     details: Any | None = None,
-    headers: dict[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     body = ErrorResponse(error=ErrorBody(code=code, message=message, details=details))
     return JSONResponse(
@@ -96,7 +97,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
-    app.add_exception_handler(RequestValidationError, validation_exception_handler)
-    app.add_exception_handler(OperationalError, database_unavailable_handler)
+    # add_exception_handler is typed as Callable[[Request, Exception], ...];
+    # narrower per-exception handlers are sound at runtime but not accepted
+    # by the stub's contravariant signature.
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(OperationalError, database_unavailable_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, unhandled_exception_handler)
