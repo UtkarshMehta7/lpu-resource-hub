@@ -9,7 +9,9 @@ from app.modules.admin.models import Department, School  # noqa: F401
 from app.modules.applications.models import Application, ApplicationEvent  # noqa: F401
 from app.modules.audit.models import AuditLog  # noqa: F401
 from app.modules.auth.models import RefreshToken  # noqa: F401
+from app.modules.bookings.models import Booking  # noqa: F401
 from app.modules.collaborations.models import CollaborationRequest  # noqa: F401
+from app.modules.facilities.models import Equipment, Facility  # noqa: F401
 from app.modules.opportunities.models import Opportunity, OpportunitySkill  # noqa: F401
 from app.modules.profiles.models import (  # noqa: F401
     ResearcherProfile,
