@@ -30,6 +30,14 @@ export function Header() {
 
         {isLoading ? null : isAuthenticated && user ? (
           <div className="flex items-center gap-3">
+            {user.role === "research_coordinator" || user.role === "admin" ? (
+              <Link
+                to="/coordinator/verification-queue"
+                className="hidden text-sm font-medium hover:underline sm:inline"
+              >
+                Verification
+              </Link>
+            ) : null}
             {user.role === "admin" ? (
               <Link
                 to="/admin/users"
@@ -38,6 +46,9 @@ export function Header() {
                 Admin
               </Link>
             ) : null}
+            <Link to="/profile" className="hidden text-sm font-medium hover:underline sm:inline">
+              Profile
+            </Link>
             <Link to="/account" className="hidden text-sm font-medium hover:underline sm:inline">
               {user.full_name}
             </Link>

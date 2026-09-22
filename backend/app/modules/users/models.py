@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Boolean, DateTime, Enum, String, func, text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -61,6 +61,17 @@ class User(Base):
     )
     coordinator_scope_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True
+    )
+    # Nullable for every role, not just admin: nothing here forces a
+    # student/faculty to have one at registration time.
+    department_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True
+    )
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    # Recomputed (not just read) whenever user_skills/user_research_areas
+    # change; true once both have >= 3 rows. See app/modules/profiles/service.py.
+    onboarding_complete: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

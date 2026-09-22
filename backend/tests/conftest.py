@@ -26,7 +26,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import Environment, Settings
 from app.core.security import create_access_token, hash_password
 from app.main import create_app
-from app.modules.users.models import User, UserRole
+from app.modules.users.models import CoordinatorScopeType, User, UserRole
 
 # Syntactically valid but never contacted: non-db tests do not run the app
 # lifespan, so no connection is attempted.
@@ -105,12 +105,16 @@ def db_settings(migrated_test_database_url: str) -> Settings:
     return make_settings(database_url=migrated_test_database_url)
 
 
-TABLES_TO_CLEAN = "refresh_tokens, audit_logs, users"
+TABLES_TO_CLEAN = (
+    "refresh_tokens, audit_logs, tag_suggestions, tag_aliases, user_skills, "
+    "user_research_areas, student_profiles, researcher_profiles, research_areas, "
+    "skills, departments, schools, users"
+)
 
 
 @pytest.fixture
 def clean_db(migrated_test_database_url: str) -> Iterator[None]:
-    """Truncates the auth/admin tables before and after each test, for isolation."""
+    """Truncates every domain table before and after each test, for isolation."""
     engine = create_engine(migrated_test_database_url)
     try:
         with engine.begin() as connection:
@@ -141,13 +145,26 @@ def seed_user(db_settings: Settings) -> Callable[..., SeededUser]:
     engine = create_engine(str(db_settings.database_url))
     session_factory = sessionmaker(bind=engine)
 
-    def _seed(role: UserRole, *, is_active: bool = True, email: str | None = None) -> SeededUser:
+    def _seed(
+        role: UserRole,
+        *,
+        is_active: bool = True,
+        email: str | None = None,
+        department_id: uuid.UUID | str | None = None,
+        coordinator_scope_type: CoordinatorScopeType | None = None,
+        coordinator_scope_id: uuid.UUID | str | None = None,
+    ) -> SeededUser:
         user = User(
             email=email or f"{role.value}-{uuid.uuid4().hex[:8]}@example.com",
             password_hash=hash_password("not-used-directly-seeded12"),
             full_name=f"Seeded {role.value}",
             role=role,
             is_active=is_active,
+            department_id=uuid.UUID(str(department_id)) if department_id is not None else None,
+            coordinator_scope_type=coordinator_scope_type,
+            coordinator_scope_id=(
+                uuid.UUID(str(coordinator_scope_id)) if coordinator_scope_id is not None else None
+            ),
         )
         with session_factory() as session:
             session.add(user)

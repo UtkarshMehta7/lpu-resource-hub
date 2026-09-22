@@ -29,19 +29,33 @@ action in general — the resource policy layer (loaded-resource ownership +
 scope match, `docs/architecture.md` §6 layer 2) is what enforces *this
 specific* department/project/etc., introduced per-module starting Step 3.
 
-## Implemented (Step 2)
+## Implemented (Steps 2–3)
 
-| Permission | STUDENT | FACULTY | COORDINATOR | ADMIN |
-|---|:-:|:-:|:-:|:-:|
-| `user:list` | | | | ✅ |
-| `user:update` | | | | ✅ |
-| `user:update_role` | | | | ✅ |
-| `user:activate` | | | | ✅ |
-| `user:deactivate` | | | | ✅ |
-| `audit:read` | | | | ✅ |
+| Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
+|---|:-:|:-:|:-:|:-:|:-:|
+| `user:list` | | | | ✅ | 2 |
+| `user:update` | | | | ✅ | 2 |
+| `user:update_role` | | | | ✅ | 2 |
+| `user:activate` | | | | ✅ | 2 |
+| `user:deactivate` | | | | ✅ | 2 |
+| `audit:read` | | | | ✅ | 2 |
+| `school:manage` | | | | ✅ | 3 |
+| `department:manage` | | | | ✅ | 3 |
+| `taxonomy:manage` | | | ✅ | ✅ | 3 |
+| `profile:verify` | | | ✅ (own dept) | ✅ (any) | 3 |
 
 Every authenticated, active user (any role) can read their own profile via
-`GET /api/v1/me` — that isn't a permission check, just authentication.
+`GET /api/v1/me`, read their own `GET/PUT /me/profile`, set their own
+`/me/skills` and `/me/research-areas`, search the taxonomy
+(`GET /skills`, `GET /research-areas`) and suggest a tag
+(`POST /tags/suggestions`) — those aren't permission checks, just
+authentication.
+
+`profile:verify` is the first permission where the permission check alone
+isn't the whole story: a coordinator passes it for *any* researcher, and the
+resource policy (`app/modules/researchers/policies.py`) then restricts them
+to their own department — returning `404`, not `403`, so they can't probe
+for profiles outside their scope.
 
 ## Planned (later steps)
 
@@ -51,8 +65,6 @@ picking it up automatically via inheritance wherever `FACULTY` has it.
 
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
-| `profile:verify` | | | ✅ (own dept) | ✅ | 3 |
-| `taxonomy:manage` | | | ✅ | ✅ | 3 |
 | `project:create` | | ✅ (verified) | ✅ | | 5 |
 | `project:review` | | | ✅ (own dept, never own project) | ✅ | 5 |
 | `project:archive` | | ✅ (own) | | ✅ | 5 |
