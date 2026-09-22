@@ -23,15 +23,26 @@ pytestmark = pytest.mark.db
 ALL_ROLES = (UserRole.STUDENT, UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR, UserRole.ADMIN)
 
 
+COORDINATOR_AND_ADMIN = frozenset({UserRole.RESEARCH_COORDINATOR, UserRole.ADMIN})
+
+
 @dataclass(frozen=True, slots=True)
 class Endpoint:
     method: str
     path_template: str  # "{id}" is replaced with a freshly seeded student's id
     allowed_roles: frozenset[UserRole]
     needs_target: bool = False
-    body: dict[str, object] | None = None
+    body: dict[str, object] | list[object] | None = None
+    # What an *authorized* caller gets. Not always 200: a create returns 201,
+    # and some endpoints legitimately 404 for the generic fixture data (see
+    # the comments below). The point of those rows is still authorization --
+    # unauthorized roles must get 403 *before* the resource is ever looked up.
+    allowed_status: int = 200
 
 
+# PUT /api/v1/me/profile is deliberately absent: its request body shape
+# depends on the caller's role, so one row can't express it. Its auth
+# surface ("any authenticated user") is covered by GET /api/v1/me/profile.
 ENDPOINTS = (
     Endpoint("GET", "/api/v1/me", frozenset(ALL_ROLES)),
     Endpoint("GET", "/api/v1/admin/users", frozenset({UserRole.ADMIN})),
@@ -59,6 +70,57 @@ ENDPOINTS = (
         frozenset({UserRole.ADMIN}),
         needs_target=True,
     ),
+    # Step 3: organisation
+    Endpoint("GET", "/api/v1/admin/schools", frozenset({UserRole.ADMIN})),
+    Endpoint(
+        "POST",
+        "/api/v1/admin/schools",
+        frozenset({UserRole.ADMIN}),
+        body={"name": "Matrix School"},
+        allowed_status=201,
+    ),
+    Endpoint("GET", "/api/v1/admin/departments", frozenset({UserRole.ADMIN})),
+    # Step 3: taxonomy
+    Endpoint("GET", "/api/v1/skills", frozenset(ALL_ROLES)),
+    Endpoint("GET", "/api/v1/research-areas", frozenset(ALL_ROLES)),
+    Endpoint(
+        "POST",
+        "/api/v1/taxonomy/skills",
+        COORDINATOR_AND_ADMIN,
+        body={"name": "Matrix Skill"},
+        allowed_status=201,
+    ),
+    Endpoint(
+        "POST",
+        "/api/v1/taxonomy/research-areas",
+        COORDINATOR_AND_ADMIN,
+        body={"name": "Matrix Area"},
+        allowed_status=201,
+    ),
+    Endpoint(
+        "POST",
+        "/api/v1/tags/suggestions",
+        frozenset(ALL_ROLES),
+        body={"suggested_name": "Matrix Tag", "suggested_type": "skill"},
+        allowed_status=201,
+    ),
+    Endpoint("GET", "/api/v1/admin/tag-suggestions", COORDINATOR_AND_ADMIN),
+    # Step 3: profiles. No profile row exists for the seeded caller, so an
+    # authorized caller gets 404 here.
+    Endpoint("GET", "/api/v1/me/profile", frozenset(ALL_ROLES), allowed_status=404),
+    Endpoint("PUT", "/api/v1/me/skills", frozenset(ALL_ROLES), body=[]),
+    Endpoint("PUT", "/api/v1/me/research-areas", frozenset(ALL_ROLES), body=[]),
+    # Step 3: verification. The generic target is a student with no
+    # researcher profile, so an authorized reviewer gets 404.
+    Endpoint("GET", "/api/v1/coordinator/verification-queue", COORDINATOR_AND_ADMIN),
+    Endpoint(
+        "POST",
+        "/api/v1/researchers/{id}/verify",
+        COORDINATOR_AND_ADMIN,
+        needs_target=True,
+        body={"decision": "verified"},
+        allowed_status=404,
+    ),
 )
 
 
@@ -74,7 +136,7 @@ def _build_cases() -> list[AuthzCase]:
     for endpoint in ENDPOINTS:
         cases.append(AuthzCase(endpoint, None, 401))
         for role in ALL_ROLES:
-            expected = 200 if role in endpoint.allowed_roles else 403
+            expected = endpoint.allowed_status if role in endpoint.allowed_roles else 403
             cases.append(AuthzCase(endpoint, role, expected))
     return cases
 
