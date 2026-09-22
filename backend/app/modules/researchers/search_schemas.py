@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from app.modules.profiles.models import ResearcherAvailability, VerificationStatus
 from app.modules.profiles.schemas import LinkItem
 from app.modules.projects.schemas import ProjectCard
+from app.modules.publications.schemas import PublicationRead
 
 
 class ResearcherCard(BaseModel):
@@ -49,8 +50,9 @@ class StudentCard(BaseModel):
 
 
 class SearchResults(BaseModel):
-    """Unified search. Later steps add projects, publications and so on."""
+    """Unified search. Later steps add opportunities and so on."""
 
     query: str
     researchers: list[ResearcherCard]
     projects: list[ProjectCard]
+    publications: list[PublicationRead]
