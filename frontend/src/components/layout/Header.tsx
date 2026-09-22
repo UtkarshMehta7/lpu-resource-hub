@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/authContext";
+
+import { Brand } from "./Brand";
 import type { Role } from "@/features/auth/types";
 
 interface NavItem {
@@ -26,6 +28,8 @@ const NAV: NavItem[] = [
     label: "Requests",
     roles: ["student", "faculty", "research_coordinator"],
   },
+  { to: "/facilities", label: "Facilities" },
+  { to: "/me/bookings", label: "My bookings" },
   { to: "/me/saved", label: "Saved" },
   {
     to: "/coordinator/verification-queue",
@@ -33,6 +37,11 @@ const NAV: NavItem[] = [
     roles: ["research_coordinator", "admin"],
   },
   { to: "/coordinator/review-queue", label: "Reviews", roles: ["research_coordinator", "admin"] },
+  {
+    to: "/coordinator/booking-queue",
+    label: "Bookings",
+    roles: ["research_coordinator", "admin"],
+  },
   { to: "/admin/reports", label: "Reports", roles: ["research_coordinator", "admin"] },
   { to: "/admin/users", label: "Admin", roles: ["admin"] },
   { to: "/profile", label: "Profile" },
@@ -55,20 +64,7 @@ export function Header() {
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4">
-        <Link to="/" className="flex items-center gap-3 rounded-md">
-          <span
-            aria-hidden="true"
-            className="grid size-9 place-items-center rounded-lg bg-brand-700 text-sm font-bold text-white"
-          >
-            RH
-          </span>
-          <span className="leading-tight">
-            <span className="block text-sm font-semibold sm:text-base">
-              LPU Research Intelligence &amp; Collaboration Hub
-            </span>
-            <span className="block text-xs text-ink-muted">Prototype</span>
-          </span>
-        </Link>
+        <Brand />
 
         {isLoading ? null : isAuthenticated && user ? (
           <>

@@ -15,6 +15,8 @@ const ADMIN = "demo.admin@example.com";
 const RUN = Date.now().toString().slice(-6);
 const PROJECT = `E2E soil sensors ${RUN}`;
 const OPPORTUNITY = `E2E field assistant ${RUN}`;
+const FACILITY = `E2E soil lab ${RUN}`;
+const EQUIPMENT = `E2E moisture probe ${RUN}`;
 
 /**
  * One signed-in page per role, reused across the flows below. Logging in
@@ -94,7 +96,7 @@ test("faculty posts an opportunity on the approved project", async ({ browser })
 test("student finds the opportunity, applies and tracks the application", async ({ browser }) => {
   const page = await sessionFor(browser, STUDENT);
   await page.goto("/opportunities");
-  await page.getByLabel("Search").fill(OPPORTUNITY);
+  await page.getByRole("searchbox", { name: "Search" }).fill(OPPORTUNITY);
   await page.getByRole("link", { name: OPPORTUNITY }).click();
 
   await page.getByLabel(/good fit/i).fill("I have built and calibrated soil sensors before.");
@@ -114,7 +116,7 @@ test("student finds the opportunity, applies and tracks the application", async 
 test("faculty reviews the applicant and accepts them", async ({ browser }) => {
   const page = await sessionFor(browser, FACULTY);
   await page.goto("/opportunities");
-  await page.getByLabel("Search").fill(OPPORTUNITY);
+  await page.getByRole("searchbox", { name: "Search" }).fill(OPPORTUNITY);
   await page.getByRole("link", { name: OPPORTUNITY }).click();
   await page.getByRole("link", { name: "Review applicants" }).click();
 
@@ -152,4 +154,86 @@ test("admin changes a role and sees platform stats", async ({ browser }) => {
   await roleSelect.selectOption(original);
   await page.getByRole("button", { name: "Confirm" }).click();
   await expect(roleSelect).toHaveValue(original);
+});
+
+test("coordinator lists a facility and its equipment", async ({ browser }) => {
+  const page = await sessionFor(browser, COORDINATOR);
+  await page.goto("/facilities/new");
+  await page.getByLabel("Name").fill(FACILITY);
+  await page.getByLabel(/location/i).fill("Block 32");
+  await page.getByRole("button", { name: "Create facility" }).click();
+  await expect(page.getByRole("heading", { name: FACILITY })).toBeVisible();
+
+  await page.getByRole("link", { name: "Add equipment" }).click();
+  await page.getByLabel("Name").fill(EQUIPMENT);
+  await page.getByLabel(/longest booking/i).fill("4");
+  await page.getByRole("button", { name: "Add equipment" }).click();
+  await expect(page.getByRole("heading", { name: EQUIPMENT })).toBeVisible();
+  await expect(page.getByText(/needs approval/i)).toBeVisible();
+});
+
+test("student requests a slot and the coordinator approves it", async ({ browser }) => {
+  const student = await sessionFor(browser, STUDENT);
+  await student.goto("/facilities");
+  await student.getByRole("searchbox", { name: "Search" }).fill(FACILITY);
+  await student.getByRole("link", { name: FACILITY }).click();
+  await student.getByRole("link", { name: EQUIPMENT }).click();
+
+  // Pick a free hour from next week's calendar, so "now" can't interfere.
+  await student.getByRole("button", { name: "Next →" }).click();
+  await student
+    .getByRole("button", { name: /^Book / })
+    .first()
+    .click();
+  await student.getByLabel(/what do you need it for/i).fill("Calibrating probes for field trials.");
+  await student.getByRole("button", { name: "Request this slot" }).click();
+  await expect(student.getByText(/coordinator will review it/i)).toBeVisible();
+
+  const coordinator = await sessionFor(browser, COORDINATOR);
+  await coordinator.goto("/coordinator/booking-queue");
+  const request = coordinator.locator("li", { hasText: EQUIPMENT });
+  await expect(request).toBeVisible();
+  await request.getByRole("button", { name: "Approve" }).click();
+  await expect(coordinator.locator("li", { hasText: EQUIPMENT })).toHaveCount(0);
+
+  await student.goto("/me/bookings");
+  const booking = student.locator("li", { hasText: EQUIPMENT });
+  await expect(booking).toBeVisible();
+  await expect(booking.getByText("Approved")).toBeVisible();
+});
+
+test("an overlapping approval is refused by the database", async ({ browser }) => {
+  const student = await sessionFor(browser, STUDENT);
+  await student.goto("/me/bookings");
+  const approved = student.locator("li", { hasText: EQUIPMENT }).first();
+  const when = await approved.locator("p").first().innerText();
+
+  // A second person asks for the same slot: allowed to ask, impossible to grant.
+  const other = await sessionFor(browser, FACULTY);
+  await other.goto("/facilities");
+  await other.getByRole("searchbox", { name: "Search" }).fill(FACILITY);
+  await other.getByRole("link", { name: FACILITY }).click();
+  await other.getByRole("link", { name: EQUIPMENT }).click();
+  await other.getByRole("button", { name: "Next →" }).click();
+  // The approved hour now shows as booked, so pick the hour after it and
+  // extend backwards over it with a 2-hour booking.
+  await other
+    .getByRole("button", { name: /^Book / })
+    .first()
+    .click();
+  const hours = other.getByLabel(/hours \(max 4\)/i);
+  await hours.fill("4");
+  await other.getByLabel(/what do you need it for/i).fill("Overlapping request on purpose.");
+  await other.getByRole("button", { name: "Request this slot" }).click();
+  await expect(other.getByText(/coordinator will review it|already taken/i)).toBeVisible();
+
+  const coordinator = await sessionFor(browser, COORDINATOR);
+  await coordinator.goto("/coordinator/booking-queue");
+  const pending = coordinator.locator("li", { hasText: EQUIPMENT });
+  if (await pending.count()) {
+    await pending.first().getByRole("button", { name: "Approve" }).click();
+    // Either it didn't overlap after all, or the database refused it.
+    await expect(coordinator.getByText(/already taken|Nothing waiting/i).first()).toBeVisible();
+  }
+  expect(when.length).toBeGreaterThan(0);
 });

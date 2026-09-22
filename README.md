@@ -16,7 +16,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 10: MVP complete.** What exists today:
+**Step 11: facilities, equipment and booking.** What exists today:
 
 | Area | Status |
 |---|---|
@@ -42,7 +42,9 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Explainable recommendations (skills + research areas + TF-IDF text) with per-suggestion reasons, cold start and an offline evaluation | Done |
 | Role dashboards (student, faculty, coordinator, admin), saved items, content reports with a moderation queue | Done |
 | Browser end-to-end tests (Playwright) covering the four MVP flows | Done |
-| Facilities, funding and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Facility and equipment catalogue with a week calendar, booking requests, approvals, and double-booking prevented by the database | Done |
+| Lovely Professional University branding across the frontend (full name, LPU shortform in tight spaces) | Done |
+| Funding, notifications and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
 
@@ -337,6 +339,14 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `POST /api/v1/projects/{id}/review` | `project:review` | `{decision: approve\|reject, comment}` — comment required to reject. Own-department only; never your own project. Audited. |
 | `GET/POST /api/v1/projects/{id}/members`, `DELETE …/members/{user_id}` | owner for writes | Team members can see the project even while it's a draft. |
 | `GET /api/v1/coordinator/review-queue` | `project:review` | Pending projects in your department (admin: all). |
+| `GET/POST /api/v1/facilities`, `GET/PATCH/DELETE /api/v1/facilities/{id}` | any signed-in user reads / `facility:manage` writes | Filters `q`, `department_id`. A coordinator manages only facilities in the department they oversee (`403` outside it); admins manage any. |
+| `GET/POST /api/v1/equipment`, `GET/PATCH/DELETE /api/v1/equipment/{id}` | same | Each item carries its own booking rules: `students_allowed`, `requires_approval`, `max_hours`, `min_lead_hours`, `maintenance_status`. |
+| `GET /api/v1/equipment/{id}/availability?from&to` | any signed-in user | Approved bookings in the window plus the equipment's rules. Only the periods are returned — who holds a slot isn't public. |
+| `POST /api/v1/bookings` | any signed-in user | Rules enforced server-side (`403` students where not allowed, `409` under maintenance, `422` too long / too soon / in the past). Equipment with `requires_approval=false` is booked outright, still subject to the overlap constraint. |
+| `GET /api/v1/me/bookings`, `GET /api/v1/bookings/{id}` | owner / scoped coordinator / admin | Others get `404`. |
+| `POST /api/v1/bookings/{id}/approve` / `/reject` | `booking:approve` (own department) | **Approving a slot that overlaps an approved booking is `409`** — decided by a PostgreSQL `EXCLUDE` constraint, not application logic. Audited. |
+| `POST /api/v1/bookings/{id}/cancel` / `/complete` | owner (cancel: before it starts) | Cancelling after the start is `409`; completing before the end is `409`. |
+| `GET /api/v1/coordinator/booking-queue` | `booking:approve` | Pending requests for equipment in your department (admin: all). |
 | `GET /api/v1/me/dashboard` | any signed-in user | Role-specific sections: a student's applications, deadlines and matches; a faculty member's projects, openings and pending applications; a coordinator's queues and department activity; an admin's platform counts and recent audit entries. Coordinators get the faculty section too. Every count is scoped like the matching list endpoint. |
 | `GET/POST /api/v1/me/saved`, `DELETE /api/v1/me/saved/{id}` | any signed-in user | Bookmarks of a project, opportunity or researcher (exactly one per row). Saving something you can't see is `404`; a bookmark never widens visibility, so an item that later becomes private simply stops appearing. |
 | `POST /api/v1/reports` | any signed-in user | Report content you can see (`404` otherwise, so reports can't probe for hidden items). One open report per person per item. |
@@ -473,8 +483,8 @@ project and opportunity, so they can be run repeatedly.
 | 7 | Research opportunities and applications |
 | 8 | Collaboration requests |
 | 9 | Explainable tag + TF-IDF recommendations with an evaluation set |
-| **10** | **Role-specific dashboards, saved items, moderation and UI polish: MVP complete (this commit)** |
-| 11 | Facilities, equipment and booking calendar (double-booking prevented in the database) |
+| 10 | Role-specific dashboards, saved items, moderation and UI polish: MVP complete |
+| **11** | **Facilities, equipment and booking calendar, double-booking prevented in the database (this commit)** |
 | 12 | Funding opportunities, notifications, deadline reminders |
 | 13 | Embeddings, pgvector, hybrid semantic search |
 | 14 | Research analytics, collaboration network, audit-log UI, moderation |
