@@ -1,0 +1,65 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
+import { describe, expect, it, vi } from "vitest";
+
+import { LoginPage } from "./LoginPage";
+
+const { useAuthMock } = vi.hoisted(() => ({ useAuthMock: vi.fn() }));
+
+vi.mock("./authContext", () => ({
+  useAuth: useAuthMock,
+}));
+
+function renderLoginPage() {
+  return render(
+    <MemoryRouter>
+      <LoginPage />
+    </MemoryRouter>,
+  );
+}
+
+describe("LoginPage validation", () => {
+  it("shows validation errors and never calls login when the form is empty", async () => {
+    const login = vi.fn();
+    useAuthMock.mockReturnValue({ login });
+    const user = userEvent.setup();
+
+    renderLoginPage();
+    await user.click(screen.getByRole("button", { name: /log in/i }));
+
+    expect(await screen.findByText(/email is required/i)).toBeInTheDocument();
+    expect(screen.getByText(/password is required/i)).toBeInTheDocument();
+    expect(login).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed email without calling login", async () => {
+    const login = vi.fn();
+    useAuthMock.mockReturnValue({ login });
+    const user = userEvent.setup();
+
+    renderLoginPage();
+    await user.type(screen.getByLabelText(/email/i), "not-an-email");
+    await user.type(screen.getByLabelText(/password/i), "whatever");
+    await user.click(screen.getByRole("button", { name: /log in/i }));
+
+    expect(await screen.findByText(/enter a valid email address/i)).toBeInTheDocument();
+    expect(login).not.toHaveBeenCalled();
+  });
+
+  it("calls login with valid credentials", async () => {
+    const login = vi.fn().mockResolvedValue(undefined);
+    useAuthMock.mockReturnValue({ login });
+    const user = userEvent.setup();
+
+    renderLoginPage();
+    await user.type(screen.getByLabelText(/email/i), "jane@example.com");
+    await user.type(screen.getByLabelText(/password/i), "correcthorsebattery");
+    await user.click(screen.getByRole("button", { name: /log in/i }));
+
+    expect(login).toHaveBeenCalledWith({
+      email: "jane@example.com",
+      password: "correcthorsebattery",
+    });
+  });
+});

@@ -18,8 +18,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
+from app.core.rate_limit import create_auth_rate_limiter
 from app.db.session import check_database_connection, create_db_engine, create_session_factory
+from app.modules.auth.router import router as auth_router
 from app.modules.health.router import router as health_router
+from app.modules.users.router import router as users_router
+
+API_V1_PREFIX = "/api/v1"
 
 logger = logging.getLogger(__name__)
 
@@ -71,17 +76,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/openapi.json" if settings.docs_enabled else None,
     )
     app.state.settings = settings
+    app.state.auth_rate_limiter = create_auth_rate_limiter()
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        # Credentials (the refresh-token cookie) are enabled in Step 1.
-        allow_credentials=False,
+        # The refresh-token cookie requires credentialed CORS.
+        allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
     register_exception_handlers(app)
 
-    # Probes live at the root; business APIs will be mounted under /api/v1.
+    # Probes live at the root; business APIs are mounted under /api/v1.
     app.include_router(health_router)
+    app.include_router(auth_router, prefix=API_V1_PREFIX)
+    app.include_router(users_router, prefix=API_V1_PREFIX)
     return app

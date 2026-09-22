@@ -49,7 +49,8 @@ export function toApiError(error: unknown): ApiError {
     if (!error.response) {
       return new ApiError("Could not reach the server.", "network");
     }
-    const { status, data } = error.response;
+    const { status } = error.response;
+    const data: unknown = error.response.data;
     if (isErrorEnvelope(data)) {
       return new ApiError(data.error.message, "http", status, data.error.code);
     }

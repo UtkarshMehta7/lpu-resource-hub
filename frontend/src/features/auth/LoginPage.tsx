@@ -1,0 +1,106 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { z } from "zod";
+
+import { toApiError } from "@/lib/api/errors";
+
+import { useAuth } from "./authContext";
+
+const loginSchema = z.object({
+  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+export function LoginPage() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) });
+
+  const redirectTo =
+    typeof (location.state as { from?: string } | null)?.from === "string"
+      ? (location.state as { from: string }).from
+      : "/account";
+
+  const onSubmit = handleSubmit(async (values) => {
+    setFormError(null);
+    try {
+      await login(values);
+      void navigate(redirectTo, { replace: true });
+    } catch (error) {
+      setFormError(toApiError(error).message);
+    }
+  });
+
+  return (
+    <div className="mx-auto max-w-sm">
+      <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
+      <p className="mt-1 text-sm text-ink-muted">Sign in to your account.</p>
+
+      <form onSubmit={(event) => void onSubmit(event)} className="mt-6 space-y-4" noValidate>
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium">
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
+            {...register("email")}
+          />
+          {errors.email ? (
+            <p className="mt-1 text-xs text-red-700">{errors.email.message}</p>
+          ) : null}
+        </div>
+
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium">
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
+            {...register("password")}
+          />
+          {errors.password ? (
+            <p className="mt-1 text-xs text-red-700">{errors.password.message}</p>
+          ) : null}
+        </div>
+
+        {formError ? (
+          <p role="alert" className="text-sm text-red-700">
+            {formError}
+          </p>
+        ) : null}
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isSubmitting ? "Logging in…" : "Log in"}
+        </button>
+      </form>
+
+      <p className="mt-4 text-sm text-ink-muted">
+        Don&apos;t have an account?{" "}
+        <Link to="/register" className="font-medium text-brand-700 hover:underline">
+          Register
+        </Link>
+      </p>
+    </div>
+  );
+}

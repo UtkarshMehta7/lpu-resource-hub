@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     db_pool_size: int = Field(default=5, ge=1, le=50)
     db_max_overflow: int = Field(default=5, ge=0, le=50)
     db_connect_timeout: int = Field(default=5, ge=1, le=60)
+    jwt_secret_key: str = Field(min_length=32)
+    access_token_expire_minutes: int = Field(default=15, ge=1, le=1440)
+    refresh_token_expire_days: int = Field(default=7, ge=1, le=90)
+    refresh_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
 
     @field_validator("database_url", "test_database_url")
     @classmethod
@@ -99,6 +103,10 @@ class Settings(BaseSettings):
     def docs_enabled(self) -> bool:
         """Interactive API docs are disabled in production."""
         return not self.is_production
+
+    @property
+    def refresh_token_expire_seconds(self) -> int:
+        return self.refresh_token_expire_days * 24 * 60 * 60
 
     def database_summary(self) -> str:
         """Human-readable database target for logs. Never includes the password."""
