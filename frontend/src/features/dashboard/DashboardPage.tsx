@@ -135,9 +135,11 @@ function StudentSections({ data }: { data: StudentDashboard }) {
       <Section title="Upcoming deadlines">
         <CardList
           items={data.upcoming_deadlines.map((deadline) => ({
-            to: `/opportunities/${deadline.opportunity_id}`,
+            to: `/${deadline.kind === "funding" ? "funding" : "opportunities"}/${deadline.item_id}`,
             title: deadline.title,
-            subtitle: `Closes ${deadline.deadline}${deadline.applied ? " · applied" : " · saved"}`,
+            subtitle: `Closes ${deadline.deadline}${
+              deadline.kind === "funding" ? " · funding call" : deadline.applied ? " · applied" : " · saved"
+            }`,
           }))}
           empty={
             <EmptyState

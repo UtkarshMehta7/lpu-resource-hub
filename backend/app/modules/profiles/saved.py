@@ -15,6 +15,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.modules.funding.models import FundingOpportunity
+from app.modules.funding.service import funding_reads
 from app.modules.opportunities.models import Opportunity
 from app.modules.opportunities.policies import visibility_filter as opportunity_visibility
 from app.modules.opportunities.service import opportunity_cards
@@ -54,6 +56,10 @@ def _assert_target_visible(db: Session, viewer: User, data: SavedCreate) -> None
                 Opportunity.id == data.opportunity_id, opportunity_visibility(viewer)
             )
         ).scalar_one_or_none()
+    elif data.funding_id is not None:
+        found = db.execute(
+            select(FundingOpportunity.id).where(FundingOpportunity.id == data.funding_id)
+        ).scalar_one_or_none()
     else:
         found = db.execute(
             select(User.id)
@@ -71,6 +77,7 @@ def save_item(db: Session, viewer: User, data: SavedCreate) -> SavedEntry:
         project_id=data.project_id,
         opportunity_id=data.opportunity_id,
         researcher_id=data.researcher_id,
+        funding_id=data.funding_id,
     )
     db.add(item)
     try:
@@ -99,6 +106,8 @@ def list_saved(db: Session, viewer: User, saved_type: SavedType | None = None) -
         query = query.where(SavedItem.opportunity_id.is_not(None))
     elif saved_type is SavedType.RESEARCHER:
         query = query.where(SavedItem.researcher_id.is_not(None))
+    elif saved_type is SavedType.FUNDING:
+        query = query.where(SavedItem.funding_id.is_not(None))
     rows = db.execute(query.order_by(SavedItem.created_at.desc())).scalars().all()
     return _to_entries(db, viewer, list(rows))
 
@@ -109,6 +118,7 @@ def _to_entries(db: Session, viewer: User, items: Sequence[SavedItem]) -> list[S
     project_ids = [i.project_id for i in items if i.project_id]
     opportunity_ids = [i.opportunity_id for i in items if i.opportunity_id]
     researcher_ids = [i.researcher_id for i in items if i.researcher_id]
+    funding_ids = [i.funding_id for i in items if i.funding_id]
 
     projects = {
         card.id: card
@@ -140,6 +150,17 @@ def _to_entries(db: Session, viewer: User, items: Sequence[SavedItem]) -> list[S
         )
     }
     researchers = {card.user_id: card for card in cards_for_researchers(db, researcher_ids)}
+    funding = {
+        read.id: read
+        for read in funding_reads(
+            db,
+            list(
+                db.execute(
+                    select(FundingOpportunity).where(FundingOpportunity.id.in_(funding_ids))
+                ).scalars()
+            ),
+        )
+    }
 
     entries: list[SavedEntry] = []
     for item in items:
@@ -159,6 +180,15 @@ def _to_entries(db: Session, viewer: User, items: Sequence[SavedItem]) -> list[S
                     saved_type=SavedType.OPPORTUNITY,
                     created_at=item.created_at,
                     item=opportunities[item.opportunity_id],
+                )
+            )
+        elif item.funding_id is not None and item.funding_id in funding:
+            entries.append(
+                SavedEntry(
+                    id=item.id,
+                    saved_type=SavedType.FUNDING,
+                    created_at=item.created_at,
+                    item=funding[item.funding_id],
                 )
             )
         elif item.researcher_id is not None and item.researcher_id in researchers:

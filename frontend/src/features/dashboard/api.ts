@@ -4,7 +4,8 @@ import type { ProjectCard } from "@/features/projects/api";
 import { apiClient } from "@/lib/api/client";
 
 export interface DeadlineItem {
-  opportunity_id: string;
+  kind: "opportunity" | "funding";
+  item_id: string;
   title: string;
   deadline: string;
   applied: boolean;

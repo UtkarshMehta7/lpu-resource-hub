@@ -3,6 +3,8 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/authContext";
 
+import { NotificationBell } from "@/features/notifications/NotificationBell";
+
 import { Brand } from "./Brand";
 import type { Role } from "@/features/auth/types";
 
@@ -29,8 +31,10 @@ const NAV: NavItem[] = [
     roles: ["student", "faculty", "research_coordinator"],
   },
   { to: "/facilities", label: "Facilities" },
+  { to: "/funding", label: "Funding" },
   { to: "/me/bookings", label: "My bookings" },
   { to: "/me/saved", label: "Saved" },
+  { to: "/me/notifications", label: "Notifications" },
   {
     to: "/coordinator/verification-queue",
     label: "Verification",
@@ -84,6 +88,7 @@ export function Header() {
                 More
               </button>
             </nav>
+            <NotificationBell />
             <button
               type="button"
               aria-expanded={menuOpen}

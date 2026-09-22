@@ -27,6 +27,7 @@ from app.modules.applications.models import Application, ApplicationStatus
 from app.modules.audit.models import AuditLog
 from app.modules.audit.schemas import AuditLogRead
 from app.modules.collaborations.models import CollaborationRequest, CollaborationStatus
+from app.modules.funding.models import FundingOpportunity, FundingStatus
 from app.modules.opportunities.models import Opportunity, OpportunityStatus
 from app.modules.opportunities.schemas import OpportunityCard
 from app.modules.opportunities.service import opportunity_cards
@@ -103,7 +104,7 @@ def _student_section(db: Session, user: User, weights: ScoreWeights) -> StudentD
 
 
 def _upcoming_deadlines(db: Session, user: User) -> list[DeadlineItem]:
-    """Openings the student applied to or saved, closing within 30 days."""
+    """Openings and funding calls the viewer applied to or saved, closing within 30 days."""
     today = datetime.now(UTC).date()
     applied = select(Application.opportunity_id).where(
         Application.applicant_id == user.id,
@@ -123,15 +124,38 @@ def _upcoming_deadlines(db: Session, user: User) -> list[DeadlineItem]:
         .order_by(Opportunity.deadline)
     ).all()
     applied_ids = set(db.execute(applied).scalars())
-    return [
+    items = [
         DeadlineItem(
-            opportunity_id=opportunity_id,
+            kind="opportunity",
+            item_id=opportunity_id,
             title=title,
             deadline=deadline,
             applied=opportunity_id in applied_ids,
         )
         for opportunity_id, title, deadline in rows
     ]
+    funding_rows = db.execute(
+        select(FundingOpportunity.id, FundingOpportunity.title, FundingOpportunity.deadline)
+        .where(
+            FundingOpportunity.status == FundingStatus.OPEN,
+            FundingOpportunity.deadline >= today,
+            FundingOpportunity.deadline <= today + timedelta(days=DEADLINE_WINDOW_DAYS),
+            FundingOpportunity.id.in_(
+                select(SavedItem.funding_id).where(
+                    SavedItem.user_id == user.id, SavedItem.funding_id.is_not(None)
+                )
+            ),
+        )
+        .order_by(FundingOpportunity.deadline)
+    ).all()
+    items.extend(
+        DeadlineItem(
+            kind="funding", item_id=funding_id, title=title, deadline=deadline, applied=False
+        )
+        for funding_id, title, deadline in funding_rows
+    )
+    items.sort(key=lambda item: item.deadline)
+    return items
 
 
 def _faculty_section(db: Session, user: User) -> FacultyDashboard:

@@ -10,6 +10,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from app.core.events import EVENT_BUS, Event, EventName
 from app.core.pagination import Page, PageParams
 from app.modules.applications.models import Application, ApplicationStatus
 from app.modules.audit import service as audit_service
@@ -314,6 +315,17 @@ def publish_opportunity(db: Session, user: User, opportunity_id: uuid.UUID) -> O
         if project is None or project.status is not ProjectStatus.ACTIVE:
             raise ProjectNotActiveError
     opportunity.status = OpportunityStatus.OPEN
+    db.flush()
+    # Tells people whose profile matches (Step 12); scored with the same code
+    # as the recommendations page.
+    EVENT_BUS.publish(
+        db,
+        Event(
+            name=EventName.OPPORTUNITY_PUBLISHED,
+            actor_id=user.id,
+            payload={"opportunity_id": opportunity.id},
+        ),
+    )
     db.commit()
     db.refresh(opportunity)
     return to_read(db, user, opportunity)

@@ -14,6 +14,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.events import EVENT_BUS, Event, EventName
 from app.core.pagination import Page, PageParams
 from app.modules.audit import service as audit_service
 from app.modules.profiles.models import ResearcherProfile, VerificationStatus
@@ -370,6 +371,20 @@ def review_project(
     project.reviewed_by = reviewer.id
     project.reviewed_at = datetime.now(UTC)
     db.flush()
+    EVENT_BUS.publish(
+        db,
+        Event(
+            name=EventName.PROJECT_REVIEWED,
+            actor_id=reviewer.id,
+            payload={
+                "recipient_id": project.owner_id,
+                "project_id": project.id,
+                "project_title": project.title,
+                "status": target.value,
+                "comment": data.comment,
+            },
+        ),
+    )
     audit_service.record(
         db,
         actor_id=reviewer.id,

@@ -17,6 +17,7 @@ const PROJECT = `E2E soil sensors ${RUN}`;
 const OPPORTUNITY = `E2E field assistant ${RUN}`;
 const FACILITY = `E2E soil lab ${RUN}`;
 const EQUIPMENT = `E2E moisture probe ${RUN}`;
+const FUNDING = `E2E demo seed grant ${RUN}`;
 
 /**
  * One signed-in page per role, reused across the flows below. Logging in
@@ -236,4 +237,51 @@ test("an overlapping approval is refused by the database", async ({ browser }) =
     await expect(coordinator.getByText(/already taken|Nothing waiting/i).first()).toBeVisible();
   }
   expect(when.length).toBeGreaterThan(0);
+});
+
+test("coordinator lists a funding call and a student saves it", async ({ browser }) => {
+  const coordinator = await sessionFor(browser, COORDINATOR);
+  await coordinator.goto("/funding/new");
+  await coordinator.getByLabel("Title").fill(FUNDING);
+  await coordinator.getByLabel("Organisation").fill("Demo Research Council");
+  const deadline = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  await coordinator.getByLabel("Deadline").fill(deadline);
+  await coordinator
+    .getByLabel("Description")
+    .fill("A fictional demo call used by the end-to-end tests.");
+  await coordinator.getByRole("button", { name: "Add call" }).click();
+  await expect(coordinator.getByRole("heading", { name: FUNDING })).toBeVisible();
+
+  const student = await sessionFor(browser, STUDENT);
+  await student.goto("/funding");
+  await student.getByRole("searchbox", { name: "Search" }).fill(FUNDING);
+  await student.getByRole("link", { name: FUNDING }).click();
+  await student.getByRole("button", { name: /☆ Save/ }).click();
+  await expect(student.getByRole("button", { name: /★ Saved/ })).toBeVisible();
+
+  // It shows up in Saved and as an upcoming deadline on the dashboard.
+  await student.goto("/me/saved?type=funding");
+  await expect(student.getByRole("link", { name: FUNDING })).toBeVisible();
+  await student.goto("/dashboard");
+  await expect(student.getByText(FUNDING)).toBeVisible();
+});
+
+test("a collaboration request shows up in the recipient's notifications", async ({ browser }) => {
+  const student = await sessionFor(browser, STUDENT);
+  await student.goto("/researchers");
+  await student
+    .getByRole("link", { name: /Demo Faculty 0/ })
+    .first()
+    .click();
+  await student.getByRole("button", { name: "Request collaboration" }).click();
+  await student.getByLabel("Message").fill(`Could we collaborate on the ${RUN} field trials?`);
+  await student.getByRole("button", { name: "Send request", exact: true }).click();
+  await expect(student.getByRole("button", { name: "Request sent" })).toBeVisible();
+
+  // The recipient's bell shows an unread count, and the page explains why.
+  const faculty = await sessionFor(browser, FACULTY);
+  await faculty.goto("/me/notifications");
+  await expect(faculty.getByText(/sent you a collaboration request/i).first()).toBeVisible();
+  await faculty.getByRole("button", { name: /mark all read/i }).click();
+  await expect(faculty.getByRole("link", { name: "Notifications" })).toBeVisible();
 });

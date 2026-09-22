@@ -25,6 +25,7 @@ import os
 import random
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -33,6 +34,7 @@ from app.core.config import get_settings
 from app.core.security import MIN_PASSWORD_LENGTH, hash_password, is_common_password
 from app.db.session import create_db_engine, create_session_factory
 from app.modules.admin.models import Department, School
+from app.modules.funding.models import FundingOpportunity
 from app.modules.profiles.models import (
     ResearcherAvailability,
     ResearcherProfile,
@@ -181,6 +183,7 @@ class SeedSummary:
     aliases: int = 0
     users: int = 0
     profiles: int = 0
+    funding_calls: int = 0
 
     def render(self) -> str:
         return (
@@ -190,7 +193,8 @@ class SeedSummary:
             f"  research areas: {self.research_areas}\n"
             f"  aliases:        {self.aliases}\n"
             f"  users:          {self.users}\n"
-            f"  profiles:       {self.profiles}"
+            f"  profiles:       {self.profiles}\n"
+            f"  funding calls:  {self.funding_calls}"
         )
 
 
@@ -329,6 +333,59 @@ def _attach_expertise(
     user.onboarding_complete = True
 
 
+# Fictional calls from invented bodies. Every row is flagged is_demo so the
+# UI can say so; nothing here mirrors a real funding programme.
+DEMO_FUNDING = (
+    (
+        "Demo Research Council",
+        "Demo seed grant for low-cost sensing",
+        "A fictional demo call for small projects building low-cost sensors.",
+        "Demo faculty with a verified researcher profile.",
+        "Up to a demo amount",
+        45,
+    ),
+    (
+        "Demo Innovation Foundation",
+        "Demo student research fellowship",
+        "A fictional demo fellowship for student-led research projects.",
+        "Demo students in their second year or later.",
+        "A demo monthly stipend",
+        20,
+    ),
+    (
+        "Demo Agritech Mission",
+        "Demo field-trial support grant",
+        "A fictional demo grant covering field trials and travel.",
+        "Demo faculty running an active project.",
+        "A demo travel allowance",
+        7,
+    ),
+)
+
+
+def _seed_funding(db: Session, summary: SeedSummary, admin: User) -> None:
+    """Idempotent: a call is identified by its (fictional) title."""
+    existing = {title for (title,) in db.execute(select(FundingOpportunity.title)).all()}
+    today = datetime.now(UTC).date()
+    for organization, title, description, eligibility, amount, days in DEMO_FUNDING:
+        if title in existing:
+            continue
+        db.add(
+            FundingOpportunity(
+                organization=organization,
+                title=title,
+                description=description,
+                eligibility=eligibility,
+                amount_text=amount,
+                deadline=today + timedelta(days=days),
+                official_source_url="https://example.org/demo-funding-call",
+                is_demo=True,
+                created_by=admin.id,
+            )
+        )
+        summary.funding_calls += 1
+
+
 def seed(db: Session, password_hash: str) -> SeedSummary:
     rng = random.Random(RANDOM_SEED)
     summary = SeedSummary()
@@ -337,7 +394,7 @@ def seed(db: Session, password_hash: str) -> SeedSummary:
     skills, areas = _seed_taxonomy(db, summary)
     existing_users = {u.email: u for u in db.execute(select(User)).scalars()}
 
-    _seed_user(
+    admin = _seed_user(
         db,
         existing_users,
         summary,
@@ -428,6 +485,8 @@ def seed(db: Session, password_hash: str) -> SeedSummary:
             )
         )
         summary.profiles += 1
+
+    _seed_funding(db, summary, admin)
 
     db.commit()
     return summary
