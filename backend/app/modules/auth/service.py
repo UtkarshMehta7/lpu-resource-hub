@@ -129,12 +129,17 @@ def change_password(db: Session, user: User, current_password: str, new_password
         raise IncorrectPasswordError
 
     user.password_hash = hash_password(new_password)
+    revoke_all_sessions(db, user.id)
+    db.commit()
+
+
+def revoke_all_sessions(db: Session, user_id: uuid.UUID) -> None:
+    """Revokes every non-revoked refresh token for a user. Does not commit."""
     db.execute(
         update(RefreshToken)
-        .where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
+        .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
         .values(revoked_at=datetime.now(UTC))
     )
-    db.commit()
 
 
 def _find_by_raw_token(db: Session, raw_token: str) -> RefreshToken | None:
