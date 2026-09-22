@@ -23,5 +23,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    // e2e/ is Playwright's; it needs a browser and running servers.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 });

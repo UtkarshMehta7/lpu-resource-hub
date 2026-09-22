@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/features/auth/authContext";
+import { ReportButton } from "@/features/reports/ReportButton";
 import { toApiError } from "@/lib/api/errors";
 
 import { deletePublication, fetchPublication, PUB_TYPE_LABEL } from "./api";
@@ -92,6 +93,7 @@ export function PublicationDetailPage() {
               Edit
             </Link>
           ) : null}
+          <ReportButton targetType="publication" targetId={publication.id} />
           {canDelete ? (
             <button
               type="button"

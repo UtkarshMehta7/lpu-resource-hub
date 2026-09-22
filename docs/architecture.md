@@ -64,6 +64,11 @@ Rules:
 
 Planned modules: auth, users, profiles, taxonomy, researchers, projects, publications, opportunities, applications, collaborations, recommendations, search, facilities, bookings, funding, notifications, analytics, admin, audit, reports.
 
+Two Step 10 features land inside existing modules rather than new ones:
+saved items live in `profiles` (personal collections under `/me/...`) and
+the role dashboards live in `analytics` (`GET /me/dashboard`), which is the
+module that later grows the Step 14 analytics.
+
 **Implemented in Step 0:** only `modules/health`.
 
 ## 4. Frontend structure
