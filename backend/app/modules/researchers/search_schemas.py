@@ -13,6 +13,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.modules.opportunities.schemas import OpportunityCard
 from app.modules.profiles.models import ResearcherAvailability, VerificationStatus
 from app.modules.profiles.schemas import LinkItem
 from app.modules.projects.schemas import ProjectCard
@@ -50,9 +51,10 @@ class StudentCard(BaseModel):
 
 
 class SearchResults(BaseModel):
-    """Unified search. Later steps add opportunities and so on."""
+    """Unified search. Later steps add more types behind the same `types` filter."""
 
     query: str
     researchers: list[ResearcherCard]
     projects: list[ProjectCard]
     publications: list[PublicationRead]
+    opportunities: list[OpportunityCard]

@@ -15,7 +15,13 @@ from app.modules.users.models import User, UserRole
 
 def test_faculty_has_exactly_its_own_grants() -> None:
     assert ROLE_PERMISSIONS[UserRole.FACULTY] == frozenset(
-        {Permission.STUDENT_DISCOVER, Permission.PROJECT_CREATE, Permission.PUBLICATION_CREATE}
+        {
+            Permission.STUDENT_DISCOVER,
+            Permission.PROJECT_CREATE,
+            Permission.PUBLICATION_CREATE,
+            Permission.OPPORTUNITY_CREATE,
+            Permission.APPLICATION_SUBMIT,
+        }
     )
 
 
@@ -30,6 +36,8 @@ def test_coordinator_inherits_faculty_grants_on_top_of_its_own() -> None:
             Permission.STUDENT_DISCOVER,  # inherited from FACULTY
             Permission.PROJECT_CREATE,  # inherited from FACULTY
             Permission.PUBLICATION_CREATE,  # inherited from FACULTY
+            Permission.OPPORTUNITY_CREATE,  # inherited from FACULTY
+            Permission.APPLICATION_SUBMIT,  # inherited from FACULTY
         }
     )
 
@@ -53,8 +61,8 @@ def test_admin_has_exactly_its_own_grants() -> None:
     )
 
 
-def test_student_has_no_permissions() -> None:
-    assert ROLE_PERMISSIONS[UserRole.STUDENT] == frozenset()
+def test_student_can_only_apply() -> None:
+    assert ROLE_PERMISSIONS[UserRole.STUDENT] == frozenset({Permission.APPLICATION_SUBMIT})
 
 
 def test_coordinator_inherits_a_hypothetical_faculty_permission() -> None:
