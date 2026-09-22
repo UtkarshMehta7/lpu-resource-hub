@@ -30,6 +30,17 @@ export function Header() {
 
         {isLoading ? null : isAuthenticated && user ? (
           <div className="flex items-center gap-3">
+            <Link
+              to="/researchers"
+              className="hidden text-sm font-medium hover:underline sm:inline"
+            >
+              Researchers
+            </Link>
+            {user.role !== "student" ? (
+              <Link to="/students" className="hidden text-sm font-medium hover:underline sm:inline">
+                Students
+              </Link>
+            ) : null}
             {user.role === "research_coordinator" || user.role === "admin" ? (
               <Link
                 to="/coordinator/verification-queue"

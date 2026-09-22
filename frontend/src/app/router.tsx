@@ -1,6 +1,9 @@
 import { createBrowserRouter } from "react-router-dom";
 
 import { AdminUsersPage } from "@/features/admin/AdminUsersPage";
+import { DirectoryPage } from "@/features/directory/DirectoryPage";
+import { ResearcherDetailPage } from "@/features/directory/ResearcherDetailPage";
+import { StudentsPage } from "@/features/directory/StudentsPage";
 import { AccountPage } from "@/features/auth/AccountPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute";
@@ -25,6 +28,8 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute />,
         children: [
           { path: "account", element: <AccountPage /> },
+          { path: "researchers", element: <DirectoryPage /> },
+          { path: "researchers/:userId", element: <ResearcherDetailPage /> },
           { path: "onboarding", element: <OnboardingPage /> },
           { path: "profile", element: <ProfilePage /> },
           {
@@ -32,6 +37,10 @@ export const router = createBrowserRouter([
             children: [
               { path: "coordinator/verification-queue", element: <VerificationQueuePage /> },
             ],
+          },
+          {
+            element: <RoleRoute allow={["faculty", "research_coordinator", "admin"]} />,
+            children: [{ path: "students", element: <StudentsPage /> }],
           },
           {
             element: <RoleRoute allow={["admin"]} />,

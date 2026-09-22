@@ -133,6 +133,9 @@ ENDPOINTS = (
         needs_target=True,
         allowed_status=404,
     ),
+    # Read-only org lists for directory filters: any signed-in user.
+    Endpoint("GET", "/api/v1/schools", frozenset(ALL_ROLES)),
+    Endpoint("GET", "/api/v1/departments", frozenset(ALL_ROLES)),
     # Students must not be able to browse other students.
     Endpoint(
         "GET",
