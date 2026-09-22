@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(default=15, ge=1, le=1440)
     refresh_token_expire_days: int = Field(default=7, ge=1, le=90)
     refresh_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    # Recommendation score weights (Step 9). They should sum to 1.0.
+    rec_weight_skill: float = Field(default=0.40, ge=0.0, le=1.0)
+    rec_weight_area: float = Field(default=0.35, ge=0.0, le=1.0)
+    rec_weight_text: float = Field(default=0.25, ge=0.0, le=1.0)
 
     @field_validator("database_url", "test_database_url")
     @classmethod

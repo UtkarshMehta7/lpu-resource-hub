@@ -36,6 +36,7 @@ from app.modules.opportunities.router import router as opportunities_router
 from app.modules.profiles.router import router as profiles_router
 from app.modules.projects.router import router as projects_router
 from app.modules.publications.router import router as publications_router
+from app.modules.recommendations.router import router as recommendations_router
 from app.modules.researchers.router import router as researchers_router
 from app.modules.taxonomy.router import router as taxonomy_router
 from app.modules.users.router import router as users_router
@@ -122,4 +123,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(opportunities_router, prefix=API_V1_PREFIX)
     app.include_router(applications_router, prefix=API_V1_PREFIX)
     app.include_router(collaborations_router, prefix=API_V1_PREFIX)
+    app.include_router(recommendations_router, prefix=API_V1_PREFIX)
     return app
