@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ReportButton } from "@/features/reports/ReportButton";
+import { SaveButton } from "@/features/saved/SaveButton";
 import { useAuth } from "@/features/auth/authContext";
 import { toApiError } from "@/lib/api/errors";
 
@@ -99,6 +101,13 @@ export function OpportunityDetailPage() {
         <p role="alert" className="mt-4 text-sm text-red-700">
           {error}
         </p>
+      ) : null}
+
+      {!isOwner ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <SaveButton type="opportunity" targetId={opportunity.id} />
+          <ReportButton targetType="opportunity" targetId={opportunity.id} />
+        </div>
       ) : null}
 
       {isOwner ? (

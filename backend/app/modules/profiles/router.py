@@ -10,15 +10,25 @@ role-conditional body type on one route declaratively.
 
 from __future__ import annotations
 
+import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.modules.profiles.models import ResearcherProfile, StudentProfile
+from app.modules.profiles.saved import (
+    AlreadySavedError,
+    SavedItemNotFoundError,
+    TargetNotFoundError,
+    delete_saved_item,
+    list_saved,
+    save_item,
+)
+from app.modules.profiles.saved_schemas import SavedCreate, SavedEntry, SavedType
 from app.modules.profiles.schemas import (
     ResearchAreaEntry,
     ResearcherProfileRead,
@@ -122,3 +132,45 @@ def update_my_research_areas(
         ResearchAreaEntry(research_area_id=row.research_area_id, is_expertise=row.is_expertise)
         for row in rows
     ]
+
+
+@router.get("/saved", response_model=list[SavedEntry])
+def read_saved(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    saved_type: Annotated[SavedType | None, Query(alias="type")] = None,
+) -> list[SavedEntry]:
+    """Bookmarks whose target is still visible to the caller."""
+    return list_saved(db, current_user, saved_type)
+
+
+@router.post("/saved", response_model=SavedEntry, status_code=status.HTTP_201_CREATED)
+def create_saved(
+    data: SavedCreate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> SavedEntry:
+    try:
+        return save_item(db, current_user, data)
+    except TargetNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="That item was not found."
+        ) from exc
+    except AlreadySavedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="You have already saved this."
+        ) from exc
+
+
+@router.delete("/saved/{saved_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_saved(
+    saved_id: uuid.UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    try:
+        delete_saved_item(db, current_user, saved_id)
+    except SavedItemNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Saved item not found."
+        ) from exc

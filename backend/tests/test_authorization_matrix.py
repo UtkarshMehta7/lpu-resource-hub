@@ -212,6 +212,29 @@ ENDPOINTS = (
     # Step 9: recommendations are personal to the caller; every role gets
     # their own (an admin's collaborator list is simply empty).
     Endpoint("GET", "/api/v1/recommendations", frozenset(ALL_ROLES)),
+    # Step 10: saved items and dashboards are personal; reports are open to
+    # everyone but only moderators see the queue.
+    Endpoint("GET", "/api/v1/me/saved", frozenset(ALL_ROLES)),
+    Endpoint(
+        "POST",
+        "/api/v1/me/saved",
+        frozenset(ALL_ROLES),
+        body={"project_id": "00000000-0000-0000-0000-000000000001"},
+        allowed_status=404,
+    ),
+    Endpoint("GET", "/api/v1/me/dashboard", frozenset(ALL_ROLES)),
+    Endpoint(
+        "POST",
+        "/api/v1/reports",
+        frozenset(ALL_ROLES),
+        body={
+            "target_type": "project",
+            "target_id": "00000000-0000-0000-0000-000000000001",
+            "reason": "This looks like spam to me.",
+        },
+        allowed_status=404,
+    ),
+    Endpoint("GET", "/api/v1/admin/reports", COORDINATOR_AND_ADMIN),
     # Students must not be able to browse other students.
     Endpoint(
         "GET",

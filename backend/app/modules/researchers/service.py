@@ -14,11 +14,24 @@ from app.modules.researchers.policies import (
     assert_in_coordinator_scope,
     assert_not_self_verification,
 )
+from app.modules.researchers.schemas import VerificationQueueItem
 from app.modules.users.models import CoordinatorScopeType, User, UserRole
 
 
 class ResearcherNotFoundError(Exception):
     """Raised when the target user has no researcher profile."""
+
+
+def to_queue_item(user: User, profile: ResearcherProfile) -> VerificationQueueItem:
+    return VerificationQueueItem(
+        user_id=user.id,
+        full_name=user.full_name,
+        email=user.email,
+        designation=profile.designation,
+        department_id=user.department_id,
+        verification_status=profile.verification_status,
+        created_at=profile.created_at,
+    )
 
 
 def list_verification_queue(db: Session, reviewer: User) -> list[tuple[User, ResearcherProfile]]:

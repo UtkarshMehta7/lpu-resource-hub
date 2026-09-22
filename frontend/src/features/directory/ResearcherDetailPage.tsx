@@ -3,6 +3,8 @@ import { Link, useParams } from "react-router-dom";
 
 import { StatusIndicator } from "@/components/ui/StatusIndicator";
 import { RequestCollaborationButton } from "@/features/collaborations/RequestCollaborationButton";
+import { ReportButton } from "@/features/reports/ReportButton";
+import { SaveButton } from "@/features/saved/SaveButton";
 import { fetchProjects } from "@/features/projects/api";
 import { PublicationsSection } from "@/features/publications/PublicationList";
 
@@ -60,7 +62,9 @@ export function ResearcherDetailPage() {
           {data.verification_status === "verified" ? (
             <StatusIndicator tone="success" label="Verified" />
           ) : null}
+          <SaveButton type="researcher" targetId={data.user_id} />
           <RequestCollaborationButton recipientId={data.user_id} recipientName={data.full_name} />
+          <ReportButton targetType="profile" targetId={data.user_id} />
         </div>
       </div>
 

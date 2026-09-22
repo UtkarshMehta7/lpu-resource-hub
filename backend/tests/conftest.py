@@ -106,7 +106,8 @@ def db_settings(migrated_test_database_url: str) -> Settings:
 
 
 TABLES_TO_CLEAN = (
-    "collaboration_requests, application_events, applications, opportunity_skills, opportunities, "
+    "saved_items, content_reports, collaboration_requests, "
+    "application_events, applications, opportunity_skills, opportunities, "
     "project_publications, publication_authors, publications, "
     "project_members, project_skills, project_research_areas, projects, "
     "refresh_tokens, audit_logs, tag_suggestions, tag_aliases, user_skills, "

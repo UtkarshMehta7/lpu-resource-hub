@@ -37,6 +37,7 @@ class Permission(StrEnum):
     OPPORTUNITY_CREATE = "opportunity:create"
     APPLICATION_SUBMIT = "application:submit"
     COLLABORATION_SEND = "collaboration:send"
+    REPORT_MODERATE = "report:moderate"
 
 
 # A role inherits everything its parent can do. ADMIN's powers are listed
@@ -67,6 +68,7 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.TAXONOMY_MANAGE,
             Permission.PROFILE_VERIFY,
             Permission.PROJECT_REVIEW,
+            Permission.REPORT_MODERATE,
         }
     ),
     UserRole.ADMIN: frozenset(
@@ -83,6 +85,7 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.PROFILE_VERIFY,
             Permission.STUDENT_DISCOVER,
             Permission.PROJECT_REVIEW,
+            Permission.REPORT_MODERATE,
         }
     ),
 }

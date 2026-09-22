@@ -20,7 +20,6 @@ from app.db.session import get_db
 from app.modules.opportunities.service import list_opportunities
 from app.modules.profiles.models import (
     ResearcherAvailability,
-    ResearcherProfile,
     VerificationStatus,
 )
 from app.modules.projects.service import list_projects
@@ -45,23 +44,12 @@ from app.modules.researchers.search_schemas import (
 from app.modules.researchers.service import (
     ResearcherNotFoundError,
     list_verification_queue,
+    to_queue_item,
     verify_researcher,
 )
 from app.modules.users.models import User
 
 router = APIRouter(tags=["researchers"])
-
-
-def _to_queue_item(user: User, profile: ResearcherProfile) -> VerificationQueueItem:
-    return VerificationQueueItem(
-        user_id=user.id,
-        full_name=user.full_name,
-        email=user.email,
-        designation=profile.designation,
-        department_id=user.department_id,
-        verification_status=profile.verification_status,
-        created_at=profile.created_at,
-    )
 
 
 @router.get(
@@ -74,7 +62,7 @@ def read_verification_queue(
     reviewer: Annotated[User, Depends(get_current_user)],
 ) -> list[VerificationQueueItem]:
     queue = list_verification_queue(db, reviewer)
-    return [_to_queue_item(user, profile) for user, profile in queue]
+    return [to_queue_item(user, profile) for user, profile in queue]
 
 
 @router.post("/researchers/{user_id}/verify", response_model=VerificationQueueItem)
@@ -103,7 +91,7 @@ def verify_researcher_route(
             status_code=status.HTTP_409_CONFLICT, detail="You cannot verify your own profile."
         ) from exc
 
-    return _to_queue_item(target_user, profile)
+    return to_queue_item(target_user, profile)
 
 
 @router.get(

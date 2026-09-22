@@ -18,7 +18,12 @@ export async function loginRequest(payload: LoginPayload): Promise<AccessTokenRe
   return response.data;
 }
 
-/** Silent refresh: succeeds only if a valid refresh-token cookie is present. */
+/**
+ * Silent refresh: succeeds only if a valid refresh-token cookie is present.
+ *
+ * Callers should use `refreshAccessToken` from the API client instead, which
+ * deduplicates concurrent attempts; this is the raw request it wraps.
+ */
 export async function refreshRequest(): Promise<AccessTokenResponse> {
   const response = await apiClient.post<AccessTokenResponse>("/api/v1/auth/refresh");
   return response.data;

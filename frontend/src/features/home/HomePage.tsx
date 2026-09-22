@@ -1,3 +1,6 @@
+import { Navigate } from "react-router-dom";
+
+import { useAuth } from "@/features/auth/authContext";
 import { BackendStatusCard } from "@/features/system-status/BackendStatusCard";
 
 const PLANNED_CAPABILITIES = [
@@ -9,11 +12,17 @@ const PLANNED_CAPABILITIES = [
 ];
 
 export function HomePage() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  // Signed-in people want their dashboard, not the marketing page.
+  if (isLoading) return null;
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+
   return (
     <div className="space-y-10">
       <section className="max-w-3xl">
         <p className="text-sm font-medium text-brand-700">
-          Development status: Step 0 · Foundation
+          Development status: Step 10 · MVP complete
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
           Make research expertise, projects and facilities discoverable.
