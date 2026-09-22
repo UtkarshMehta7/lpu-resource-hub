@@ -15,7 +15,7 @@ from app.modules.users.models import User, UserRole
 
 def test_faculty_has_exactly_its_own_grants() -> None:
     assert ROLE_PERMISSIONS[UserRole.FACULTY] == frozenset(
-        {Permission.STUDENT_DISCOVER, Permission.PROJECT_CREATE}
+        {Permission.STUDENT_DISCOVER, Permission.PROJECT_CREATE, Permission.PUBLICATION_CREATE}
     )
 
 
@@ -29,6 +29,7 @@ def test_coordinator_inherits_faculty_grants_on_top_of_its_own() -> None:
             Permission.PROJECT_REVIEW,
             Permission.STUDENT_DISCOVER,  # inherited from FACULTY
             Permission.PROJECT_CREATE,  # inherited from FACULTY
+            Permission.PUBLICATION_CREATE,  # inherited from FACULTY
         }
     )
 
