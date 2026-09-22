@@ -30,6 +30,7 @@ import { MyBookingsPage } from "@/features/facilities/MyBookingsPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ModerationQueuePage } from "@/features/reports/ModerationQueuePage";
 import { SavedPage } from "@/features/saved/SavedPage";
+import { SearchPage } from "@/features/search/SearchPage";
 import { RecommendationsPage } from "@/features/recommendations/RecommendationsPage";
 import { CollaborationsPage } from "@/features/collaborations/CollaborationsPage";
 import { ApplicantsPage } from "@/features/opportunities/ApplicantsPage";
@@ -71,6 +72,7 @@ export const router = createBrowserRouter([
           { path: "opportunities/:opportunityId/applicants", element: <ApplicantsPage /> },
           { path: "me/applications", element: <MyApplicationsPage /> },
           { path: "collaborations", element: <CollaborationsPage /> },
+          { path: "search", element: <SearchPage /> },
           { path: "recommendations", element: <RecommendationsPage /> },
           { path: "dashboard", element: <DashboardPage /> },
           { path: "me/saved", element: <SavedPage /> },

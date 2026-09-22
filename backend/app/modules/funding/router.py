@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
@@ -23,6 +23,8 @@ from app.db.session import get_db
 from app.modules.funding import service
 from app.modules.funding.models import FundingStatus
 from app.modules.funding.schemas import FundingCreate, FundingRead, FundingUpdate
+from app.modules.search.models import EntityType
+from app.modules.search.tasks import schedule_embedding
 from app.modules.users.models import User
 
 router = APIRouter(tags=["funding"])
@@ -74,9 +76,17 @@ def read_funding_list(
 
 
 @router.post("/funding", response_model=FundingRead, status_code=status.HTTP_201_CREATED)
-def create_funding(data: FundingCreate, db: DbSession, actor: Manager) -> FundingRead:
+def create_funding(
+    data: FundingCreate,
+    request: Request,
+    background: BackgroundTasks,
+    db: DbSession,
+    actor: Manager,
+) -> FundingRead:
     with _domain_errors():
-        return service.create_funding(db, actor, data)
+        funding = service.create_funding(db, actor, data)
+    schedule_embedding(request, background, EntityType.FUNDING, funding.id)
+    return funding
 
 
 @router.get("/funding/{funding_id}", response_model=FundingRead)

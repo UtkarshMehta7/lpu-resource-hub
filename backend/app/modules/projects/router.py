@@ -13,7 +13,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
@@ -33,6 +33,8 @@ from app.modules.projects.schemas import (
     ProjectUpdate,
     ReviewRequest,
 )
+from app.modules.search.models import EntityType
+from app.modules.search.tasks import schedule_embedding
 from app.modules.users.models import User
 
 router = APIRouter(tags=["projects"])
@@ -111,11 +113,15 @@ def read_projects(
 @router.post("/projects", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
 def create_project(
     data: ProjectCreate,
+    request: Request,
+    background: BackgroundTasks,
     db: DbSession,
     owner: Annotated[User, Depends(require_permission(Permission.PROJECT_CREATE))],
 ) -> ProjectRead:
     with _domain_errors():
-        return service.create_project(db, owner, data)
+        project = service.create_project(db, owner, data)
+    schedule_embedding(request, background, EntityType.PROJECT, project.id)
+    return project
 
 
 @router.get("/projects/{project_id}", response_model=ProjectRead)
@@ -126,10 +132,17 @@ def read_project(project_id: uuid.UUID, db: DbSession, viewer: CurrentUser) -> P
 
 @router.patch("/projects/{project_id}", response_model=ProjectRead)
 def update_project(
-    project_id: uuid.UUID, data: ProjectUpdate, db: DbSession, actor: CurrentUser
+    project_id: uuid.UUID,
+    data: ProjectUpdate,
+    request: Request,
+    background: BackgroundTasks,
+    db: DbSession,
+    actor: CurrentUser,
 ) -> ProjectRead:
     with _domain_errors():
-        return service.update_project(db, actor, project_id, data)
+        project = service.update_project(db, actor, project_id, data)
+    schedule_embedding(request, background, EntityType.PROJECT, project.id)
+    return project
 
 
 @router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)

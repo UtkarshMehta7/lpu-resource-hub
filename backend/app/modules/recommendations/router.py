@@ -11,9 +11,9 @@ from app.core.config import Settings, get_settings
 from app.core.deps import get_current_user
 from app.core.rate_limit import enforce_search_rate_limit
 from app.db.session import get_db
-from app.ml.features import ScoreWeights
 from app.modules.recommendations import service
 from app.modules.recommendations.schemas import RecommendationsResponse, TargetType
+from app.modules.recommendations.weights import score_weights
 from app.modules.users.models import User
 
 router = APIRouter(tags=["recommendations"])
@@ -31,9 +31,4 @@ def read_recommendations(
     type: TargetType = TargetType.OPPORTUNITIES,
     limit: Annotated[int, Query(ge=1, le=20)] = 10,
 ) -> RecommendationsResponse:
-    weights = ScoreWeights(
-        skill=settings.rec_weight_skill,
-        area=settings.rec_weight_area,
-        text=settings.rec_weight_text,
-    )
-    return service.recommend(db, viewer, type, limit, weights)
+    return service.recommend(db, viewer, type, limit, score_weights(settings))

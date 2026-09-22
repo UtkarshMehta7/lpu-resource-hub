@@ -16,7 +16,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 12: funding, notifications and deadline reminders.** What exists today:
+**Step 13: semantic search.** What exists today:
 
 | Area | Status |
 |---|---|
@@ -45,7 +45,8 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Facility and equipment catalogue with a week calendar, booking requests, approvals, and double-booking prevented by the database | Done |
 | Lovely Professional University branding across the frontend (full name, LPU shortform in tight spaces) | Done |
 | Funding calls (fictional demo data), saveable, with in-app notifications from domain events and 7/1-day deadline reminders | Done |
-| Semantic search, analytics and deployment | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Natural-language search: sentence embeddings in pgvector, fused with full-text search (optional install; falls back cleanly) | Done |
+| Analytics and deployment | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
 
@@ -340,6 +341,7 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `POST /api/v1/projects/{id}/review` | `project:review` | `{decision: approve\|reject, comment}` — comment required to reject. Own-department only; never your own project. Audited. |
 | `GET/POST /api/v1/projects/{id}/members`, `DELETE …/members/{user_id}` | owner for writes | Team members can see the project even while it's a draft. |
 | `GET /api/v1/coordinator/review-queue` | `project:review` | Pending projects in your department (admin: all). |
+| `GET /api/v1/search/semantic?q=&limit=` | any signed-in user | Ask in plain language. Full-text and vector rankings are fused with reciprocal rank fusion; visibility rules are the same ones the list endpoints apply. `semantic_used: false` means the optional ML extra isn't installed and the answer is lexical-only. |
 | `GET/POST /api/v1/funding`, `GET/PATCH/DELETE /api/v1/funding/{id}` | any signed-in user reads / `funding:manage` writes | Filters `q`, `status`, `open_only`, `research_area_id`, `deadline_before`. Seeded calls are fictional and flagged `is_demo`. |
 | `GET /api/v1/me/notifications` | any signed-in user | Your own notifications plus the unread count. Others' are never visible (`404` on a foreign id). |
 | `POST /api/v1/me/notifications/{id}/read`, `POST /api/v1/me/notifications/read-all` | any signed-in user | |
@@ -490,8 +492,8 @@ project and opportunity, so they can be run repeatedly.
 | 9 | Explainable tag + TF-IDF recommendations with an evaluation set |
 | 10 | Role-specific dashboards, saved items, moderation and UI polish: MVP complete |
 | 11 | Facilities, equipment and booking calendar, double-booking prevented in the database |
-| **12** | **Funding calls, event-driven notifications, deadline reminders (this commit)** |
-| 13 | Embeddings, pgvector, hybrid semantic search |
+| 12 | Funding calls, event-driven notifications, deadline reminders |
+| **13** | **Embeddings, pgvector, hybrid semantic search (this commit)** |
 | 14 | Research analytics, collaboration network, audit-log UI, moderation |
 | 15 | Optional Docker, CI/CD, free-tier deployment, hardening |
 

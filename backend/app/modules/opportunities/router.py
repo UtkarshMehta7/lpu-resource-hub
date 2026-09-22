@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
@@ -30,6 +30,8 @@ from app.modules.opportunities.schemas import (
     OpportunityRead,
     OpportunityUpdate,
 )
+from app.modules.search.models import EntityType
+from app.modules.search.tasks import schedule_embedding
 from app.modules.users.models import User
 
 router = APIRouter(tags=["opportunities"])
@@ -120,11 +122,15 @@ def read_opportunities(
 @router.post("/opportunities", response_model=OpportunityRead, status_code=status.HTTP_201_CREATED)
 def create_opportunity(
     data: OpportunityCreate,
+    request: Request,
+    background: BackgroundTasks,
     db: DbSession,
     creator: Annotated[User, Depends(require_permission(Permission.OPPORTUNITY_CREATE))],
 ) -> OpportunityRead:
     with _domain_errors():
-        return service.create_opportunity(db, creator, data)
+        opportunity = service.create_opportunity(db, creator, data)
+    schedule_embedding(request, background, EntityType.OPPORTUNITY, opportunity.id)
+    return opportunity
 
 
 @router.get("/opportunities/{opportunity_id}", response_model=OpportunityRead)
@@ -137,10 +143,17 @@ def read_opportunity(
 
 @router.patch("/opportunities/{opportunity_id}", response_model=OpportunityRead)
 def update_opportunity(
-    opportunity_id: uuid.UUID, data: OpportunityUpdate, db: DbSession, actor: CurrentUser
+    opportunity_id: uuid.UUID,
+    data: OpportunityUpdate,
+    request: Request,
+    background: BackgroundTasks,
+    db: DbSession,
+    actor: CurrentUser,
 ) -> OpportunityRead:
     with _domain_errors():
-        return service.update_opportunity(db, actor, opportunity_id, data)
+        opportunity = service.update_opportunity(db, actor, opportunity_id, data)
+    schedule_embedding(request, background, EntityType.OPPORTUNITY, opportunity.id)
+    return opportunity
 
 
 @router.post("/opportunities/{opportunity_id}/publish", response_model=OpportunityRead)

@@ -70,6 +70,7 @@ def score_item(
     weights: ScoreWeights,
     text_score: float = 0.0,
     related_terms: tuple[str, ...] = (),
+    semantic_score: float = 0.0,
 ) -> Breakdown:
     skills = skill_score(viewer, item)
     areas = area_score(viewer, item, parents)
@@ -77,10 +78,16 @@ def score_item(
     shared = viewer.research_areas & item.research_areas
     related = _related_areas(viewer.research_areas, item.research_areas, parents)
     return Breakdown(
-        score=weights.skill * skills + weights.area * areas + weights.text * text_score,
+        score=(
+            weights.skill * skills
+            + weights.area * areas
+            + weights.text * text_score
+            + weights.semantic * max(semantic_score, 0.0)
+        ),
         skill_score=skills,
         area_score=areas,
         text_score=text_score,
+        semantic_score=semantic_score,
         matched_required=tuple(sorted(matched & item.required_skills, key=str)),
         total_required=len(item.required_skills),
         matched_optional=tuple(sorted(matched - item.required_skills, key=str)),

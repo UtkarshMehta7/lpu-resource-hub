@@ -15,7 +15,6 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.ml.explain import build_reasons
-from app.ml.features import ScoreWeights
 from app.ml.scoring import score_item
 from app.modules.notifications.models import NotificationType
 from app.modules.notifications.service import notify
@@ -27,6 +26,7 @@ from app.modules.recommendations.service import (
     tag_names,
     viewer_features,
 )
+from app.modules.recommendations.weights import score_weights
 from app.modules.users.models import User, UserRole
 
 # Don't notify half a department because one word matched.
@@ -78,12 +78,7 @@ def notify_relevant_users(db: Session, opportunity_id: uuid.UUID | str) -> int:
     if not candidates:
         return 0
 
-    settings = get_settings()
-    weights = ScoreWeights(
-        skill=settings.rec_weight_skill,
-        area=settings.rec_weight_area,
-        text=settings.rec_weight_text,
-    )
+    weights = score_weights(get_settings())
     item = opportunity_features(db, opportunity)
     parents = area_parents(db)
     skill_names, area_names = tag_names(db)
