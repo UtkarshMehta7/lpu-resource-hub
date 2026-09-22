@@ -29,7 +29,7 @@ action in general — the resource policy layer (loaded-resource ownership +
 scope match, `docs/architecture.md` §6 layer 2) is what enforces *this
 specific* department/project/etc., introduced per-module starting Step 3.
 
-## Implemented (Steps 2–7)
+## Implemented (Steps 2–8)
 
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
@@ -49,6 +49,7 @@ specific* department/project/etc., introduced per-module starting Step 3.
 | `publication:create` | | ✅ | ✅ (inherited) | | 6 |
 | `opportunity:create` | | ✅ (own active project) | ✅ (inherited; also department-wide) | | 7 |
 | `application:submit` | ✅ (student openings) | ✅ (collaborations) | ✅ (inherited) | | 7 |
+| `collaboration:send` | ✅ | ✅ | ✅ (inherited) | | 8 |
 
 Every authenticated, active user (any role) can read their own profile via
 `GET /api/v1/me`, read their own `GET/PUT /me/profile`, set their own
@@ -76,7 +77,6 @@ picking it up automatically via inheritance wherever `FACULTY` has it.
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
 | `project:archive` | | ✅ (own) | | ✅ | 5 |
-| `collaboration:send` | ✅ | ✅ | ✅ | | 8 |
 | `facility:manage` | | | ✅ | ✅ | 11 |
 | `booking:approve` | | | ✅ | ✅ | 11 |
 | `funding:manage` | | | ✅ | ✅ | 12 |

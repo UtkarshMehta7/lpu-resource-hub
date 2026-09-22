@@ -21,6 +21,7 @@ def test_faculty_has_exactly_its_own_grants() -> None:
             Permission.PUBLICATION_CREATE,
             Permission.OPPORTUNITY_CREATE,
             Permission.APPLICATION_SUBMIT,
+            Permission.COLLABORATION_SEND,
         }
     )
 
@@ -38,6 +39,7 @@ def test_coordinator_inherits_faculty_grants_on_top_of_its_own() -> None:
             Permission.PUBLICATION_CREATE,  # inherited from FACULTY
             Permission.OPPORTUNITY_CREATE,  # inherited from FACULTY
             Permission.APPLICATION_SUBMIT,  # inherited from FACULTY
+            Permission.COLLABORATION_SEND,  # inherited from FACULTY
         }
     )
 
@@ -61,8 +63,10 @@ def test_admin_has_exactly_its_own_grants() -> None:
     )
 
 
-def test_student_can_only_apply() -> None:
-    assert ROLE_PERMISSIONS[UserRole.STUDENT] == frozenset({Permission.APPLICATION_SUBMIT})
+def test_student_can_only_apply_and_request_collaboration() -> None:
+    assert ROLE_PERMISSIONS[UserRole.STUDENT] == frozenset(
+        {Permission.APPLICATION_SUBMIT, Permission.COLLABORATION_SEND}
+    )
 
 
 def test_coordinator_inherits_a_hypothetical_faculty_permission() -> None:

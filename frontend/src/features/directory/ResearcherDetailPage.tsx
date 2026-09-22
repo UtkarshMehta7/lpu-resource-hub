@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { StatusIndicator } from "@/components/ui/StatusIndicator";
+import { RequestCollaborationButton } from "@/features/collaborations/RequestCollaborationButton";
 import { fetchProjects } from "@/features/projects/api";
 import { PublicationsSection } from "@/features/publications/PublicationList";
 
@@ -55,9 +56,12 @@ export function ResearcherDetailPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{data.full_name}</h1>
           <p className="mt-1 text-sm text-ink-muted">{data.designation}</p>
         </div>
-        {data.verification_status === "verified" ? (
-          <StatusIndicator tone="success" label="Verified" />
-        ) : null}
+        <div className="flex flex-wrap items-center gap-3">
+          {data.verification_status === "verified" ? (
+            <StatusIndicator tone="success" label="Verified" />
+          ) : null}
+          <RequestCollaborationButton recipientId={data.user_id} recipientName={data.full_name} />
+        </div>
       </div>
 
       <p className="mt-3 text-sm text-ink-muted">{AVAILABILITY_LABEL[data.availability]}</p>

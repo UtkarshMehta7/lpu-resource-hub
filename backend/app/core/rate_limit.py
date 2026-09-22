@@ -11,6 +11,7 @@ counters.
 from __future__ import annotations
 
 import time
+import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
 from threading import Lock
@@ -23,6 +24,10 @@ AUTH_RATE_LIMIT_WINDOW_SECONDS = 60.0
 # than auth's -- it exists to stop scraping, not to slow down a user typing.
 SEARCH_RATE_LIMIT_MAX_REQUESTS = 60
 SEARCH_RATE_LIMIT_WINDOW_SECONDS = 60.0
+# Collaboration requests notify a real person, so sending is budgeted per
+# user (not IP): enough for genuine outreach, not enough to spam a department.
+COLLABORATION_RATE_LIMIT_MAX_REQUESTS = 10
+COLLABORATION_RATE_LIMIT_WINDOW_SECONDS = 3600.0
 
 
 @dataclass
@@ -56,6 +61,23 @@ def create_search_rate_limiter() -> RateLimiter:
         max_requests=SEARCH_RATE_LIMIT_MAX_REQUESTS,
         window_seconds=SEARCH_RATE_LIMIT_WINDOW_SECONDS,
     )
+
+
+def create_collaboration_rate_limiter() -> RateLimiter:
+    return RateLimiter(
+        max_requests=COLLABORATION_RATE_LIMIT_MAX_REQUESTS,
+        window_seconds=COLLABORATION_RATE_LIMIT_WINDOW_SECONDS,
+    )
+
+
+def enforce_collaboration_rate_limit(request: Request, user_id: uuid.UUID) -> None:
+    """Per-user budget for sending collaboration requests."""
+    limiter: RateLimiter = request.app.state.collaboration_rate_limiter
+    if not limiter.allow(str(user_id)):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="You're sending requests too quickly. Try again later.",
+        )
 
 
 def get_auth_rate_limiter(request: Request) -> RateLimiter:

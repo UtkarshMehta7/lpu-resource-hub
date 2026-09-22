@@ -16,7 +16,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 7: opportunities & applications.** What exists today:
+**Step 8: collaboration requests.** What exists today:
 
 | Area | Status |
 |---|---|
@@ -38,7 +38,8 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Research projects: draft → coordinator review → active → completed/archived, team members, visibility rules, review queue | Done |
 | Publications: ordered internal/external author lists, DOI de-duplication, project links, shown on researcher and project pages | Done |
 | Opportunity board (draft → open → closed/filled) and application workflow with status timeline, applicant review, auto-add to project team | Done |
-| Collaboration requests and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Direct collaboration requests (send/accept/decline/cancel) with inbox/sent, privacy rules and a per-user send limit | Done |
+| Recommendations and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
 
@@ -333,6 +334,11 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `POST /api/v1/projects/{id}/review` | `project:review` | `{decision: approve\|reject, comment}` — comment required to reject. Own-department only; never your own project. Audited. |
 | `GET/POST /api/v1/projects/{id}/members`, `DELETE …/members/{user_id}` | owner for writes | Team members can see the project even while it's a draft. |
 | `GET /api/v1/coordinator/review-queue` | `project:review` | Pending projects in your department (admin: all). |
+| `POST /api/v1/collaborations` | `collaboration:send` (student, faculty, coordinator) | `{recipient_id, project_id?, message}`. Researchers are always reachable; students only if discoverable; admins never (`404`). One pending request per person per project (`409`). Limited to 10 sends per hour per user. |
+| `GET /api/v1/me/collaborations?box=inbox\|sent&status=` | any signed-in user | Your own requests, either direction. |
+| `GET /api/v1/collaborations/{id}` | sender or recipient | Anyone else gets `404`. A referenced project's title is shown only to viewers who can see the project. |
+| `POST /api/v1/collaborations/{id}/accept` / `/decline` | recipient only | The sender gets `403`; a non-pending request is `409`. |
+| `POST /api/v1/collaborations/{id}/cancel` | sender only | Same rules, mirrored. |
 | `GET/POST /api/v1/opportunities` | any signed-in user / `opportunity:create` | Filters `q`, `type`, `status`, `department_id`, `skill_id`, `project_id`, `deadline_after`, `deadline_before`, `mine`. Drafts are visible only to the poster, the scoped coordinator and admins. Faculty post on their own **active** projects; coordinators also department-wide. |
 | `GET/PATCH /api/v1/opportunities/{id}` | poster for edits | Editable while draft or open. `positions` can't drop below accepted applicants. |
 | `POST /api/v1/opportunities/{id}/publish` / `/close` | poster (close: also scoped coordinator, admin) | New opportunities start as drafts; publishing opens them. Non-poster closes are audited. |
@@ -344,7 +350,7 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `GET/POST /api/v1/publications` | any signed-in user / `publication:create` | List with `q`, `author_id` (authored or created), `year`, `project_id`, `research_area_id` (via linked projects). Linked projects you can't see are omitted. |
 | `GET/PATCH/DELETE /api/v1/publications/{id}` | creator for edits; creator or admin for delete | Authors are an ordered list of `{user_id}` or `{external_name}`. Duplicate DOI (case/prefix-insensitive) is `409`. Admin deletes are audited. |
 
-Directory, project list and search endpoints are rate-limited to 60 requests/minute per IP. `/search` now covers researchers, projects, publications and opportunities.
+Directory, project list and search endpoints are rate-limited to 60 requests/minute per IP; sending collaboration requests is limited to 10 per hour per user. `/search` now covers researchers, projects, publications and opportunities.
 
 Setting `>= 3` skills and `>= 3` research areas flips
 `onboarding_complete` on `GET /api/v1/me`, which is what gates
