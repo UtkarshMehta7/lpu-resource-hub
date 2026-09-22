@@ -31,6 +31,8 @@ class Permission(StrEnum):
     TAXONOMY_MANAGE = "taxonomy:manage"
     PROFILE_VERIFY = "profile:verify"
     STUDENT_DISCOVER = "student:discover"
+    PROJECT_CREATE = "project:create"
+    PROJECT_REVIEW = "project:review"
 
 
 # A role inherits everything its parent can do. ADMIN's powers are listed
@@ -45,11 +47,12 @@ ROLE_HIERARCHY: dict[UserRole, UserRole | None] = {
 _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
     UserRole.STUDENT: frozenset(),
     # First FACULTY-level grant: RESEARCH_COORDINATOR inherits it for free.
-    UserRole.FACULTY: frozenset({Permission.STUDENT_DISCOVER}),
+    UserRole.FACULTY: frozenset({Permission.STUDENT_DISCOVER, Permission.PROJECT_CREATE}),
     UserRole.RESEARCH_COORDINATOR: frozenset(
         {
             Permission.TAXONOMY_MANAGE,
             Permission.PROFILE_VERIFY,
+            Permission.PROJECT_REVIEW,
         }
     ),
     UserRole.ADMIN: frozenset(
@@ -65,6 +68,7 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.TAXONOMY_MANAGE,
             Permission.PROFILE_VERIFY,
             Permission.STUDENT_DISCOVER,
+            Permission.PROJECT_REVIEW,
         }
     ),
 }
