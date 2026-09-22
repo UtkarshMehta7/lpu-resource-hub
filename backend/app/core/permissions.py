@@ -36,6 +36,7 @@ class Permission(StrEnum):
     PUBLICATION_CREATE = "publication:create"
     OPPORTUNITY_CREATE = "opportunity:create"
     APPLICATION_SUBMIT = "application:submit"
+    COLLABORATION_SEND = "collaboration:send"
 
 
 # A role inherits everything its parent can do. ADMIN's powers are listed
@@ -48,7 +49,7 @@ ROLE_HIERARCHY: dict[UserRole, UserRole | None] = {
 }
 
 _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
-    UserRole.STUDENT: frozenset({Permission.APPLICATION_SUBMIT}),
+    UserRole.STUDENT: frozenset({Permission.APPLICATION_SUBMIT, Permission.COLLABORATION_SEND}),
     # First FACULTY-level grant: RESEARCH_COORDINATOR inherits it for free.
     UserRole.FACULTY: frozenset(
         {
@@ -58,6 +59,7 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.OPPORTUNITY_CREATE,
             # Faculty apply only to COLLABORATION openings (checked in the service).
             Permission.APPLICATION_SUBMIT,
+            Permission.COLLABORATION_SEND,
         }
     ),
     UserRole.RESEARCH_COORDINATOR: frozenset(
