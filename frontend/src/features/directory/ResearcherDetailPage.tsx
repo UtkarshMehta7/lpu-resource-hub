@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { StatusIndicator } from "@/components/ui/StatusIndicator";
+import { fetchProjects } from "@/features/projects/api";
 
 import { fetchResearcher } from "./api";
 
@@ -16,6 +17,11 @@ export function ResearcherDetailPage() {
   const { data, isPending, isError } = useQuery({
     queryKey: ["researcher", userId],
     queryFn: () => fetchResearcher(userId ?? ""),
+    enabled: Boolean(userId),
+  });
+  const { data: projects } = useQuery({
+    queryKey: ["projects", { owner_id: userId }],
+    queryFn: () => fetchProjects({ owner_id: userId }),
     enabled: Boolean(userId),
   });
 
@@ -80,9 +86,27 @@ export function ResearcherDetailPage() {
         </section>
       ) : null}
 
-      <p className="mt-10 text-xs text-ink-muted">
-        Projects and publications appear here in a later step.
-      </p>
+      <section className="mt-8">
+        <h2 className="text-base font-semibold">Projects</h2>
+        {projects && projects.items.length > 0 ? (
+          <ul className="mt-2 space-y-1">
+            {projects.items.map((project) => (
+              <li key={project.id}>
+                <Link
+                  to={`/projects/${project.id}`}
+                  className="text-sm text-brand-700 hover:underline"
+                >
+                  {project.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-ink-muted">No public projects yet.</p>
+        )}
+      </section>
+
+      <p className="mt-10 text-xs text-ink-muted">Publications appear here in a later step.</p>
     </div>
   );
 }

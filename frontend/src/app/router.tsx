@@ -12,6 +12,10 @@ import { RoleRoute } from "@/features/auth/RoleRoute";
 import { HomePage } from "@/features/home/HomePage";
 import { NotFoundPage } from "@/features/home/NotFoundPage";
 import { OnboardingPage } from "@/features/onboarding/OnboardingPage";
+import { ProjectDetailPage } from "@/features/projects/ProjectDetailPage";
+import { ProjectFormPage } from "@/features/projects/ProjectFormPage";
+import { ProjectsPage } from "@/features/projects/ProjectsPage";
+import { ReviewQueuePage } from "@/features/projects/ReviewQueuePage";
 import { ProfilePage } from "@/features/profiles/ProfilePage";
 import { VerificationQueuePage } from "@/features/researchers/VerificationQueuePage";
 
@@ -31,16 +35,25 @@ export const router = createBrowserRouter([
           { path: "researchers", element: <DirectoryPage /> },
           { path: "researchers/:userId", element: <ResearcherDetailPage /> },
           { path: "onboarding", element: <OnboardingPage /> },
+          { path: "projects", element: <ProjectsPage /> },
+          { path: "projects/mine", element: <ProjectsPage mine /> },
+          { path: "projects/:projectId", element: <ProjectDetailPage /> },
+          { path: "projects/:projectId/edit", element: <ProjectFormPage /> },
           { path: "profile", element: <ProfilePage /> },
           {
             element: <RoleRoute allow={["research_coordinator", "admin"]} />,
             children: [
               { path: "coordinator/verification-queue", element: <VerificationQueuePage /> },
+              { path: "coordinator/review-queue", element: <ReviewQueuePage /> },
             ],
           },
           {
             element: <RoleRoute allow={["faculty", "research_coordinator", "admin"]} />,
             children: [{ path: "students", element: <StudentsPage /> }],
+          },
+          {
+            element: <RoleRoute allow={["faculty", "research_coordinator"]} />,
+            children: [{ path: "projects/new", element: <ProjectFormPage /> }],
           },
           {
             element: <RoleRoute allow={["admin"]} />,
