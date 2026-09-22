@@ -1,0 +1,47 @@
+# ---- Environment & secrets --------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- Python -----------------------------------------------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# ---- Node / frontend --------------------------------------------------------
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+
+# ---- Local databases & data -------------------------------------------------
+*.sqlite
+*.sqlite3
+*.db
+pgdata/
+*.dump
+
+# ---- Logs -------------------------------------------------------------------
+*.log
+logs/
+
+# ---- OS / editors -----------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*~
