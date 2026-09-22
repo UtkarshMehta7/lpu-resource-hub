@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.deps import get_current_user
 from app.core.pagination import Page, PageParams
 from app.core.permissions import Permission, require_permission
 from app.core.rate_limit import client_ip
@@ -52,6 +53,10 @@ from app.modules.users.models import User, UserRole
 
 router = APIRouter(prefix="/users", tags=["admin"])
 org_router = APIRouter(tags=["admin"])
+# Read-only school/department lists for every signed-in user: the directory
+# filters need them, and the names are not sensitive. Mounted at /api/v1,
+# not under /admin.
+public_org_router = APIRouter(tags=["organisation"])
 
 
 def _load_target(db: Annotated[Session, Depends(get_db)], user_id: uuid.UUID) -> User:
@@ -279,3 +284,19 @@ def _load_department(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Department not found."
         ) from exc
+
+
+@public_org_router.get(
+    "/schools", response_model=list[SchoolRead], dependencies=[Depends(get_current_user)]
+)
+def read_public_schools(db: Annotated[Session, Depends(get_db)]) -> list[School]:
+    return list_schools(db)
+
+
+@public_org_router.get(
+    "/departments", response_model=list[DepartmentRead], dependencies=[Depends(get_current_user)]
+)
+def read_public_departments(
+    db: Annotated[Session, Depends(get_db)], school_id: uuid.UUID | None = None
+) -> list[Department]:
+    return list_departments(db, school_id=school_id)

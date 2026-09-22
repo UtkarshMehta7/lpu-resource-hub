@@ -16,7 +16,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 3: organisation, taxonomy, profiles & faculty verification.** What exists today:
+**Step 4: researcher directory & search.** What exists today:
 
 | Area | Status |
 |---|---|
@@ -34,7 +34,8 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Faculty verification: department-scoped coordinator queue, verify/reject, audited | Done |
 | Onboarding wizard, profile page, tag picker, coordinator verification queue (UI) | Done |
 | Fictional demo seed data (`scripts/seed_demo_data.py`) | Done |
-| Directory/search, projects, publications and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Researcher directory (full-text + typo-tolerant search, filters), researcher detail, opt-in student discovery, unified search | Done |
+| Projects, publications and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
 
@@ -303,7 +304,7 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `GET/POST /api/v1/admin/schools`, `PATCH/DELETE .../{id}` | Admin only. Deleting a school cascades to its departments. |
 | `GET/POST /api/v1/admin/departments`, `PATCH/DELETE .../{id}` | Admin only. Deleting a department clears its users' `department_id`. |
 
-## Profiles, taxonomy & verification API
+## Profiles, taxonomy, verification & directory API
 
 | Endpoint | Auth | Notes |
 |---|---|---|
@@ -316,6 +317,14 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `GET /api/v1/admin/tag-suggestions`, `POST .../{id}/approve` / `/reject` | `taxonomy:manage` | Approving creates the real skill/research area. |
 | `GET /api/v1/coordinator/verification-queue` | `profile:verify` | Coordinators see only their own department; admins see everything. |
 | `POST /api/v1/researchers/{id}/verify` | `profile:verify` | `{decision: verified\|rejected, comment}`. Outside your department scope returns `404`. You can never verify yourself. |
+
+| `GET /api/v1/researchers` | any signed-in user | `q` (full-text + misspelled-name tolerant), `school_id`, `department_id`, `research_area_id` (includes child areas), `skill_id`, `availability`, `verified_only`, `sort`, pagination. No email in results. |
+| `GET /api/v1/researchers/{id}` | any signed-in user | Public profile with research areas and skills. |
+| `GET /api/v1/students` | `student:discover` (faculty, coordinator, admin) | Opted-in students only (`is_discoverable`), public fields only. |
+| `GET /api/v1/search?q=&types=researchers` | any signed-in user | Unified search; more `types` arrive in later steps. |
+| `GET /api/v1/schools`, `GET /api/v1/departments` | any signed-in user | Read-only lists for filters. |
+
+Directory and search endpoints are rate-limited to 60 requests/minute per IP.
 
 Setting `>= 3` skills and `>= 3` research areas flips
 `onboarding_complete` on `GET /api/v1/me`, which is what gates
@@ -370,7 +379,7 @@ lpu-research-hub/
 │   │       ├── taxonomy/        # skills, research areas, aliases, suggestions
 │   │       ├── profiles/        # student/researcher profiles, skills, areas
 │   │       └── researchers/     # verification queue and decisions
-│   ├── alembic/                 # migration environment + versions/ (0001 baseline … 0004 org/taxonomy/profiles)
+│   ├── alembic/                 # migration environment + versions/ (0001 baseline … 0005 full-text search)
 │   ├── scripts/                 # create_admin.py, seed_demo_data.py
 │   ├── tests/                   # pytest suite (db tests marked `db`)
 │   ├── alembic.ini
@@ -380,7 +389,7 @@ lpu-research-hub/
 │   ├── src/
 │   │   ├── app/                 # App, router, layouts
 │   │   ├── components/          # layout/ (header, banner), ui/ (primitives)
-│   │   ├── features/            # home/, system-status/, auth/, admin/, taxonomy/, profiles/, onboarding/, researchers/
+│   │   ├── features/            # home/, system-status/, auth/, admin/, taxonomy/, profiles/, onboarding/, researchers/, directory/
 │   │   ├── test/                # Vitest setup
 │   │   └── lib/                 # config, api client + error normalisation
 │   ├── index.html
@@ -391,7 +400,7 @@ lpu-research-hub/
 │   ├── architecture.md          # approved architecture (source of truth)
 │   ├── development.md           # day-to-day workflow and conventions
 │   ├── rbac-matrix.md           # full role -> permission design
-│   └── adr/0001-foundation-decisions.md … 0004-profiles-and-taxonomy.md
+│   └── adr/0001-foundation-decisions.md … 0005-directory-and-search.md
 ├── CLAUDE.md
 ├── lpu-roadmap-prompts.md
 ├── .editorconfig
@@ -407,8 +416,8 @@ lpu-research-hub/
 | 0 | Project foundation |
 | 1 | Users, authentication, JWT with rotating refresh tokens |
 | 2 | RBAC core: permission map, policies, audit hook, authorization test scaffold |
-| **3** | **Schools, departments, taxonomy, student and researcher profiles, faculty verification, demo seed data (this commit)** |
-| 4 | Researcher directory and full-text search |
+| 3 | Schools, departments, taxonomy, student and researcher profiles, faculty verification, demo seed data |
+| **4** | **Researcher directory and full-text search (this commit)** |
 | 5 | Research projects with coordinator review workflow and team members |
 | 6 | Publications |
 | 7 | Research opportunities and applications |

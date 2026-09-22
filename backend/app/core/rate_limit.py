@@ -19,6 +19,10 @@ from fastapi import HTTPException, Request, status
 
 AUTH_RATE_LIMIT_MAX_REQUESTS = 5
 AUTH_RATE_LIMIT_WINDOW_SECONDS = 60.0
+# Search is read-only and browsed interactively, so the budget is far larger
+# than auth's -- it exists to stop scraping, not to slow down a user typing.
+SEARCH_RATE_LIMIT_MAX_REQUESTS = 60
+SEARCH_RATE_LIMIT_WINDOW_SECONDS = 60.0
 
 
 @dataclass
@@ -47,9 +51,27 @@ def create_auth_rate_limiter() -> RateLimiter:
     )
 
 
+def create_search_rate_limiter() -> RateLimiter:
+    return RateLimiter(
+        max_requests=SEARCH_RATE_LIMIT_MAX_REQUESTS,
+        window_seconds=SEARCH_RATE_LIMIT_WINDOW_SECONDS,
+    )
+
+
 def get_auth_rate_limiter(request: Request) -> RateLimiter:
     limiter: RateLimiter = request.app.state.auth_rate_limiter
     return limiter
+
+
+def enforce_search_rate_limit(request: Request) -> None:
+    """Route dependency for the directory/search endpoints. Keyed by IP only:
+    unlike auth there is no account being targeted."""
+    limiter: RateLimiter = request.app.state.search_rate_limiter
+    if not limiter.allow(client_ip(request)):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests. Try again shortly.",
+        )
 
 
 def client_ip(request: Request) -> str:
