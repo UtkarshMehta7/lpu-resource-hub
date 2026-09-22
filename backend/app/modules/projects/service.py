@@ -205,6 +205,11 @@ def _to_read(db: Session, project: Project) -> ProjectRead:
 # --- reads -----------------------------------------------------------------
 
 
+def project_cards(db: Session, projects: Sequence[Project]) -> list[ProjectCard]:
+    """Public wrapper used by recommendations (Step 9)."""
+    return _to_cards(db, projects)
+
+
 def get_project(db: Session, viewer: User, project_id: uuid.UUID) -> ProjectRead:
     return _to_read(db, _load_visible(db, viewer, project_id))
 
