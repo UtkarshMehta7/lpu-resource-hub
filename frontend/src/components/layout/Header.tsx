@@ -51,6 +51,14 @@ export function Header() {
             >
               Opportunities
             </Link>
+            {user.role !== "admin" ? (
+              <Link
+                to="/collaborations"
+                className="hidden text-sm font-medium hover:underline sm:inline"
+              >
+                Requests
+              </Link>
+            ) : null}
             {user.role !== "student" ? (
               <Link to="/students" className="hidden text-sm font-medium hover:underline sm:inline">
                 Students

@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 
+import { RequestCollaborationButton } from "@/features/collaborations/RequestCollaborationButton";
+
 import { fetchDiscoverableStudents } from "./api";
 
 /** Faculty/coordinator/admin only. The backend returns opted-in students only. */
@@ -57,7 +59,13 @@ export function StudentsPage() {
           <ul className="mt-3 space-y-3">
             {data.items.map((student) => (
               <li key={student.user_id} className="rounded-card border border-line bg-surface p-4">
-                <p className="text-sm font-semibold">{student.full_name}</p>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="text-sm font-semibold">{student.full_name}</p>
+                  <RequestCollaborationButton
+                    recipientId={student.user_id}
+                    recipientName={student.full_name}
+                  />
+                </div>
                 <p className="text-sm text-ink-muted">
                   {student.program} · Year {student.year}
                 </p>

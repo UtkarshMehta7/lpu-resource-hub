@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/features/auth/authContext";
+import { RequestCollaborationButton } from "@/features/collaborations/RequestCollaborationButton";
 import { PublicationsSection } from "@/features/publications/PublicationList";
 import { toApiError } from "@/lib/api/errors";
 
@@ -119,6 +120,15 @@ export function ProjectDetailPage() {
               {project.owner_name}
             </Link>
           </p>
+          {!isOwner ? (
+            <div className="mt-2">
+              <RequestCollaborationButton
+                recipientId={project.owner_id}
+                recipientName={project.owner_name}
+                projectId={project.id}
+              />
+            </div>
+          ) : null}
         </div>
         <span className="rounded-md border border-line px-2 py-1 text-xs font-medium">
           {STATUS_LABEL[project.status]}
