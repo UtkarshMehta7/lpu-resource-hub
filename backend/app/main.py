@@ -27,6 +27,7 @@ from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
 from app.modules.health.router import router as health_router
 from app.modules.profiles.router import router as profiles_router
+from app.modules.projects.router import router as projects_router
 from app.modules.researchers.router import router as researchers_router
 from app.modules.taxonomy.router import router as taxonomy_router
 from app.modules.users.router import router as users_router
@@ -107,4 +108,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(taxonomy_router, prefix=API_V1_PREFIX)
     app.include_router(profiles_router, prefix=API_V1_PREFIX)
     app.include_router(researchers_router, prefix=API_V1_PREFIX)
+    app.include_router(projects_router, prefix=API_V1_PREFIX)
     return app

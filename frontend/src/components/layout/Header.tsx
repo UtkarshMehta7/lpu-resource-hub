@@ -36,6 +36,9 @@ export function Header() {
             >
               Researchers
             </Link>
+            <Link to="/projects" className="hidden text-sm font-medium hover:underline sm:inline">
+              Projects
+            </Link>
             {user.role !== "student" ? (
               <Link to="/students" className="hidden text-sm font-medium hover:underline sm:inline">
                 Students
@@ -47,6 +50,14 @@ export function Header() {
                 className="hidden text-sm font-medium hover:underline sm:inline"
               >
                 Verification
+              </Link>
+            ) : null}
+            {user.role === "research_coordinator" || user.role === "admin" ? (
+              <Link
+                to="/coordinator/review-queue"
+                className="hidden text-sm font-medium hover:underline sm:inline"
+              >
+                Reviews
               </Link>
             ) : null}
             {user.role === "admin" ? (

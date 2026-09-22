@@ -16,7 +16,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 4: researcher directory & search.** What exists today:
+**Step 5: research projects & review workflow.** What exists today:
 
 | Area | Status |
 |---|---|
@@ -35,7 +35,8 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Onboarding wizard, profile page, tag picker, coordinator verification queue (UI) | Done |
 | Fictional demo seed data (`scripts/seed_demo_data.py`) | Done |
 | Researcher directory (full-text + typo-tolerant search, filters), researcher detail, opt-in student discovery, unified search | Done |
-| Projects, publications and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Research projects: draft → coordinator review → active → completed/archived, team members, visibility rules, review queue | Done |
+| Publications, opportunities and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
 
@@ -324,7 +325,14 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `GET /api/v1/search?q=&types=researchers` | any signed-in user | Unified search; more `types` arrive in later steps. |
 | `GET /api/v1/schools`, `GET /api/v1/departments` | any signed-in user | Read-only lists for filters. |
 
-Directory and search endpoints are rate-limited to 60 requests/minute per IP.
+| `GET/POST /api/v1/projects` | any signed-in user / `project:create` | List with `q`, `status`, `mine`, `owner_id`, `department_id`, `research_area_id`, `skill_id`. Only projects you may see are returned. |
+| `GET/PATCH/DELETE /api/v1/projects/{id}` | owner for writes | Hidden projects are `404`. Owner may edit in draft or active. `DELETE` removes a draft, archives anything else. |
+| `POST /api/v1/projects/{id}/submit` / `/complete` / `/archive` | owner (admin may archive any) | Submit requires a verified researcher profile. Invalid transitions are `409`. |
+| `POST /api/v1/projects/{id}/review` | `project:review` | `{decision: approve\|reject, comment}` — comment required to reject. Own-department only; never your own project. Audited. |
+| `GET/POST /api/v1/projects/{id}/members`, `DELETE …/members/{user_id}` | owner for writes | Team members can see the project even while it's a draft. |
+| `GET /api/v1/coordinator/review-queue` | `project:review` | Pending projects in your department (admin: all). |
+
+Directory, project list and search endpoints are rate-limited to 60 requests/minute per IP. `/search` now covers researchers and projects.
 
 Setting `>= 3` skills and `>= 3` research areas flips
 `onboarding_complete` on `GET /api/v1/me`, which is what gates
@@ -378,8 +386,9 @@ lpu-research-hub/
 │   │       ├── audit/           # append-only audit log
 │   │       ├── taxonomy/        # skills, research areas, aliases, suggestions
 │   │       ├── profiles/        # student/researcher profiles, skills, areas
-│   │       └── researchers/     # verification queue and decisions
-│   ├── alembic/                 # migration environment + versions/ (0001 baseline … 0005 full-text search)
+│   │       ├── researchers/     # verification, directory, search
+│   │       └── projects/        # projects, review workflow, members
+│   ├── alembic/                 # migration environment + versions/ (0001 baseline … 0006 research projects)
 │   ├── scripts/                 # create_admin.py, seed_demo_data.py
 │   ├── tests/                   # pytest suite (db tests marked `db`)
 │   ├── alembic.ini
@@ -389,7 +398,7 @@ lpu-research-hub/
 │   ├── src/
 │   │   ├── app/                 # App, router, layouts
 │   │   ├── components/          # layout/ (header, banner), ui/ (primitives)
-│   │   ├── features/            # home/, system-status/, auth/, admin/, taxonomy/, profiles/, onboarding/, researchers/, directory/
+│   │   ├── features/            # home/, system-status/, auth/, admin/, taxonomy/, profiles/, onboarding/, researchers/, directory/, projects/
 │   │   ├── test/                # Vitest setup
 │   │   └── lib/                 # config, api client + error normalisation
 │   ├── index.html
@@ -400,7 +409,7 @@ lpu-research-hub/
 │   ├── architecture.md          # approved architecture (source of truth)
 │   ├── development.md           # day-to-day workflow and conventions
 │   ├── rbac-matrix.md           # full role -> permission design
-│   └── adr/0001-foundation-decisions.md … 0005-directory-and-search.md
+│   └── adr/0001-foundation-decisions.md … 0006-research-projects.md
 ├── CLAUDE.md
 ├── lpu-roadmap-prompts.md
 ├── .editorconfig
@@ -417,8 +426,8 @@ lpu-research-hub/
 | 1 | Users, authentication, JWT with rotating refresh tokens |
 | 2 | RBAC core: permission map, policies, audit hook, authorization test scaffold |
 | 3 | Schools, departments, taxonomy, student and researcher profiles, faculty verification, demo seed data |
-| **4** | **Researcher directory and full-text search (this commit)** |
-| 5 | Research projects with coordinator review workflow and team members |
+| 4 | Researcher directory and full-text search |
+| **5** | **Research projects with coordinator review workflow and team members (this commit)** |
 | 6 | Publications |
 | 7 | Research opportunities and applications |
 | 8 | Collaboration requests |
