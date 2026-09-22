@@ -20,6 +20,15 @@ class UserRole(StrEnum):
     ADMIN = "admin"
 
 
+class CoordinatorScopeType(StrEnum):
+    """A research coordinator's authority scope. Department-level is used today;
+    SCHOOL and UNIVERSITY exist so the schema doesn't need to change later."""
+
+    DEPARTMENT = "department"
+    SCHOOL = "school"
+    UNIVERSITY = "university"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -38,6 +47,21 @@ class User(Base):
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    # A research coordinator's authority scope. No FK on coordinator_scope_id:
+    # it's a polymorphic reference (a department/school/university id
+    # depending on coordinator_scope_type) and none of those tables exist yet
+    # (departments arrive in Step 3). Validated at the application layer.
+    coordinator_scope_type: Mapped[CoordinatorScopeType | None] = mapped_column(
+        Enum(
+            CoordinatorScopeType,
+            name="coordinator_scope_type",
+            values_callable=lambda enum: [member.value for member in enum],
+        ),
+        nullable=True,
+    )
+    coordinator_scope_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
