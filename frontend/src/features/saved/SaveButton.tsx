@@ -19,11 +19,13 @@ export function SaveButton({ type, targetId }: { type: SavedType; targetId: stri
         await unsaveItem(existing.id);
         return;
       }
-      const target = {
+      const targets: Record<SavedType, SaveTarget> = {
         project: { project_id: targetId },
         opportunity: { opportunity_id: targetId },
         researcher: { researcher_id: targetId },
-      }[type] as SaveTarget;
+        funding: { funding_id: targetId },
+      };
+      const target = targets[type];
       await saveItem(target);
     },
     onSuccess: async () => {

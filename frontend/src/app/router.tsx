@@ -16,6 +16,10 @@ import { ProjectDetailPage } from "@/features/projects/ProjectDetailPage";
 import { ProjectFormPage } from "@/features/projects/ProjectFormPage";
 import { ProjectsPage } from "@/features/projects/ProjectsPage";
 import { ReviewQueuePage } from "@/features/projects/ReviewQueuePage";
+import { FundingDetailPage } from "@/features/funding/FundingDetailPage";
+import { FundingFormPage } from "@/features/funding/FundingFormPage";
+import { FundingPage } from "@/features/funding/FundingPage";
+import { NotificationsPage } from "@/features/notifications/NotificationsPage";
 import { BookingQueuePage } from "@/features/facilities/BookingQueuePage";
 import { EquipmentDetailPage } from "@/features/facilities/EquipmentDetailPage";
 import { EquipmentFormPage } from "@/features/facilities/EquipmentFormPage";
@@ -74,6 +78,9 @@ export const router = createBrowserRouter([
           { path: "facilities/:facilityId", element: <FacilityDetailPage /> },
           { path: "equipment/:equipmentId", element: <EquipmentDetailPage /> },
           { path: "me/bookings", element: <MyBookingsPage /> },
+          { path: "funding", element: <FundingPage /> },
+          { path: "funding/:fundingId", element: <FundingDetailPage /> },
+          { path: "me/notifications", element: <NotificationsPage /> },
           { path: "publications/mine", element: <PublicationsPage mine /> },
           { path: "publications/:publicationId", element: <PublicationDetailPage /> },
           { path: "publications/:publicationId/edit", element: <PublicationFormPage /> },
@@ -86,6 +93,7 @@ export const router = createBrowserRouter([
               { path: "admin/reports", element: <ModerationQueuePage /> },
               { path: "coordinator/booking-queue", element: <BookingQueuePage /> },
               { path: "facilities/new", element: <FacilityFormPage /> },
+              { path: "funding/new", element: <FundingFormPage /> },
               {
                 path: "facilities/:facilityId/equipment/new",
                 element: <EquipmentFormPage />,

@@ -3,7 +3,7 @@ import type { OpportunityCard } from "@/features/opportunities/api";
 import type { ProjectCard } from "@/features/projects/api";
 import { apiClient } from "@/lib/api/client";
 
-export type SavedType = "project" | "opportunity" | "researcher";
+export type SavedType = "project" | "opportunity" | "researcher" | "funding";
 
 export interface SavedEntry {
   id: string;
@@ -13,7 +13,10 @@ export interface SavedEntry {
 }
 
 export type SaveTarget =
-  { project_id: string } | { opportunity_id: string } | { researcher_id: string };
+  | { project_id: string }
+  | { opportunity_id: string }
+  | { researcher_id: string }
+  | { funding_id: string };
 
 export async function fetchSaved(type?: SavedType): Promise<SavedEntry[]> {
   const response = await apiClient.get<SavedEntry[]>("/api/v1/me/saved", {

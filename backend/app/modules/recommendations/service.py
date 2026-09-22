@@ -81,14 +81,14 @@ class Candidates:
 # --- shared lookups ----------------------------------------------------------
 
 
-def _area_parents(db: Session) -> dict[uuid.UUID, uuid.UUID | None]:
+def area_parents(db: Session) -> dict[uuid.UUID, uuid.UUID | None]:
     return {
         area_id: parent_id
         for area_id, parent_id in db.execute(select(ResearchArea.id, ResearchArea.parent_id)).all()
     }
 
 
-def _names(db: Session) -> tuple[dict[uuid.UUID, str], dict[uuid.UUID, str]]:
+def tag_names(db: Session) -> tuple[dict[uuid.UUID, str], dict[uuid.UUID, str]]:
     skills = {sid: name for sid, name in db.execute(select(Skill.id, Skill.name)).all()}
     areas = {
         aid: name for aid, name in db.execute(select(ResearchArea.id, ResearchArea.name)).all()
@@ -286,7 +286,33 @@ def _project_candidates(db: Session, viewer: User) -> Candidates:
     )
 
 
-def _eligible_types(viewer: User) -> tuple[OpportunityType, ...]:
+def opportunity_features(db: Session, opportunity: Opportunity) -> ItemFeatures:
+    """Features for one opening: required skills count double the optional ones.
+
+    Shared with the "relevant opportunity" notification (Step 12) so a
+    notification and a recommendation always agree about the same opening.
+    """
+    skills: dict[uuid.UUID, float] = {}
+    required: set[uuid.UUID] = set()
+    for skill_id, is_required in db.execute(
+        select(OpportunitySkill.skill_id, OpportunitySkill.is_required).where(
+            OpportunitySkill.opportunity_id == opportunity.id
+        )
+    ).all():
+        skills[skill_id] = REQUIRED_WEIGHT if is_required else OPTIONAL_WEIGHT
+        if is_required:
+            required.add(skill_id)
+    return ItemFeatures(
+        item_id=opportunity.id,
+        skills=skills,
+        required_skills=required,
+        research_areas=set(),
+        text=join_documents([opportunity.title, opportunity.description, opportunity.eligibility]),
+    )
+
+
+def eligible_opportunity_types(viewer: User) -> tuple[OpportunityType, ...]:
+    """Which opening types this role may apply to (Step 7 rules)."""
     if viewer.role is UserRole.STUDENT:
         return tuple(sorted(STUDENT_TYPES, key=str))
     if viewer.role in RESEARCHER_ROLES:
@@ -295,7 +321,7 @@ def _eligible_types(viewer: User) -> tuple[OpportunityType, ...]:
 
 
 def _opportunity_candidates(db: Session, viewer: User) -> Candidates:
-    eligible = _eligible_types(viewer)
+    eligible = eligible_opportunity_types(viewer)
     if not eligible:
         return Candidates(features=[], newest_ids=[])
     opportunities = (
@@ -316,33 +342,9 @@ def _opportunity_candidates(db: Session, viewer: User) -> Candidates:
         .scalars()
         .all()
     )
-    ids = [opportunity.id for opportunity in opportunities]
-    skills: dict[uuid.UUID, dict[uuid.UUID, float]] = {}
-    required: dict[uuid.UUID, set[uuid.UUID]] = {}
-    for opportunity_id, skill_id, is_required in db.execute(
-        select(
-            OpportunitySkill.opportunity_id, OpportunitySkill.skill_id, OpportunitySkill.is_required
-        ).where(OpportunitySkill.opportunity_id.in_(ids))
-    ).all():
-        skills.setdefault(opportunity_id, {})[skill_id] = (
-            REQUIRED_WEIGHT if is_required else OPTIONAL_WEIGHT
-        )
-        if is_required:
-            required.setdefault(opportunity_id, set()).add(skill_id)
     return Candidates(
-        features=[
-            ItemFeatures(
-                item_id=opportunity.id,
-                skills=skills.get(opportunity.id, {}),
-                required_skills=required.get(opportunity.id, set()),
-                research_areas=set(),
-                text=join_documents(
-                    [opportunity.title, opportunity.description, opportunity.eligibility]
-                ),
-            )
-            for opportunity in opportunities
-        ],
-        newest_ids=ids,
+        features=[opportunity_features(db, opportunity) for opportunity in opportunities],
+        newest_ids=[opportunity.id for opportunity in opportunities],
     )
 
 
@@ -446,12 +448,12 @@ def recommend(
         )
 
     index = INDEX_CACHE.get_or_build(target.value, _fingerprint(db, target), _corpus(db, target))
-    skill_names, area_names = _names(db)
+    skill_names, area_names = tag_names(db)
     ranked: list[ScoredItem] = Recommender(weights).recommend(
         features,
         candidates.features,
         limit,
-        area_parents=_area_parents(db),
+        area_parents=area_parents(db),
         skill_names=skill_names,
         area_names=area_names,
         index=index,

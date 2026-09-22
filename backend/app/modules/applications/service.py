@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.events import EVENT_BUS, Event, EventName
 from app.modules.applications.models import Application, ApplicationEvent, ApplicationStatus
 from app.modules.applications.policies import (
     assert_eligible,
@@ -159,6 +160,20 @@ def apply(
         raise DuplicateApplicationError from exc
     application.status = ApplicationStatus.SUBMITTED
     _record_event(db, application, applicant, None)
+    EVENT_BUS.publish(
+        db,
+        Event(
+            name=EventName.APPLICATION_SUBMITTED,
+            actor_id=applicant.id,
+            payload={
+                "recipient_id": opportunity.created_by,
+                "application_id": application.id,
+                "opportunity_id": opportunity.id,
+                "opportunity_title": opportunity.title,
+                "applicant_name": applicant.full_name,
+            },
+        ),
+    )
     db.commit()
     db.refresh(application)
     return _to_reads(db, [(application, opportunity)])[0]
@@ -238,6 +253,21 @@ def change_status(
                 )
         opportunity_service.mark_filled_if_full(db, opportunity)
 
+    EVENT_BUS.publish(
+        db,
+        Event(
+            name=EventName.APPLICATION_DECIDED,
+            actor_id=reviewer.id,
+            payload={
+                "recipient_id": application.applicant_id,
+                "application_id": application.id,
+                "opportunity_id": opportunity.id,
+                "opportunity_title": opportunity.title,
+                "status": data.status.value,
+                "note": data.note,
+            },
+        ),
+    )
     audit_service.record(
         db,
         actor_id=reviewer.id,

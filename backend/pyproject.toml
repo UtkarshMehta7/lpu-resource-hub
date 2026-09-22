@@ -21,6 +21,8 @@ dependencies = [
     # Recommendations (Step 9): TF-IDF + cosine similarity, run locally.
     "scikit-learn>=1.6,<2.0",
     "numpy>=2.1,<3.0",
+    # Deadline reminders (Step 12): in-process scheduler, no broker.
+    "apscheduler>=3.11,<4.0",
 ]
 
 [project.optional-dependencies]
@@ -74,7 +76,7 @@ plugins = ["pydantic.mypy"]
 # scikit-learn ships no type stubs; this is scoped to that import only, not
 # a blanket relaxation.
 [[tool.mypy.overrides]]
-module = ["sklearn.*"]
+module = ["sklearn.*", "apscheduler.*"]
 ignore_missing_imports = true
 
 [tool.pydantic-mypy]

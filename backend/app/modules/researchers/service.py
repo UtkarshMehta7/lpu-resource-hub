@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.events import EVENT_BUS, Event, EventName
 from app.modules.audit import service as audit_service
 from app.modules.profiles.models import ResearcherProfile, VerificationStatus
 from app.modules.researchers.policies import (
@@ -82,6 +83,18 @@ def verify_researcher(
     profile.verified_by = reviewer.id
     profile.verified_at = datetime.now(UTC)
     db.flush()
+    EVENT_BUS.publish(
+        db,
+        Event(
+            name=EventName.PROFILE_VERIFIED,
+            actor_id=reviewer.id,
+            payload={
+                "recipient_id": profile.user_id,
+                "status": decision.value,
+                "comment": comment,
+            },
+        ),
+    )
 
     # researcher_profiles has no comment column by design (see ADR 0004):
     # the reviewer's reasoning lives in the audit record, which is where the
