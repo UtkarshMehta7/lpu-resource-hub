@@ -204,6 +204,13 @@ def _to_cards(db: Session, viewer: User, rows: Sequence[Opportunity]) -> list[Op
     ]
 
 
+def opportunity_cards(
+    db: Session, viewer: User, rows: Sequence[Opportunity]
+) -> list[OpportunityCard]:
+    """Public wrapper used by recommendations (Step 9)."""
+    return _to_cards(db, viewer, rows)
+
+
 def to_read(db: Session, viewer: User, opportunity: Opportunity) -> OpportunityRead:
     card = _to_cards(db, viewer, [opportunity])[0]
     mine = db.execute(

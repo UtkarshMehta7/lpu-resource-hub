@@ -1,0 +1,173 @@
+{
+  "_about": [
+    "Hand-labelled relevance judgements for the Step 9 evaluation.",
+    "Graded 0-3 (3 = clearly relevant, 2 = relevant, 1 = marginal, 0 = not relevant).",
+    "Items are opportunity-shaped: required/optional skills, research areas, free text.",
+    "Names are turned into stable UUIDs by scripts/evaluate_recommendations.py, so the",
+    "real scoring code runs unchanged against these fixtures.",
+    "All names and descriptions are fictional demo data, like the rest of the prototype."
+  ],
+  "areas": {
+    "machine-learning": null,
+    "deep-learning": "machine-learning",
+    "computer-vision": "machine-learning",
+    "agriculture": null,
+    "soil-science": "agriculture",
+    "chemistry": null,
+    "materials": "chemistry"
+  },
+  "items": [
+    {
+      "id": "vision-assistant",
+      "skills": { "python": "required", "pytorch": "required", "opencv": "optional" },
+      "areas": ["deep-learning", "computer-vision"],
+      "text": "computer vision deep learning image classification neural networks training"
+    },
+    {
+      "id": "nlp-assistant",
+      "skills": { "python": "required", "pytorch": "optional" },
+      "areas": ["machine-learning"],
+      "text": "natural language processing transformers text models training"
+    },
+    {
+      "id": "ml-deployment",
+      "skills": { "python": "required", "docker": "required" },
+      "areas": ["machine-learning"],
+      "text": "deploying machine learning models docker containers pipelines"
+    },
+    {
+      "id": "statistics-support",
+      "skills": { "statistics": "required", "python": "optional" },
+      "areas": ["machine-learning"],
+      "text": "statistical analysis of experiments data summaries"
+    },
+    {
+      "id": "soil-sensors",
+      "skills": { "sensors": "required", "arduino": "required", "field-work": "optional" },
+      "areas": ["soil-science"],
+      "text": "soil moisture sensors field trials calibration farms"
+    },
+    {
+      "id": "irrigation-scheduling",
+      "skills": { "sensors": "required", "python": "optional" },
+      "areas": ["agriculture"],
+      "text": "irrigation scheduling water use sensors farms"
+    },
+    {
+      "id": "crop-yield-models",
+      "skills": { "python": "required", "statistics": "optional" },
+      "areas": ["agriculture", "machine-learning"],
+      "text": "crop yield prediction models field data"
+    },
+    {
+      "id": "greenhouse-trials",
+      "skills": { "field-work": "required" },
+      "areas": ["agriculture"],
+      "text": "greenhouse trials plant growth measurements"
+    },
+    {
+      "id": "chromatography-lab",
+      "skills": { "chromatography": "required", "matlab": "optional" },
+      "areas": ["chemistry"],
+      "text": "chromatography analysis of samples laboratory workflow"
+    },
+    {
+      "id": "spectroscopy-study",
+      "skills": { "spectroscopy": "required" },
+      "areas": ["materials"],
+      "text": "spectroscopy material characterisation optical measurements"
+    },
+    {
+      "id": "battery-materials",
+      "skills": { "matlab": "required" },
+      "areas": ["materials"],
+      "text": "battery materials electrodes testing cycles"
+    },
+    {
+      "id": "robot-navigation",
+      "skills": { "opencv": "required", "python": "optional", "arduino": "optional" },
+      "areas": ["computer-vision"],
+      "text": "robot navigation cameras control experiments"
+    },
+    {
+      "id": "lab-teaching",
+      "skills": { "statistics": "optional" },
+      "areas": ["chemistry"],
+      "text": "teaching assistant laboratory sessions undergraduate"
+    },
+    {
+      "id": "reporting-dashboard",
+      "skills": { "sql": "required", "docker": "optional" },
+      "areas": [],
+      "text": "web dashboard database sql reporting administration"
+    }
+  ],
+  "viewers": [
+    {
+      "id": "ml-student",
+      "skills": { "python": 5, "pytorch": 4, "docker": 2 },
+      "areas": ["deep-learning", "machine-learning"],
+      "text": "deep learning for image classification neural networks pytorch model training",
+      "relevance": {
+        "vision-assistant": 3,
+        "nlp-assistant": 2,
+        "ml-deployment": 2,
+        "robot-navigation": 2,
+        "statistics-support": 1,
+        "crop-yield-models": 1,
+        "soil-sensors": 0,
+        "irrigation-scheduling": 0,
+        "greenhouse-trials": 0,
+        "chromatography-lab": 0,
+        "spectroscopy-study": 0,
+        "battery-materials": 0,
+        "lab-teaching": 0,
+        "reporting-dashboard": 0
+      }
+    },
+    {
+      "id": "agri-sensors-student",
+      "skills": { "sensors": 5, "arduino": 4, "field-work": 3, "python": 2 },
+      "areas": ["agriculture", "soil-science"],
+      "text": "low cost soil moisture sensors iot field trials on smallholder farms",
+      "relevance": {
+        "soil-sensors": 3,
+        "irrigation-scheduling": 3,
+        "crop-yield-models": 2,
+        "greenhouse-trials": 2,
+        "robot-navigation": 1,
+        "statistics-support": 0,
+        "vision-assistant": 0,
+        "nlp-assistant": 0,
+        "ml-deployment": 0,
+        "chromatography-lab": 0,
+        "spectroscopy-study": 0,
+        "battery-materials": 0,
+        "lab-teaching": 0,
+        "reporting-dashboard": 0
+      }
+    },
+    {
+      "id": "chemistry-researcher",
+      "skills": { "spectroscopy": 5, "chromatography": 4, "matlab": 3 },
+      "areas": ["chemistry", "materials"],
+      "text": "analytical chemistry spectroscopy material characterisation of thin films",
+      "relevance": {
+        "spectroscopy-study": 3,
+        "chromatography-lab": 3,
+        "battery-materials": 2,
+        "lab-teaching": 1,
+        "statistics-support": 0,
+        "vision-assistant": 0,
+        "nlp-assistant": 0,
+        "ml-deployment": 0,
+        "soil-sensors": 0,
+        "irrigation-scheduling": 0,
+        "crop-yield-models": 0,
+        "greenhouse-trials": 0,
+        "robot-navigation": 0,
+        "reporting-dashboard": 0
+      }
+    }
+  ]
+}

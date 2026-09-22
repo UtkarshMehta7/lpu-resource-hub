@@ -209,6 +209,9 @@ ENDPOINTS = (
         allowed_status=404,
     ),
     Endpoint("GET", "/api/v1/me/collaborations", frozenset(ALL_ROLES)),
+    # Step 9: recommendations are personal to the caller; every role gets
+    # their own (an admin's collaborator list is simply empty).
+    Endpoint("GET", "/api/v1/recommendations", frozenset(ALL_ROLES)),
     # Students must not be able to browse other students.
     Endpoint(
         "GET",
