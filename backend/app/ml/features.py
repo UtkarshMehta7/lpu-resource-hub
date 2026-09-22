@@ -48,6 +48,25 @@ class ScoreWeights:
     skill: float = 0.40
     area: float = 0.35
     text: float = 0.25
+    # Step 13: semantic similarity, 0 when embeddings aren't installed.
+    semantic: float = 0.0
+
+    def with_semantic(self, share: float) -> ScoreWeights:
+        """Gives `share` of the total to semantic similarity, scaling the rest.
+
+        One knob instead of four: the structured and lexical weights keep
+        their relative proportions, so turning embeddings on doesn't silently
+        re-tune the Step 9 scoring.
+        """
+        if share <= 0:
+            return self
+        keep = 1.0 - share
+        return ScoreWeights(
+            skill=self.skill * keep,
+            area=self.area * keep,
+            text=self.text * keep,
+            semantic=share,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +77,7 @@ class Breakdown:
     skill_score: float
     area_score: float
     text_score: float
+    semantic_score: float = 0.0
     matched_required: tuple[uuid.UUID, ...] = ()
     total_required: int = 0
     matched_optional: tuple[uuid.UUID, ...] = ()

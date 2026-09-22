@@ -1,58 +1,114 @@
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 
+import { Monogram, UNIVERSITY_NAME, UNIVERSITY_SHORT } from "@/components/layout/Brand";
 import { useAuth } from "@/features/auth/authContext";
 import { BackendStatusCard } from "@/features/system-status/BackendStatusCard";
 
-const PLANNED_CAPABILITIES = [
-  "Researcher profiles and a searchable expertise directory across departments",
-  "Research projects and opportunities that students can browse and apply to",
-  "Facility and equipment catalogue with a booking calendar",
-  "Funding calls with deadline reminders",
-  "Explainable, tag-based collaboration and research recommendations",
+const CAPABILITIES = [
+  {
+    title: "Find the right people",
+    body: "Search researcher expertise across departments, or ask in plain language and let the platform match meaning, not just keywords.",
+    to: "/search",
+    action: "Try a search",
+  },
+  {
+    title: "Projects and openings",
+    body: "Faculty publish reviewed research projects and student openings; students apply and track every application in one place.",
+    to: "/opportunities",
+    action: "Browse opportunities",
+  },
+  {
+    title: "Labs and equipment",
+    body: "A shared catalogue with a week-by-week booking calendar. Two people can never hold the same slot.",
+    to: "/facilities",
+    action: "See facilities",
+  },
+  {
+    title: "Funding, with reminders",
+    body: "Funding calls in one list. Save one and you're reminded a week and a day before it closes.",
+    to: "/funding",
+    action: "View funding calls",
+  },
+  {
+    title: "Recommendations that explain themselves",
+    body: "Every suggestion shows the skills, research areas and wording it matched on — no black box.",
+    to: "/recommendations",
+    action: "See your matches",
+  },
+  {
+    title: "Work together",
+    body: "Send a collaboration request to a researcher or an opted-in student, and keep the thread in your inbox.",
+    to: "/collaborations",
+    action: "Open requests",
+  },
 ];
 
+/** Signed-out landing page. Signed-in people go straight to their dashboard. */
 export function HomePage() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Signed-in people want their dashboard, not the marketing page.
   if (isLoading) return null;
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
   return (
-    <div className="space-y-10">
-      <section className="max-w-3xl">
-        <p className="text-sm font-medium text-brand-700">
-          Lovely Professional University · Development status: Step 11
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-          Make LPU research expertise, projects and facilities discoverable.
+    <div className="space-y-14">
+      <section className="mx-auto max-w-3xl text-center">
+        <div className="flex justify-center">
+          <Monogram className="size-14 text-lg" />
+        </div>
+        <p className="mt-4 text-sm font-medium text-brand-700">{UNIVERSITY_NAME}</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+          Research Intelligence &amp; Collaboration Hub
         </h1>
-        <p className="mt-4 text-ink-muted">
-          Faculty expertise, ongoing projects and lab facilities are often invisible across
-          department boundaries. This platform is being built to help students and researchers find
-          each other, put equipment to use and stay ahead of funding deadlines.
+        <p className="mt-4 text-base text-ink-muted">
+          Expertise, projects, lab equipment and funding across {UNIVERSITY_SHORT} departments — in
+          one place, so students and researchers can actually find each other.
+        </p>
+        <div className="mt-7 flex flex-wrap justify-center gap-3">
+          <Link
+            to="/register"
+            className="rounded-md bg-brand-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-800"
+          >
+            Create an account
+          </Link>
+          <Link
+            to="/login"
+            className="rounded-md border border-line bg-surface px-5 py-2.5 text-sm font-medium hover:bg-canvas"
+          >
+            Log in
+          </Link>
+        </div>
+        <p className="mt-4 text-xs text-ink-muted">
+          A prototype built for the {UNIVERSITY_SHORT} ecosystem. Everything you see is fictional
+          demo data.
         </p>
       </section>
 
-      <BackendStatusCard />
-
-      <section aria-labelledby="planned-heading">
-        <h2 id="planned-heading" className="text-base font-semibold">
-          Planned capabilities
+      <section aria-labelledby="capabilities-heading">
+        <h2 id="capabilities-heading" className="sr-only">
+          What you can do here
         </h2>
-        <p className="mt-1 text-sm text-ink-muted">
-          Not yet implemented; delivered phase by phase.
-        </p>
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-          {PLANNED_CAPABILITIES.map((item) => (
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {CAPABILITIES.map((capability) => (
             <li
-              key={item}
-              className="rounded-card border border-line bg-surface px-4 py-3 text-sm text-ink-muted"
+              key={capability.title}
+              className="flex flex-col rounded-card border border-line bg-surface p-5"
             >
-              {item}
+              <h3 className="text-base font-semibold">{capability.title}</h3>
+              <p className="mt-2 flex-1 text-sm text-ink-muted">{capability.body}</p>
+              <Link
+                to={capability.to}
+                className="mt-4 text-sm font-medium text-brand-700 hover:underline"
+              >
+                {capability.action} →
+              </Link>
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="mx-auto max-w-3xl">
+        <BackendStatusCard />
       </section>
     </div>
   );

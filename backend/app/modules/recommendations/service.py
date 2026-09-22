@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.ml import embeddings
 from app.ml.explain import COLD_START_REASON
 from app.ml.features import (
     OPTIONAL_WEIGHT,
@@ -63,6 +64,8 @@ from app.modules.recommendations.schemas import (
     TargetType,
 )
 from app.modules.researchers.directory import cards_for_researchers, cards_for_students
+from app.modules.search import service as search_service
+from app.modules.search.models import EntityType
 from app.modules.taxonomy.models import ResearchArea, Skill
 from app.modules.users.models import User, UserRole
 
@@ -428,6 +431,36 @@ def _cards(
 # --- entry point -------------------------------------------------------------
 
 
+SEMANTIC_ENTITY: dict[TargetType, EntityType] = {
+    TargetType.RESEARCHERS: EntityType.RESEARCHER,
+    TargetType.COLLABORATORS: EntityType.RESEARCHER,
+    TargetType.PROJECTS: EntityType.PROJECT,
+    TargetType.OPPORTUNITIES: EntityType.OPPORTUNITY,
+}
+
+
+def _semantic_scores(
+    db: Session, viewer: User, target: TargetType, item_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, float]:
+    """Cosine similarity between the viewer's own text and each candidate.
+
+    Empty when the ML extra isn't installed or the viewer has nothing written
+    yet, which is exactly when the Step 9 scoring should stand alone.
+    """
+    if not item_ids or not embeddings.is_available():
+        return {}
+    viewer_text = _user_documents(db, [viewer.id]).get(viewer.id, "")
+    if not viewer_text.strip():
+        return {}
+    viewer_vector = embeddings.embed_text(viewer_text)
+    if viewer_vector is None:
+        return {}
+    stored = search_service.embeddings_for(db, SEMANTIC_ENTITY[target], item_ids)
+    return {
+        item_id: search_service.cosine(viewer_vector, vector) for item_id, vector in stored.items()
+    }
+
+
 def recommend(
     db: Session, viewer: User, target: TargetType, limit: int, weights: ScoreWeights
 ) -> RecommendationsResponse:
@@ -449,6 +482,7 @@ def recommend(
 
     index = INDEX_CACHE.get_or_build(target.value, _fingerprint(db, target), _corpus(db, target))
     skill_names, area_names = tag_names(db)
+    semantic = _semantic_scores(db, viewer, target, [item.item_id for item in candidates.features])
     ranked: list[ScoredItem] = Recommender(weights).recommend(
         features,
         candidates.features,
@@ -457,6 +491,7 @@ def recommend(
         skill_names=skill_names,
         area_names=area_names,
         index=index,
+        semantic_scores=semantic,
     )
     cards = _cards(db, viewer, target, [item.item_id for item in ranked])
     return RecommendationsResponse(

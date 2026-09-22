@@ -52,6 +52,14 @@ class Settings(BaseSettings):
     rec_weight_skill: float = Field(default=0.40, ge=0.0, le=1.0)
     rec_weight_area: float = Field(default=0.35, ge=0.0, le=1.0)
     rec_weight_text: float = Field(default=0.25, ge=0.0, le=1.0)
+    # Share of the recommendation *score* given to semantic similarity when
+    # embeddings are installed (Step 13). Default 0: the offline evaluation
+    # says the hybrid ranks slightly worse than the Step 9 scorer on the
+    # labelled set (docs/ai-evaluation.md), so Phase 1 stays the default and
+    # this knob exists to re-test as the corpus grows. Semantic *search*
+    # (/search/semantic) is unaffected and always on when the extra is
+    # installed.
+    rec_semantic_weight: float = Field(default=0.0, ge=0.0, le=0.9)
     # Deadline-reminder scheduler (Step 12). Off in tests; on in a real run.
     enable_scheduler: bool = False
     reminder_interval_minutes: int = Field(default=60, ge=5, le=1440)

@@ -13,7 +13,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
@@ -47,6 +47,8 @@ from app.modules.profiles.service import (
     upsert_researcher_profile,
     upsert_student_profile,
 )
+from app.modules.search.models import EntityType
+from app.modules.search.tasks import schedule_embedding
 from app.modules.users.models import User, UserRole
 
 router = APIRouter(prefix="/me", tags=["profiles"])
@@ -78,6 +80,7 @@ def read_my_profile(
 @router.put("/profile", response_model=StudentProfileRead | ResearcherProfileRead)
 async def update_my_profile(
     request: Request,
+    background: BackgroundTasks,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> ProfileRead:
@@ -98,7 +101,10 @@ async def update_my_profile(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.errors()
         ) from exc
-    return _to_read_schema(upsert_researcher_profile(db, current_user, researcher_data))
+    profile = upsert_researcher_profile(db, current_user, researcher_data)
+    # The profile text feeds semantic search, so re-embed it after replying.
+    schedule_embedding(request, background, EntityType.RESEARCHER, current_user.id)
+    return _to_read_schema(profile)
 
 
 @router.put("/skills", response_model=list[SkillEntry])

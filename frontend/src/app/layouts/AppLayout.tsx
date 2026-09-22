@@ -1,6 +1,5 @@
 import { Outlet } from "react-router-dom";
 
-import { DemoBanner } from "@/components/layout/DemoBanner";
 import {
   Monogram,
   PRODUCT_NAME,
@@ -12,7 +11,6 @@ import { Header } from "@/components/layout/Header";
 export function AppLayout() {
   return (
     <div className="flex min-h-dvh flex-col">
-      <DemoBanner />
       <Header />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
         <Outlet />
