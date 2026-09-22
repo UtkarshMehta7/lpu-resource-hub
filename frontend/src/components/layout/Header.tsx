@@ -30,6 +30,14 @@ export function Header() {
 
         {isLoading ? null : isAuthenticated && user ? (
           <div className="flex items-center gap-3">
+            {user.role === "admin" ? (
+              <Link
+                to="/admin/users"
+                className="hidden text-sm font-medium hover:underline sm:inline"
+              >
+                Admin
+              </Link>
+            ) : null}
             <Link to="/account" className="hidden text-sm font-medium hover:underline sm:inline">
               {user.full_name}
             </Link>

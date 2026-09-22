@@ -16,18 +16,20 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 1: users, authentication, JWT with rotating refresh tokens.** What exists today:
+**Step 2: RBAC core & audit log.** What exists today:
 
 | Area | Status |
 |---|---|
 | FastAPI backend skeleton with settings, logging, error envelope and CORS | Done |
 | PostgreSQL connection (SQLAlchemy 2.0 + psycopg 3) | Done |
-| Alembic migrations (baseline, then `users` and `refresh_tokens`) | Done |
+| Alembic migrations (baseline, then `users`/`refresh_tokens`, then coordinator scope + `audit_logs`) | Done |
 | `GET /health` (liveness) and `GET /health/ready` (readiness) | Done |
 | React + TypeScript + Vite + Tailwind shell with a backend status card | Done |
 | Registration, login, silent-refresh, logout with Argon2id + rotating refresh tokens | Done |
 | Frontend auth UI (register/login, protected `/account` page, silent session restore) | Done |
-| RBAC, profiles, projects and all other features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Permission map + `require_permission`, admin user management, append-only audit log | Done |
+| Admin Users page (role changes, activate/deactivate) behind a role-gated route | Done |
+| Profiles, projects and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
 
@@ -277,6 +279,23 @@ python -m scripts.create_admin
 It prompts for email, full name and password (never pass the password as a
 CLI argument or environment variable that could end up in shell history).
 
+## RBAC & admin API
+
+Backend-enforced role-based access control: `require_permission("resource:action")`
+checks the caller's role against a permission map (`app/core/permissions.py`,
+full design in [`docs/rbac-matrix.md`](docs/rbac-matrix.md)). `401` = not
+authenticated, `403` = authenticated but not allowed. `RESEARCH_COORDINATOR`
+inherits everything `FACULTY` can do; today neither has any permissions yet
+(no domain resources exist), so only `ADMIN` can call these endpoints.
+
+| Endpoint | Notes |
+|---|---|
+| `GET /api/v1/admin/users` | Paginated, filter by `role`/`is_active`. |
+| `PATCH /api/v1/admin/users/{id}` | `full_name`, `coordinator_scope_type`, `coordinator_scope_id` only — role and activation are never mass-assignable here. |
+| `POST /api/v1/admin/users/{id}/role` | `{role}`. Rejects changing your own role, and rejects any change that would leave zero active admins. |
+| `POST /api/v1/admin/users/{id}/activate` / `/deactivate` | Deactivating revokes every refresh token for that user. Rejects removing the last active admin. |
+| `GET /api/v1/admin/audit-logs` | Paginated, filter by `entity_type`/`entity_id`/`actor_id`/`action`. Role and activation changes are recorded here. |
+
 ## Quality checks and tests
 
 ```bash
@@ -302,13 +321,16 @@ lpu-research-hub/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py              # create_app() factory, lifespan, middleware
-│   │   ├── core/                # config, logging, error envelope, security, deps, rate_limit
+│   │   ├── core/                # config, logging, error envelope, security, deps, rate_limit, permissions, pagination
 │   │   ├── db/                  # declarative base, engine/session, model_registry
 │   │   └── modules/
 │   │       ├── health/          # /health and /health/ready
-│   │       ├── auth/            # register, login, refresh, logout
-│   │       └── users/           # /me
-│   ├── alembic/                 # migration environment + versions/ (0001 baseline, 0002 users/refresh_tokens)
+│   │       ├── auth/            # register, login, refresh, logout, change-password
+│   │       ├── users/           # /me
+│   │       ├── admin/           # admin user management
+│   │       └── audit/           # append-only audit log
+│   ├── alembic/                 # migration environment + versions/ (0001 baseline, 0002 users/refresh_tokens, 0003 coordinator scope + audit_logs)
+│   ├── scripts/                 # create_admin.py
 │   ├── tests/                   # pytest suite (db tests marked `db`)
 │   ├── alembic.ini
 │   ├── pyproject.toml
@@ -317,7 +339,8 @@ lpu-research-hub/
 │   ├── src/
 │   │   ├── app/                 # App, router, layouts
 │   │   ├── components/          # layout/ (header, banner), ui/ (primitives)
-│   │   ├── features/            # home/, system-status/, auth/ (one folder per feature)
+│   │   ├── features/            # home/, system-status/, auth/, admin/ (one folder per feature)
+│   │   ├── test/                # Vitest setup
 │   │   └── lib/                 # config, api client + error normalisation
 │   ├── index.html
 │   ├── package.json
@@ -326,7 +349,10 @@ lpu-research-hub/
 ├── docs/
 │   ├── architecture.md          # approved architecture (source of truth)
 │   ├── development.md           # day-to-day workflow and conventions
-│   └── adr/0001-foundation-decisions.md, 0002-authentication.md
+│   ├── rbac-matrix.md           # full role -> permission design
+│   └── adr/0001-foundation-decisions.md, 0002-authentication.md, 0003-rbac-core.md
+├── CLAUDE.md
+├── lpu-roadmap-prompts.md
 ├── .editorconfig
 ├── .gitignore
 ├── LICENSE
@@ -338,8 +364,8 @@ lpu-research-hub/
 | Step | Scope |
 |---|---|
 | 0 | Project foundation |
-| **1** | **Users, authentication, JWT with rotating refresh tokens (this commit)** |
-| 2 | RBAC core: permission map, policies, audit hook, authorization test scaffold |
+| 1 | Users, authentication, JWT with rotating refresh tokens |
+| **2** | **RBAC core: permission map, policies, audit hook, authorization test scaffold (this commit)** |
 | 3 | Schools, departments, taxonomy, student and researcher profiles, faculty verification, demo seed data |
 | 4 | Researcher directory and full-text search |
 | 5 | Research projects with coordinator review workflow and team members |

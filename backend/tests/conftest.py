@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import os
 import subprocess
-from collections.abc import Iterator
+import uuid
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -19,9 +21,12 @@ from dotenv import dotenv_values
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 from app.core.config import Environment, Settings
+from app.core.security import create_access_token, hash_password
 from app.main import create_app
+from app.modules.users.models import User, UserRole
 
 # Syntactically valid but never contacted: non-db tests do not run the app
 # lifespan, so no connection is attempted.
@@ -100,15 +105,55 @@ def db_settings(migrated_test_database_url: str) -> Settings:
     return make_settings(database_url=migrated_test_database_url)
 
 
+TABLES_TO_CLEAN = "refresh_tokens, audit_logs, users"
+
+
 @pytest.fixture
 def clean_db(migrated_test_database_url: str) -> Iterator[None]:
-    """Truncates the auth tables before and after each test, for isolation."""
+    """Truncates the auth/admin tables before and after each test, for isolation."""
     engine = create_engine(migrated_test_database_url)
     try:
         with engine.begin() as connection:
-            connection.execute(text("TRUNCATE TABLE refresh_tokens, users CASCADE"))
+            connection.execute(text(f"TRUNCATE TABLE {TABLES_TO_CLEAN} CASCADE"))
         yield
     finally:
         with engine.begin() as connection:
-            connection.execute(text("TRUNCATE TABLE refresh_tokens, users CASCADE"))
+            connection.execute(text(f"TRUNCATE TABLE {TABLES_TO_CLEAN} CASCADE"))
         engine.dispose()
+
+
+@dataclass(frozen=True, slots=True)
+class SeededUser:
+    id: uuid.UUID
+    email: str
+    role: UserRole
+    access_token: str
+
+
+@pytest.fixture
+def seed_user(db_settings: Settings) -> Callable[..., SeededUser]:
+    """Inserts a user directly via the ORM and returns a ready-to-use access token.
+
+    research_coordinator/admin can't self-register through the API (same
+    constraint scripts/create_admin.py works around), so authorization tests
+    need a way to seed them directly.
+    """
+    engine = create_engine(str(db_settings.database_url))
+    session_factory = sessionmaker(bind=engine)
+
+    def _seed(role: UserRole, *, is_active: bool = True, email: str | None = None) -> SeededUser:
+        user = User(
+            email=email or f"{role.value}-{uuid.uuid4().hex[:8]}@example.com",
+            password_hash=hash_password("not-used-directly-seeded12"),
+            full_name=f"Seeded {role.value}",
+            role=role,
+            is_active=is_active,
+        )
+        with session_factory() as session:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            token = create_access_token(user.id, user.role.value, db_settings)
+            return SeededUser(id=user.id, email=user.email, role=user.role, access_token=token)
+
+    return _seed
