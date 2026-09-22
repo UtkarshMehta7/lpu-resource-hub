@@ -138,7 +138,11 @@ function StudentSections({ data }: { data: StudentDashboard }) {
             to: `/${deadline.kind === "funding" ? "funding" : "opportunities"}/${deadline.item_id}`,
             title: deadline.title,
             subtitle: `Closes ${deadline.deadline}${
-              deadline.kind === "funding" ? " · funding call" : deadline.applied ? " · applied" : " · saved"
+              deadline.kind === "funding"
+                ? " · funding call"
+                : deadline.applied
+                  ? " · applied"
+                  : " · saved"
             }`,
           }))}
           empty={

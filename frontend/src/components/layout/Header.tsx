@@ -51,7 +51,8 @@ const NAV: NavItem[] = [
   { to: "/profile", label: "Profile" },
 ];
 
-const LINK = "text-sm font-medium hover:underline aria-[current=page]:text-brand-700";
+const LINK =
+  "whitespace-nowrap text-sm font-medium hover:underline aria-[current=page]:text-brand-700";
 
 export function Header() {
   const { isAuthenticated, isLoading, user, logout } = useAuth();
