@@ -105,7 +105,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # The refresh-token cookie requires credentialed CORS.
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type"],
+        # X-Requested-With is the CSRF guard every browser request carries,
+        # so it must survive the preflight or nothing works from a browser.
+        allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
     )
     register_exception_handlers(app)
 

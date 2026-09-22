@@ -5,6 +5,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/features/auth/authContext";
 import { RequestCollaborationButton } from "@/features/collaborations/RequestCollaborationButton";
+import { ReportButton } from "@/features/reports/ReportButton";
+import { SaveButton } from "@/features/saved/SaveButton";
 import { PublicationsSection } from "@/features/publications/PublicationList";
 import { toApiError } from "@/lib/api/errors";
 
@@ -121,7 +123,9 @@ export function ProjectDetailPage() {
             </Link>
           </p>
           {!isOwner ? (
-            <div className="mt-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <SaveButton type="project" targetId={project.id} />
+              <ReportButton targetType="project" targetId={project.id} />
               <RequestCollaborationButton
                 recipientId={project.owner_id}
                 recipientName={project.owner_name}
