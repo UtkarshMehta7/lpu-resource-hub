@@ -30,6 +30,9 @@ export function Header() {
 
         {isLoading ? null : isAuthenticated && user ? (
           <div className="flex items-center gap-3">
+            <Link to="/recommendations" className="text-sm font-medium hover:underline">
+              For you
+            </Link>
             <Link
               to="/researchers"
               className="hidden text-sm font-medium hover:underline sm:inline"

@@ -1,7 +1,9 @@
 import type { Page } from "@/features/directory/api";
 import { apiClient } from "@/lib/api/client";
 
-export type ProjectStatus = "draft" | "pending_review" | "active" | "completed" | "archived";
+import type { ProjectStatus } from "./labels";
+
+export { STATUS_LABEL, type ProjectStatus } from "./labels";
 
 /** Matches the backend's ProjectCard / ProjectRead schemas. */
 export interface ProjectCard {
@@ -52,14 +54,6 @@ export interface ProjectFilters {
   owner_id?: string;
   page?: number;
 }
-
-export const STATUS_LABEL: Record<ProjectStatus, string> = {
-  draft: "Draft",
-  pending_review: "Pending review",
-  active: "Active",
-  completed: "Completed",
-  archived: "Archived",
-};
 
 function clean(filters: object): Record<string, unknown> {
   return Object.fromEntries(

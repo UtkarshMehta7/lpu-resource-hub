@@ -16,7 +16,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 8: collaboration requests.** What exists today:
+**Step 9: explainable recommendations.** What exists today:
 
 | Area | Status |
 |---|---|
@@ -39,7 +39,8 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Publications: ordered internal/external author lists, DOI de-duplication, project links, shown on researcher and project pages | Done |
 | Opportunity board (draft → open → closed/filled) and application workflow with status timeline, applicant review, auto-add to project team | Done |
 | Direct collaboration requests (send/accept/decline/cancel) with inbox/sent, privacy rules and a per-user send limit | Done |
-| Recommendations and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Explainable recommendations (skills + research areas + TF-IDF text) with per-suggestion reasons, cold start and an offline evaluation | Done |
+| Dashboards, facilities, funding and all other domain features | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
 
@@ -334,6 +335,7 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `POST /api/v1/projects/{id}/review` | `project:review` | `{decision: approve\|reject, comment}` — comment required to reject. Own-department only; never your own project. Audited. |
 | `GET/POST /api/v1/projects/{id}/members`, `DELETE …/members/{user_id}` | owner for writes | Team members can see the project even while it's a draft. |
 | `GET /api/v1/coordinator/review-queue` | `project:review` | Pending projects in your department (admin: all). |
+| `GET /api/v1/recommendations?type=&limit=` | any signed-in user | `type` is `opportunities` (default), `projects`, `researchers` or `collaborators`. Returns cards with a match score and the reasons behind it. Business filters (visibility, eligibility, deadlines, already applied, self) run in SQL before scoring. A sparse profile returns the newest items with `cold_start: true`. |
 | `POST /api/v1/collaborations` | `collaboration:send` (student, faculty, coordinator) | `{recipient_id, project_id?, message}`. Researchers are always reachable; students only if discoverable; admins never (`404`). One pending request per person per project (`409`). Limited to 10 sends per hour per user. |
 | `GET /api/v1/me/collaborations?box=inbox\|sent&status=` | any signed-in user | Your own requests, either direction. |
 | `GET /api/v1/collaborations/{id}` | sender or recipient | Anyone else gets `404`. A referenced project's title is shown only to viewers who can see the project. |
