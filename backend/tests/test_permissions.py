@@ -13,14 +13,20 @@ from app.core.permissions import ROLE_HIERARCHY, ROLE_PERMISSIONS, Permission, r
 from app.modules.users.models import User, UserRole
 
 
-def test_coordinator_has_no_permissions_of_its_own_today() -> None:
-    # Nothing has granted FACULTY a permission yet (no domain resources
-    # exist), so RESEARCH_COORDINATOR inherits an empty set too.
+def test_faculty_still_has_no_permissions_of_its_own() -> None:
+    # No FACULTY-level resource exists yet (that starts in Step 5+), so
+    # RESEARCH_COORDINATOR's inherited set is empty; its own grants
+    # (taxonomy:manage, profile:verify) are asserted separately below.
     assert ROLE_PERMISSIONS[UserRole.FACULTY] == frozenset()
-    assert ROLE_PERMISSIONS[UserRole.RESEARCH_COORDINATOR] == frozenset()
 
 
-def test_admin_has_exactly_the_step_2_permissions() -> None:
+def test_coordinator_has_exactly_its_step_3_permissions() -> None:
+    assert ROLE_PERMISSIONS[UserRole.RESEARCH_COORDINATOR] == frozenset(
+        {Permission.TAXONOMY_MANAGE, Permission.PROFILE_VERIFY}
+    )
+
+
+def test_admin_has_exactly_its_step_2_and_3_permissions() -> None:
     assert ROLE_PERMISSIONS[UserRole.ADMIN] == frozenset(
         {
             Permission.USER_LIST,
@@ -29,6 +35,10 @@ def test_admin_has_exactly_the_step_2_permissions() -> None:
             Permission.USER_ACTIVATE,
             Permission.USER_DEACTIVATE,
             Permission.AUDIT_READ,
+            Permission.SCHOOL_MANAGE,
+            Permission.DEPARTMENT_MANAGE,
+            Permission.TAXONOMY_MANAGE,
+            Permission.PROFILE_VERIFY,
         }
     )
 

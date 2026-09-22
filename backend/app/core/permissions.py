@@ -26,6 +26,10 @@ class Permission(StrEnum):
     USER_ACTIVATE = "user:activate"
     USER_DEACTIVATE = "user:deactivate"
     AUDIT_READ = "audit:read"
+    SCHOOL_MANAGE = "school:manage"
+    DEPARTMENT_MANAGE = "department:manage"
+    TAXONOMY_MANAGE = "taxonomy:manage"
+    PROFILE_VERIFY = "profile:verify"
 
 
 # A role inherits everything its parent can do. ADMIN's powers are listed
@@ -40,7 +44,12 @@ ROLE_HIERARCHY: dict[UserRole, UserRole | None] = {
 _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
     UserRole.STUDENT: frozenset(),
     UserRole.FACULTY: frozenset(),
-    UserRole.RESEARCH_COORDINATOR: frozenset(),
+    UserRole.RESEARCH_COORDINATOR: frozenset(
+        {
+            Permission.TAXONOMY_MANAGE,
+            Permission.PROFILE_VERIFY,
+        }
+    ),
     UserRole.ADMIN: frozenset(
         {
             Permission.USER_LIST,
@@ -49,6 +58,10 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.USER_ACTIVATE,
             Permission.USER_DEACTIVATE,
             Permission.AUDIT_READ,
+            Permission.SCHOOL_MANAGE,
+            Permission.DEPARTMENT_MANAGE,
+            Permission.TAXONOMY_MANAGE,
+            Permission.PROFILE_VERIFY,
         }
     ),
 }

@@ -1,0 +1,80 @@
+"""Pydantic schemas for student/researcher profiles.
+
+verification_status/verified_by/verified_at are deliberately absent from
+ResearcherProfileUpdate: never client-writable, only set by the researchers
+module's verify action.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.modules.profiles.models import ResearcherAvailability, VerificationStatus
+
+
+class LinkItem(BaseModel):
+    label: str = Field(min_length=1, max_length=100)
+    url: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("url")
+    @classmethod
+    def _validate_url(cls, value: str) -> str:
+        if not value.startswith(("http://", "https://")):
+            raise ValueError("url must start with http:// or https://")
+        return value
+
+
+class StudentProfileRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    profile_type: str = "student"
+    program: str
+    year: int
+    bio: str | None
+    interests: str | None
+    is_discoverable: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class StudentProfileUpdate(BaseModel):
+    program: str = Field(min_length=1, max_length=150)
+    year: int = Field(ge=1, le=10)
+    bio: str | None = Field(default=None, max_length=5000)
+    interests: str | None = Field(default=None, max_length=2000)
+    is_discoverable: bool = False
+
+
+class ResearcherProfileRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    profile_type: str = "researcher"
+    designation: str
+    bio: str | None
+    availability: ResearcherAvailability
+    links: list[LinkItem] | None
+    verification_status: VerificationStatus
+    verified_by: uuid.UUID | None
+    verified_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ResearcherProfileUpdate(BaseModel):
+    designation: str = Field(min_length=1, max_length=150)
+    bio: str | None = Field(default=None, max_length=5000)
+    availability: ResearcherAvailability = ResearcherAvailability.AVAILABLE
+    links: list[LinkItem] | None = None
+
+
+class SkillEntry(BaseModel):
+    skill_id: uuid.UUID
+    proficiency: int = Field(ge=1, le=5)
+
+
+class ResearchAreaEntry(BaseModel):
+    research_area_id: uuid.UUID
+    is_expertise: bool = False

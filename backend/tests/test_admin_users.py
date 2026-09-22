@@ -26,6 +26,20 @@ def _auth_headers(user: SeededUser) -> dict[str, str]:
     return {"Authorization": f"Bearer {user.access_token}"}
 
 
+def _create_department(client: TestClient, admin: SeededUser) -> str:
+    school_response = client.post(
+        "/api/v1/admin/schools", headers=_auth_headers(admin), json={"name": "Demo School"}
+    )
+    school_id = school_response.json()["id"]
+    department_response = client.post(
+        "/api/v1/admin/departments",
+        headers=_auth_headers(admin),
+        json={"school_id": school_id, "name": "Demo Department"},
+    )
+    department_id: str = department_response.json()["id"]
+    return department_id
+
+
 def test_list_users_requires_admin(
     client: TestClient, seed_user: Callable[..., SeededUser]
 ) -> None:
@@ -100,18 +114,34 @@ def test_patch_user_sets_coordinator_scope(
 ) -> None:
     admin = seed_user(UserRole.ADMIN)
     coordinator = seed_user(UserRole.RESEARCH_COORDINATOR)
-    scope_id = "11111111-1111-1111-1111-111111111111"
+    department_id = _create_department(client, admin)
 
     response = client.patch(
         f"/api/v1/admin/users/{coordinator.id}",
         headers=_auth_headers(admin),
-        json={"coordinator_scope_type": "department", "coordinator_scope_id": scope_id},
+        json={"coordinator_scope_type": "department", "coordinator_scope_id": department_id},
     )
 
     assert response.status_code == 200
     body = response.json()
     assert body["coordinator_scope_type"] == "department"
-    assert body["coordinator_scope_id"] == scope_id
+    assert body["coordinator_scope_id"] == department_id
+
+
+def test_patch_user_rejects_a_department_scope_id_that_does_not_exist(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    admin = seed_user(UserRole.ADMIN)
+    coordinator = seed_user(UserRole.RESEARCH_COORDINATOR)
+    fake_department_id = "11111111-1111-1111-1111-111111111111"
+
+    response = client.patch(
+        f"/api/v1/admin/users/{coordinator.id}",
+        headers=_auth_headers(admin),
+        json={"coordinator_scope_type": "department", "coordinator_scope_id": fake_department_id},
+    )
+
+    assert response.status_code == 422
 
 
 def test_patch_unknown_user_is_404(
