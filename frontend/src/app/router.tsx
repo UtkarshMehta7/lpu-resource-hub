@@ -16,6 +16,11 @@ import { ProjectDetailPage } from "@/features/projects/ProjectDetailPage";
 import { ProjectFormPage } from "@/features/projects/ProjectFormPage";
 import { ProjectsPage } from "@/features/projects/ProjectsPage";
 import { ReviewQueuePage } from "@/features/projects/ReviewQueuePage";
+import { ApplicantsPage } from "@/features/opportunities/ApplicantsPage";
+import { MyApplicationsPage } from "@/features/opportunities/MyApplicationsPage";
+import { OpportunitiesPage } from "@/features/opportunities/OpportunitiesPage";
+import { OpportunityDetailPage } from "@/features/opportunities/OpportunityDetailPage";
+import { OpportunityFormPage } from "@/features/opportunities/OpportunityFormPage";
 import { PublicationDetailPage } from "@/features/publications/PublicationDetailPage";
 import { PublicationFormPage } from "@/features/publications/PublicationFormPage";
 import { PublicationsPage } from "@/features/publications/PublicationsPage";
@@ -43,6 +48,12 @@ export const router = createBrowserRouter([
           { path: "projects/:projectId", element: <ProjectDetailPage /> },
           { path: "projects/:projectId/edit", element: <ProjectFormPage /> },
           { path: "publications", element: <PublicationsPage /> },
+          { path: "opportunities", element: <OpportunitiesPage /> },
+          { path: "opportunities/mine", element: <OpportunitiesPage mine /> },
+          { path: "opportunities/:opportunityId", element: <OpportunityDetailPage /> },
+          { path: "opportunities/:opportunityId/edit", element: <OpportunityFormPage /> },
+          { path: "opportunities/:opportunityId/applicants", element: <ApplicantsPage /> },
+          { path: "me/applications", element: <MyApplicationsPage /> },
           { path: "publications/mine", element: <PublicationsPage mine /> },
           { path: "publications/:publicationId", element: <PublicationDetailPage /> },
           { path: "publications/:publicationId/edit", element: <PublicationFormPage /> },
@@ -63,6 +74,7 @@ export const router = createBrowserRouter([
             children: [
               { path: "projects/new", element: <ProjectFormPage /> },
               { path: "publications/new", element: <PublicationFormPage /> },
+              { path: "opportunities/new", element: <OpportunityFormPage /> },
             ],
           },
           {

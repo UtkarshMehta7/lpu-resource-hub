@@ -29,7 +29,7 @@ action in general — the resource policy layer (loaded-resource ownership +
 scope match, `docs/architecture.md` §6 layer 2) is what enforces *this
 specific* department/project/etc., introduced per-module starting Step 3.
 
-## Implemented (Steps 2–6)
+## Implemented (Steps 2–7)
 
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
@@ -47,6 +47,8 @@ specific* department/project/etc., introduced per-module starting Step 3.
 | `project:create` | | ✅ | ✅ (inherited) | | 5 |
 | `project:review` | | | ✅ (own dept, never own project) | ✅ (never own project) | 5 |
 | `publication:create` | | ✅ | ✅ (inherited) | | 6 |
+| `opportunity:create` | | ✅ (own active project) | ✅ (inherited; also department-wide) | | 7 |
+| `application:submit` | ✅ (student openings) | ✅ (collaborations) | ✅ (inherited) | | 7 |
 
 Every authenticated, active user (any role) can read their own profile via
 `GET /api/v1/me`, read their own `GET/PUT /me/profile`, set their own
@@ -61,6 +63,10 @@ resource policy (`app/modules/researchers/policies.py`) then restricts them
 to their own department — returning `404`, not `403`, so they can't probe
 for profiles outside their scope.
 
+Deciding an application isn't a permission: it's a resource policy. Only
+the opportunity's creator may change an application's status; the scoped
+coordinator and admins can read applications but not decide them.
+
 ## Planned (later steps)
 
 Not yet in `core/permissions.py`. Listed here so the shape of the eventual
@@ -70,9 +76,6 @@ picking it up automatically via inheritance wherever `FACULTY` has it.
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
 | `project:archive` | | ✅ (own) | | ✅ | 5 |
-| `opportunity:create` | | ✅ (own active project) | ✅ | | 7 |
-| `application:decide` | | ✅ (own opportunity) | ✅ | | 7 |
-| `application:submit` | ✅ | | | | 7 |
 | `collaboration:send` | ✅ | ✅ | ✅ | | 8 |
 | `facility:manage` | | | ✅ | ✅ | 11 |
 | `booking:approve` | | | ✅ | ✅ | 11 |

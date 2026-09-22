@@ -45,6 +45,12 @@ export function Header() {
             >
               Publications
             </Link>
+            <Link
+              to="/opportunities"
+              className="hidden text-sm font-medium hover:underline sm:inline"
+            >
+              Opportunities
+            </Link>
             {user.role !== "student" ? (
               <Link to="/students" className="hidden text-sm font-medium hover:underline sm:inline">
                 Students
