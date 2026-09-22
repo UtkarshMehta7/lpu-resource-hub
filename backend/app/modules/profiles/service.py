@@ -16,6 +16,7 @@ from app.modules.profiles.models import (
     StudentProfile,
     UserResearchArea,
     UserSkill,
+    VerificationStatus,
 )
 from app.modules.profiles.schemas import (
     ResearchAreaEntry,
@@ -70,11 +71,20 @@ def upsert_student_profile(db: Session, user: User, data: StudentProfileUpdate) 
 def upsert_researcher_profile(
     db: Session, user: User, data: ResearcherProfileUpdate
 ) -> ResearcherProfile:
+    """Saving a researcher profile (re)submits it for coordinator review.
+
+    There is no separate "submit" endpoint in the approved API surface, so
+    this is what moves a profile into PENDING and puts it on the
+    verification queue. An already-VERIFIED profile keeps its status:
+    editing a bio should not silently revoke verification.
+    """
     links = [item.model_dump() for item in data.links] if data.links is not None else None
     profile = db.get(ResearcherProfile, user.id)
     if profile is None:
-        profile = ResearcherProfile(user_id=user.id)
+        profile = ResearcherProfile(user_id=user.id, verification_status=VerificationStatus.PENDING)
         db.add(profile)
+    elif profile.verification_status is not VerificationStatus.VERIFIED:
+        profile.verification_status = VerificationStatus.PENDING
     profile.designation = data.designation
     profile.bio = data.bio
     profile.availability = data.availability

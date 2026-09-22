@@ -111,7 +111,8 @@ def test_faculty_put_profile_creates_researcher_shape(
     assert response.status_code == 200
     body = response.json()
     assert body["profile_type"] == "researcher"
-    assert body["verification_status"] == "unverified"
+    # Saving a researcher profile submits it for coordinator review.
+    assert body["verification_status"] == "pending"
     assert body["links"] == [{"label": "Homepage", "url": "https://example.com"}]
 
 
