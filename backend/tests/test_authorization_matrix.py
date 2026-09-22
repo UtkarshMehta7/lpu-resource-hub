@@ -157,6 +157,21 @@ ENDPOINTS = (
         body={"decision": "approve"},
         allowed_status=404,
     ),
+    # Step 6: publications are readable by everyone; publication:create is a
+    # FACULTY grant (coordinator inherits it).
+    Endpoint("GET", "/api/v1/publications", frozenset(ALL_ROLES)),
+    Endpoint(
+        "POST",
+        "/api/v1/publications",
+        frozenset({UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR}),
+        body={
+            "title": "Matrix",
+            "year": 2024,
+            "pub_type": "journal_article",
+            "authors": [{"external_name": "A. Author"}],
+        },
+        allowed_status=201,
+    ),
     # Students must not be able to browse other students.
     Endpoint(
         "GET",

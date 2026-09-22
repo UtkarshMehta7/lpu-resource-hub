@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { StatusIndicator } from "@/components/ui/StatusIndicator";
 import { fetchProjects } from "@/features/projects/api";
+import { PublicationsSection } from "@/features/publications/PublicationList";
 
 import { fetchResearcher } from "./api";
 
@@ -106,7 +107,7 @@ export function ResearcherDetailPage() {
         )}
       </section>
 
-      <p className="mt-10 text-xs text-ink-muted">Publications appear here in a later step.</p>
+      <PublicationsSection filters={{ author_id: userId }} />
     </div>
   );
 }

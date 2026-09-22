@@ -16,6 +16,9 @@ import { ProjectDetailPage } from "@/features/projects/ProjectDetailPage";
 import { ProjectFormPage } from "@/features/projects/ProjectFormPage";
 import { ProjectsPage } from "@/features/projects/ProjectsPage";
 import { ReviewQueuePage } from "@/features/projects/ReviewQueuePage";
+import { PublicationDetailPage } from "@/features/publications/PublicationDetailPage";
+import { PublicationFormPage } from "@/features/publications/PublicationFormPage";
+import { PublicationsPage } from "@/features/publications/PublicationsPage";
 import { ProfilePage } from "@/features/profiles/ProfilePage";
 import { VerificationQueuePage } from "@/features/researchers/VerificationQueuePage";
 
@@ -39,6 +42,10 @@ export const router = createBrowserRouter([
           { path: "projects/mine", element: <ProjectsPage mine /> },
           { path: "projects/:projectId", element: <ProjectDetailPage /> },
           { path: "projects/:projectId/edit", element: <ProjectFormPage /> },
+          { path: "publications", element: <PublicationsPage /> },
+          { path: "publications/mine", element: <PublicationsPage mine /> },
+          { path: "publications/:publicationId", element: <PublicationDetailPage /> },
+          { path: "publications/:publicationId/edit", element: <PublicationFormPage /> },
           { path: "profile", element: <ProfilePage /> },
           {
             element: <RoleRoute allow={["research_coordinator", "admin"]} />,
@@ -53,7 +60,10 @@ export const router = createBrowserRouter([
           },
           {
             element: <RoleRoute allow={["faculty", "research_coordinator"]} />,
-            children: [{ path: "projects/new", element: <ProjectFormPage /> }],
+            children: [
+              { path: "projects/new", element: <ProjectFormPage /> },
+              { path: "publications/new", element: <PublicationFormPage /> },
+            ],
           },
           {
             element: <RoleRoute allow={["admin"]} />,

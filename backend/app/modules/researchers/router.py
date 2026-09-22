@@ -23,6 +23,7 @@ from app.modules.profiles.models import (
     VerificationStatus,
 )
 from app.modules.projects.service import list_projects
+from app.modules.publications.service import list_publications
 from app.modules.researchers.directory import (
     ResearcherNotFoundError as DirectoryResearcherNotFoundError,
 )
@@ -179,13 +180,18 @@ def unified_search(
     viewer: Annotated[User, Depends(get_current_user)],
     params: Annotated[PageParams, Depends()],
     q: str,
-    types: str = "researchers,projects",
+    types: str = "researchers,projects,publications",
 ) -> SearchResults:
-    """Unified search. Only researchers are searchable today; later steps add
-    projects, publications and opportunities behind the same `types` filter."""
+    """Unified search over researchers, projects and publications; later steps
+    add opportunities behind the same `types` filter."""
     wanted = {t.strip() for t in types.split(",") if t.strip()}
     researchers = list_researchers(db, params, q=q).items if "researchers" in wanted else []
     # Projects go through the same visibility filter as /projects, so search
     # can never surface someone else's draft.
     projects = list_projects(db, viewer, params, q=q).items if "projects" in wanted else []
-    return SearchResults(query=q, researchers=researchers, projects=projects)
+    publications = (
+        list_publications(db, viewer, params, q=q).items if "publications" in wanted else []
+    )
+    return SearchResults(
+        query=q, researchers=researchers, projects=projects, publications=publications
+    )

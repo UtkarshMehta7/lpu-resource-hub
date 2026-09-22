@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/features/auth/authContext";
+import { PublicationsSection } from "@/features/publications/PublicationList";
 import { toApiError } from "@/lib/api/errors";
 
 import {
@@ -214,6 +215,8 @@ export function ProjectDetailPage() {
           </ul>
         )}
       </section>
+
+      <PublicationsSection filters={{ project_id: project.id }} />
 
       <ConfirmDialog
         open={pending !== null}
