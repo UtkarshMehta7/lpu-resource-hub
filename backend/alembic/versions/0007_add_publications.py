@@ -168,3 +168,4 @@ def downgrade() -> None:
     )
     op.drop_index(op.f("ix_publications_created_by"), table_name="publications")
     op.drop_table("publications")
+    sa.Enum(name="publication_type").drop(op.get_bind(), checkfirst=True)

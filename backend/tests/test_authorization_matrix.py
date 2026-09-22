@@ -172,6 +172,33 @@ ENDPOINTS = (
         },
         allowed_status=201,
     ),
+    # Step 7: opportunities and applications. The random project id / target
+    # id aren't real, so authorized callers get 404 -- the point is that
+    # unauthorized roles get 403 first.
+    Endpoint("GET", "/api/v1/opportunities", frozenset(ALL_ROLES)),
+    Endpoint(
+        "POST",
+        "/api/v1/opportunities",
+        frozenset({UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR}),
+        body={
+            "title": "Matrix",
+            "description": "Matrix",
+            "opportunity_type": "research_assistant",
+            "project_id": "00000000-0000-0000-0000-000000000001",
+            "positions": 1,
+            "deadline": "2099-01-01",
+        },
+        allowed_status=404,
+    ),
+    Endpoint(
+        "POST",
+        "/api/v1/opportunities/{id}/applications",
+        frozenset({UserRole.STUDENT, UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR}),
+        needs_target=True,
+        body={"statement": "Matrix"},
+        allowed_status=404,
+    ),
+    Endpoint("GET", "/api/v1/me/applications", frozenset(ALL_ROLES)),
     # Students must not be able to browse other students.
     Endpoint(
         "GET",
