@@ -26,6 +26,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Semantic search (Step 13). Optional on purpose: the app runs without it and
+# falls back to the Step 9 lexical/structured matching.
+ml = [
+    "sentence-transformers>=3.3,<6.0",
+    "pgvector>=0.3,<1.0",
+]
 dev = [
     "pytest>=8.3,<10.0",
     "httpx>=0.28,<1.0",

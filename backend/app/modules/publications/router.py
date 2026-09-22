@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
@@ -26,6 +26,8 @@ from app.modules.publications.schemas import (
     PublicationRead,
     PublicationUpdate,
 )
+from app.modules.search.models import EntityType
+from app.modules.search.tasks import schedule_embedding
 from app.modules.users.models import User
 
 router = APIRouter(tags=["publications"])
@@ -93,11 +95,15 @@ def read_publications(
 @router.post("/publications", response_model=PublicationRead, status_code=status.HTTP_201_CREATED)
 def create_publication(
     data: PublicationCreate,
+    request: Request,
+    background: BackgroundTasks,
     db: DbSession,
     creator: Annotated[User, Depends(require_permission(Permission.PUBLICATION_CREATE))],
 ) -> PublicationRead:
     with _domain_errors():
-        return service.create_publication(db, creator, data)
+        publication = service.create_publication(db, creator, data)
+    schedule_embedding(request, background, EntityType.PUBLICATION, publication.id)
+    return publication
 
 
 @router.get("/publications/{publication_id}", response_model=PublicationRead)

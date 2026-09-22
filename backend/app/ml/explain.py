@@ -12,6 +12,8 @@ from collections.abc import Mapping
 from app.ml.features import Breakdown
 
 MAX_NAMES = 4
+# Below this, semantic similarity isn't worth mentioning to a person.
+STRONG_SEMANTIC = 0.35
 
 
 def _join(names: list[str]) -> str:
@@ -48,6 +50,13 @@ def build_reasons(
     if related:
         noun = "area" if len(related) == 1 else "areas"
         reasons.append(f"Related research {noun}: {_join(sorted(related))}")
+
+    # Only claimed when it actually contributed, and phrased as the hedge it
+    # is: the model found the writing similar, not the tags.
+    if breakdown.semantic_score >= STRONG_SEMANTIC:
+        reasons.append(
+            f"Your profile and this describe similar work ({breakdown.semantic_score:.0%} similar)"
+        )
 
     if breakdown.related_terms:
         reasons.append(f"Related terms: {_join(list(breakdown.related_terms))}")
