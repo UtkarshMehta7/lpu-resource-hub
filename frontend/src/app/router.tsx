@@ -16,6 +16,7 @@ import { ProjectDetailPage } from "@/features/projects/ProjectDetailPage";
 import { ProjectFormPage } from "@/features/projects/ProjectFormPage";
 import { ProjectsPage } from "@/features/projects/ProjectsPage";
 import { ReviewQueuePage } from "@/features/projects/ReviewQueuePage";
+import { CollaborationsPage } from "@/features/collaborations/CollaborationsPage";
 import { ApplicantsPage } from "@/features/opportunities/ApplicantsPage";
 import { MyApplicationsPage } from "@/features/opportunities/MyApplicationsPage";
 import { OpportunitiesPage } from "@/features/opportunities/OpportunitiesPage";
@@ -54,6 +55,7 @@ export const router = createBrowserRouter([
           { path: "opportunities/:opportunityId/edit", element: <OpportunityFormPage /> },
           { path: "opportunities/:opportunityId/applicants", element: <ApplicantsPage /> },
           { path: "me/applications", element: <MyApplicationsPage /> },
+          { path: "collaborations", element: <CollaborationsPage /> },
           { path: "publications/mine", element: <PublicationsPage mine /> },
           { path: "publications/:publicationId", element: <PublicationDetailPage /> },
           { path: "publications/:publicationId/edit", element: <PublicationFormPage /> },

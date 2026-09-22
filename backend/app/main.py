@@ -18,7 +18,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
-from app.core.rate_limit import create_auth_rate_limiter, create_search_rate_limiter
+from app.core.rate_limit import (
+    create_auth_rate_limiter,
+    create_collaboration_rate_limiter,
+    create_search_rate_limiter,
+)
 from app.db.session import check_database_connection, create_db_engine, create_session_factory
 from app.modules.admin.router import org_router as admin_org_router
 from app.modules.admin.router import public_org_router
@@ -26,6 +30,7 @@ from app.modules.admin.router import router as admin_router
 from app.modules.applications.router import router as applications_router
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
+from app.modules.collaborations.router import router as collaborations_router
 from app.modules.health.router import router as health_router
 from app.modules.opportunities.router import router as opportunities_router
 from app.modules.profiles.router import router as profiles_router
@@ -89,6 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.auth_rate_limiter = create_auth_rate_limiter()
     app.state.search_rate_limiter = create_search_rate_limiter()
+    app.state.collaboration_rate_limiter = create_collaboration_rate_limiter()
 
     app.add_middleware(
         CORSMiddleware,
@@ -115,4 +121,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(publications_router, prefix=API_V1_PREFIX)
     app.include_router(opportunities_router, prefix=API_V1_PREFIX)
     app.include_router(applications_router, prefix=API_V1_PREFIX)
+    app.include_router(collaborations_router, prefix=API_V1_PREFIX)
     return app
