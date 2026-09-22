@@ -1,9 +1,11 @@
 import { createBrowserRouter } from "react-router-dom";
 
+import { AdminUsersPage } from "@/features/admin/AdminUsersPage";
 import { AccountPage } from "@/features/auth/AccountPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute";
 import { RegisterPage } from "@/features/auth/RegisterPage";
+import { RoleRoute } from "@/features/auth/RoleRoute";
 import { HomePage } from "@/features/home/HomePage";
 import { NotFoundPage } from "@/features/home/NotFoundPage";
 
@@ -18,7 +20,13 @@ export const router = createBrowserRouter([
       { path: "register", element: <RegisterPage /> },
       {
         element: <ProtectedRoute />,
-        children: [{ path: "account", element: <AccountPage /> }],
+        children: [
+          { path: "account", element: <AccountPage /> },
+          {
+            element: <RoleRoute allow={["admin"]} />,
+            children: [{ path: "admin/users", element: <AdminUsersPage /> }],
+          },
+        ],
       },
       { path: "*", element: <NotFoundPage /> },
     ],
