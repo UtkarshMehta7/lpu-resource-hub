@@ -34,5 +34,6 @@ from app.modules.publications.models import (  # noqa: F401
     PublicationAuthor,
 )
 from app.modules.reports.models import ContentReport  # noqa: F401
+from app.modules.search.models import EntityEmbedding  # noqa: F401
 from app.modules.taxonomy.models import ResearchArea, Skill, TagAlias, TagSuggestion  # noqa: F401
 from app.modules.users.models import User  # noqa: F401

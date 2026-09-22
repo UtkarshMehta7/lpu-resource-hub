@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from threading import Thread
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +26,7 @@ from app.core.rate_limit import (
 )
 from app.db.session import check_database_connection, create_db_engine, create_session_factory
 from app.jobs.scheduler import start_scheduler
+from app.ml import embeddings
 from app.modules.admin.router import org_router as admin_org_router
 from app.modules.admin.router import public_org_router
 from app.modules.admin.router import router as admin_router
@@ -46,6 +48,7 @@ from app.modules.publications.router import router as publications_router
 from app.modules.recommendations.router import router as recommendations_router
 from app.modules.reports.router import router as reports_router
 from app.modules.researchers.router import router as researchers_router
+from app.modules.search.router import router as search_router
 from app.modules.taxonomy.router import router as taxonomy_router
 from app.modules.users.router import router as users_router
 
@@ -83,6 +86,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Handlers turn domain events into notifications (Step 12). Registered
     # here, once per app, rather than at import time.
     register_notification_handlers()
+
+    # Load the embedding model off the request path: without this the first
+    # semantic search pays several seconds of model load (measured ~9s cold,
+    # ~35ms warm). Skipped entirely when the optional ML extra is absent.
+    if embeddings.is_available():
+        Thread(target=embeddings.load_model, name="embedding-warmup", daemon=True).start()
 
     scheduler = None
     if settings.enable_scheduler:
@@ -152,4 +161,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(bookings_router, prefix=API_V1_PREFIX)
     app.include_router(funding_router, prefix=API_V1_PREFIX)
     app.include_router(notifications_router, prefix=API_V1_PREFIX)
+    app.include_router(search_router, prefix=API_V1_PREFIX)
     return app

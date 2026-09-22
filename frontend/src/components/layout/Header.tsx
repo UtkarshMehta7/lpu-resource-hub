@@ -19,6 +19,7 @@ interface NavItem {
  * never see a link on one and not the other. */
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard" },
+  { to: "/search", label: "Search" },
   { to: "/recommendations", label: "For you" },
   { to: "/researchers", label: "Researchers" },
   { to: "/projects", label: "Projects" },

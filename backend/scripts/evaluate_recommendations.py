@@ -17,6 +17,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from app.ml.embeddings import embed_texts, is_available
 from app.ml.features import (
     OPTIONAL_WEIGHT,
     REQUIRED_WEIGHT,
@@ -33,6 +34,9 @@ NAMESPACE = uuid.UUID("11111111-2222-3333-4444-555555555555")
 RELEVANT_FROM = 2
 PRECISION_AT = 5
 NDCG_AT = 10
+# Share of the score given to semantic similarity in the hybrid run; matches
+# the app's default (Settings.rec_semantic_weight).
+SEMANTIC_SHARE = 0.25
 
 
 def _id(name: str) -> uuid.UUID:
@@ -106,9 +110,36 @@ def ndcg_at_k(ranked: Sequence[int], ideal: Sequence[int], k: int) -> float:
     return dcg(ranked[:k]) / best if best else 0.0
 
 
-def evaluate(data: Mapping[str, Any], weights: ScoreWeights | None = None) -> dict[str, Any]:
+def semantic_scores(
+    data: Mapping[str, Any], viewer_text: str, items: Sequence[ItemFeatures]
+) -> dict[uuid.UUID, float]:
+    """Cosine similarity between a viewer's text and each item's text.
+
+    Uses the same model as the running app. Returns {} when the optional ML
+    extra isn't installed, which makes the hybrid run degrade to Phase 1.
+    """
+    del data
+    vectors = embed_texts([viewer_text, *[item.text for item in items]])
+    if vectors is None:
+        return {}
+    viewer_vector, *item_vectors = vectors
+    return {
+        item.item_id: float(sum(a * b for a, b in zip(viewer_vector, vector, strict=True)))
+        for item, vector in zip(items, item_vectors, strict=True)
+    }
+
+
+def evaluate(
+    data: Mapping[str, Any],
+    weights: ScoreWeights | None = None,
+    *,
+    semantic: bool = False,
+) -> dict[str, Any]:
     items, parents, skill_names, area_names, index = build_world(data)
-    recommender = Recommender(weights or ScoreWeights())
+    weights = weights or ScoreWeights()
+    if semantic:
+        weights = weights.with_semantic(SEMANTIC_SHARE)
+    recommender = Recommender(weights)
     per_viewer: list[dict[str, Any]] = []
     for raw in data["viewers"]:
         viewer = viewer_features(raw)
@@ -121,6 +152,7 @@ def evaluate(data: Mapping[str, Any], weights: ScoreWeights | None = None) -> di
             skill_names=skill_names,
             area_names=area_names,
             index=index,
+            semantic_scores=semantic_scores(data, raw["text"], items) if semantic else None,
         )
         grades = [judgements.get(scored.item_id, 0) for scored in ranked]
         per_viewer.append(
@@ -142,6 +174,7 @@ def evaluate(data: Mapping[str, Any], weights: ScoreWeights | None = None) -> di
         )
     count = len(per_viewer) or 1
     return {
+        "mode": "hybrid" if semantic else "phase1",
         "viewers": per_viewer,
         "mean_precision_at_5": round(sum(v["precision_at_5"] for v in per_viewer) / count, 4),
         "mean_ndcg_at_10": round(sum(v["ndcg_at_10"] for v in per_viewer) / count, 4),
@@ -151,16 +184,37 @@ def evaluate(data: Mapping[str, Any], weights: ScoreWeights | None = None) -> di
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", action="store_true", help="print raw JSON results")
+    parser.add_argument(
+        "--compare",
+        action="store_true",
+        help="run Phase 1 and the hybrid (semantic) scorer side by side",
+    )
     args = parser.parse_args()
 
-    results = evaluate(load_fixture())
+    data = load_fixture()
+    runs = [evaluate(data)]
+    if args.compare:
+        if not is_available():
+            print('The ML extra isn\'t installed; run: pip install -e ".[ml]"')
+            return
+        runs.append(evaluate(data, semantic=True))
+
     if args.json:
-        print(json.dumps(results, indent=2))
+        print(json.dumps(runs if args.compare else runs[0], indent=2))
         return
-    print(f"{'viewer':<24}{'P@5':>8}{'nDCG@10':>10}")
-    for row in results["viewers"]:
-        print(f"{row['viewer']:<24}{row['precision_at_5']:>8}{row['ndcg_at_10']:>10}")
-    print(f"{'mean':<24}{results['mean_precision_at_5']:>8}{results['mean_ndcg_at_10']:>10}")
+
+    print(f"{'mode':<10}{'viewer':<24}{'P@5':>8}{'nDCG@10':>10}")
+    for results in runs:
+        for row in results["viewers"]:
+            print(
+                f"{results['mode']:<10}{row['viewer']:<24}"
+                f"{row['precision_at_5']:>8}{row['ndcg_at_10']:>10}"
+            )
+        print(
+            f"{results['mode']:<10}{'mean':<24}"
+            f"{results['mean_precision_at_5']:>8}{results['mean_ndcg_at_10']:>10}\n"
+        )
+    results = runs[0]
     print("\nTop 5 with reasons:")
     for row in results["viewers"]:
         print(f"\n{row['viewer']}:")

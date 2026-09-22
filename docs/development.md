@@ -44,6 +44,35 @@ Rules:
 - Every schema change is a reviewed migration. Never call `Base.metadata.create_all()`.
 - Use sequential four-digit revision IDs (`--rev-id 0002`, `0003`, …) so file names sort in order.
 - Enable PostgreSQL extensions (`CREATE EXTENSION IF NOT EXISTS ...`) in the migration of the step that first needs them.
+
+### pgvector (Step 13)
+
+`vector` is not a *trusted* extension, so unlike `pg_trgm` and `btree_gist` a
+plain database owner cannot create it -- migration `0013` will fail with
+`permission denied to create extension "vector"`. Install it once per server
+and enable it once per database as a superuser:
+
+```bash
+brew install pgvector                                   # or your platform's package
+psql -d lpu_research_hub      -c "CREATE EXTENSION IF NOT EXISTS vector"
+psql -d lpu_research_hub_test -c "CREATE EXTENSION IF NOT EXISTS vector"
+```
+
+The migration still runs `CREATE EXTENSION IF NOT EXISTS vector`, which is a
+no-op (and needs no privileges) once it is already there.
+
+### Optional ML extra (Step 13)
+
+Semantic search needs sentence-transformers, which is an optional install:
+
+```bash
+cd backend && pip install -e ".[ml]"
+python -m scripts.backfill_embeddings        # embed existing rows
+```
+
+Without it the app runs normally: `/search/semantic` answers with the lexical
+ranking and reports `semantic_used: false`, and recommendations use the Step 9
+scoring (which is the default regardless -- see docs/ai-evaluation.md).
 - New model modules must be imported where `alembic/env.py` can see them (a model registry is introduced in Step 1).
 
 ## Adding a backend module

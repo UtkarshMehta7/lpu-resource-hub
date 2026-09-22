@@ -44,8 +44,10 @@ class Recommender:
         skill_names: Mapping[uuid.UUID, str],
         area_names: Mapping[uuid.UUID, str],
         index: TfidfIndex | None = None,
+        semantic_scores: Mapping[uuid.UUID, float] | None = None,
     ) -> list[ScoredItem]:
         similarities = index.similarities(viewer.text) if index else {}
+        semantic = semantic_scores or {}
         scored: list[ScoredItem] = []
         for item in items:
             text_score = similarities.get(item.item_id, 0.0)
@@ -55,7 +57,13 @@ class Recommender:
                 else ()
             )
             breakdown = score_item(
-                viewer, item, area_parents, self.weights, text_score=text_score, related_terms=terms
+                viewer,
+                item,
+                area_parents,
+                self.weights,
+                text_score=text_score,
+                related_terms=terms,
+                semantic_score=semantic.get(item.item_id, 0.0),
             )
             if breakdown.score <= MIN_SCORE:
                 continue

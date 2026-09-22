@@ -52,6 +52,70 @@ test suite rather than shipping quietly.
   code.** It cannot show whether real users would agree. Treat it as a
   change-detector, not a user study.
 
+## Step 13: does semantic matching beat it?
+
+Step 13 added sentence embeddings (all-MiniLM-L6-v2, 384 dimensions, local
+CPU) stored in pgvector. The roadmap set a clear bar: the hybrid recommender
+must beat Phase 1 on precision@5 / nDCG@10, and if it doesn't, say so and
+keep Phase 1 as the default.
+
+**It doesn't. Phase 1 stays the default.**
+
+```bash
+cd backend && python -m scripts.evaluate_recommendations --compare
+```
+
+| Semantic share of the score | precision@5 | nDCG@10 |
+|---|---:|---:|
+| **0.00 (Phase 1, default)** | **0.7167** | **0.9953** |
+| 0.05 | 0.6667 | 0.9953 |
+| 0.10 | 0.6667 | 0.9953 |
+| 0.15 | 0.6667 | 0.9953 |
+| 0.20 | 0.6667 | 0.9953 |
+| 0.25 | 0.6667 | 0.9817 |
+| 0.40 | 0.6667 | 0.9822 |
+
+Every mix tried is worse than or equal to Phase 1, so `rec_semantic_weight`
+defaults to `0.0`: recommendations keep the Step 9 scoring. The knob stays in
+`Settings` so this can be re-tested as the corpus grows.
+
+### Why it loses here
+
+- **The fixtures are short and tag-rich.** Each item is two lines of text plus
+  explicit required/optional skills and research areas. Structured overlap is
+  a strong signal on that data; embeddings add noise the tags already cover.
+- **The set is tiny** (3 viewers, 14 items). One item swapping places moves
+  precision@5 by a sixth, which is what the 0.7167 → 0.6667 drop is: a single
+  marginal item displacing a relevant one for one viewer.
+- **Absolute similarities are low and poorly separated** on profile-length
+  text: a good match scores ~0.20–0.30 cosine, and an unrelated query still
+  scores ~0.15–0.23. That is why `MIN_SIMILARITY` (0.15) is described in code
+  as a tail-trim, not a relevance test.
+
+### Where semantic *does* win: search
+
+Ranking a labelled candidate set is not the same task as answering a
+question. On the demo database, natural-language queries that share no words
+with the text return **nothing** lexically and sensible results semantically:
+
+| Query | Lexical hits | Semantic hits |
+|---|---:|---:|
+| "researchers working on soil moisture sensing in farms" | 0 researchers | 3 researchers |
+| "equipment for measuring how wet farmland is" | 0 projects | finds the soil-sensor project |
+| "machine learning for images" | 0 researchers | 3 researchers |
+
+So `/api/v1/search/semantic` keeps the hybrid on by default (lexical and
+vector rankings fused with reciprocal rank fusion), while
+`/api/v1/recommendations` keeps Phase 1 scoring. Two different jobs, two
+different verdicts, both recorded here rather than assumed.
+
+### Cost
+
+Measured locally: the model loads in ~3–8s (warmed in a background thread at
+startup, so it's off the request path), after which a semantic search is
+~35–50ms end to end. Embedding one entity is a few milliseconds and is
+skipped entirely when its content hash hasn't changed.
+
 ## What the scores are made of
 
 ```
@@ -91,8 +155,10 @@ match, and an item that scores zero is dropped rather than explained.
 - **Cold start:** a viewer with fewer than 3 skills, fewer than 3 research
   areas and no profile text gets the newest items, clearly labelled as such
   in the API (`cold_start: true`) and in the UI.
-- **Lexical only:** TF-IDF matches words, not meaning. "CNN" and
-  "convolutional network" are unrelated to it. Step 13 adds embeddings.
+- **Recommendations are lexical + structured only.** TF-IDF matches words,
+  not meaning. Embeddings exist and power search, but they are switched off
+  in the recommendation score because the evaluation above says they make it
+  worse on this data.
 - **No feedback loop:** nothing learns from what people click or apply to.
 - **Popularity is ignored**, so a brand-new item competes on content alone.
 - **Term statistics are global:** the TF-IDF index is built over all items of
