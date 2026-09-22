@@ -150,6 +150,48 @@ def _to_cards(
     ]
 
 
+def cards_for_researchers(db: Session, user_ids: Sequence[uuid.UUID]) -> list[ResearcherCard]:
+    """Cards for specific researchers, used by recommendations (Step 9)."""
+    if not user_ids:
+        return []
+    rows = db.execute(
+        select(User, ResearcherProfile)
+        .join(ResearcherProfile, ResearcherProfile.user_id == User.id)
+        .where(User.id.in_(user_ids), User.is_active.is_(True))
+    ).all()
+    return _to_cards(db, rows)
+
+
+def cards_for_students(db: Session, user_ids: Sequence[uuid.UUID]) -> list[StudentCard]:
+    """Cards for specific opted-in students. The is_discoverable filter stays
+    in the query, so a private student can never be returned."""
+    if not user_ids:
+        return []
+    rows = db.execute(
+        select(User, StudentProfile)
+        .join(StudentProfile, StudentProfile.user_id == User.id)
+        .where(
+            User.id.in_(user_ids),
+            User.is_active.is_(True),
+            StudentProfile.is_discoverable.is_(True),
+        )
+    ).all()
+    areas, skills = _tags_by_user(db, [user.id for user, _ in rows])
+    return [
+        StudentCard(
+            user_id=user.id,
+            full_name=user.full_name,
+            program=profile.program,
+            year=profile.year,
+            department_id=user.department_id,
+            interests=profile.interests,
+            research_areas=areas.get(user.id, []),
+            skills=skills.get(user.id, []),
+        )
+        for user, profile in rows
+    ]
+
+
 def list_researchers(
     db: Session,
     params: PageParams,
