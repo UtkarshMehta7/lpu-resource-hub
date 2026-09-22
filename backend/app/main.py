@@ -20,10 +20,14 @@ from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.rate_limit import create_auth_rate_limiter
 from app.db.session import check_database_connection, create_db_engine, create_session_factory
+from app.modules.admin.router import org_router as admin_org_router
 from app.modules.admin.router import router as admin_router
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
 from app.modules.health.router import router as health_router
+from app.modules.profiles.router import router as profiles_router
+from app.modules.researchers.router import router as researchers_router
+from app.modules.taxonomy.router import router as taxonomy_router
 from app.modules.users.router import router as users_router
 
 API_V1_PREFIX = "/api/v1"
@@ -95,5 +99,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router, prefix=API_V1_PREFIX)
     app.include_router(users_router, prefix=API_V1_PREFIX)
     app.include_router(admin_router, prefix=f"{API_V1_PREFIX}/admin")
+    app.include_router(admin_org_router, prefix=f"{API_V1_PREFIX}/admin")
     app.include_router(audit_router, prefix=f"{API_V1_PREFIX}/admin")
+    app.include_router(taxonomy_router, prefix=API_V1_PREFIX)
+    app.include_router(profiles_router, prefix=API_V1_PREFIX)
+    app.include_router(researchers_router, prefix=API_V1_PREFIX)
     return app

@@ -9,6 +9,10 @@ const USER: UserRead = {
   full_name: "Jane Doe",
   role: "student",
   is_active: true,
+  department_id: null,
+  coordinator_scope_type: null,
+  coordinator_scope_id: null,
+  onboarding_complete: false,
   created_at: "2026-01-01T00:00:00Z",
 };
 
