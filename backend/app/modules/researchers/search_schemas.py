@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from app.modules.profiles.models import ResearcherAvailability, VerificationStatus
 from app.modules.profiles.schemas import LinkItem
+from app.modules.projects.schemas import ProjectCard
 
 
 class ResearcherCard(BaseModel):
@@ -52,3 +53,4 @@ class SearchResults(BaseModel):
 
     query: str
     researchers: list[ResearcherCard]
+    projects: list[ProjectCard]
