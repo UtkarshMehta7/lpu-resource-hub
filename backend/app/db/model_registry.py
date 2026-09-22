@@ -20,5 +20,10 @@ from app.modules.projects.models import (  # noqa: F401
     ProjectResearchArea,
     ProjectSkill,
 )
+from app.modules.publications.models import (  # noqa: F401
+    ProjectPublication,
+    Publication,
+    PublicationAuthor,
+)
 from app.modules.taxonomy.models import ResearchArea, Skill, TagAlias, TagSuggestion  # noqa: F401
 from app.modules.users.models import User  # noqa: F401
