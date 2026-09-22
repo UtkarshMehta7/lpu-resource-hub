@@ -12,6 +12,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     SmallInteger,
     String,
@@ -19,7 +20,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -61,6 +62,13 @@ class VerificationStatus(StrEnum):
 
 class ResearcherProfile(Base):
     __tablename__ = "researcher_profiles"
+    __table_args__ = (
+        Index(
+            "ix_researcher_profiles_search_document",
+            "search_document",
+            postgresql_using="gin",
+        ),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
@@ -91,6 +99,12 @@ class ResearcherProfile(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Weighted full-text document (A: name, B: designation + skills + research
+    # areas, C: bio). Not a generated column: the inputs live in users,
+    # user_skills and user_research_areas, and a generated column can only
+    # read its own row. Recomputed by profiles.service whenever any input
+    # changes -- see ADR 0005.
+    search_document: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
