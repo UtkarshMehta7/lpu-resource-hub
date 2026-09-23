@@ -301,6 +301,11 @@ ENDPOINTS = (
         },
         allowed_status=201,
     ),
+    # Step 14: analytics and the collaboration network are for coordinators
+    # and admins; platform settings are admin-only.
+    Endpoint("GET", "/api/v1/analytics/overview", COORDINATOR_AND_ADMIN),
+    Endpoint("GET", "/api/v1/analytics/network", COORDINATOR_AND_ADMIN),
+    Endpoint("GET", "/api/v1/admin/settings", frozenset({UserRole.ADMIN})),
     # Students must not be able to browse other students.
     Endpoint(
         "GET",

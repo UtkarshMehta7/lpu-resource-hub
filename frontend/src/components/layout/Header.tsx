@@ -52,8 +52,11 @@ const NAV: NavItem[] = [
     label: "Bookings",
     roles: ["research_coordinator", "admin"],
   },
+  { to: "/analytics", label: "Analytics", roles: ["research_coordinator", "admin"] },
   { to: "/admin/reports", label: "Reports", roles: ["research_coordinator", "admin"] },
   { to: "/admin/users", label: "Admin", roles: ["admin"] },
+  { to: "/admin/audit-logs", label: "Audit log", roles: ["admin"] },
+  { to: "/admin/settings", label: "Settings", roles: ["admin"] },
   { to: "/profile", label: "Profile" },
 ];
 

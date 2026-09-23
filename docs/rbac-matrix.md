@@ -55,6 +55,7 @@ specific* department/project/etc., introduced per-module starting Step 3.
 | `facility:manage` | | | ✅ (own dept) | ✅ (any) | 11 |
 | `booking:approve` | | | ✅ (own dept) | ✅ (any) | 11 |
 | `funding:manage` | | | ✅ (university-wide) | ✅ | 12 |
+| `analytics:read` | | | ✅ (own dept figures) | ✅ (platform) | 14 |
 
 Every authenticated, active user (any role) can read their own profile via
 `GET /api/v1/me`, read their own `GET/PUT /me/profile`, set their own

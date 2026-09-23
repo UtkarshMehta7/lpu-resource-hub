@@ -39,6 +39,7 @@ class Permission(StrEnum):
     APPLICATION_SUBMIT = "application:submit"
     COLLABORATION_SEND = "collaboration:send"
     REPORT_MODERATE = "report:moderate"
+    ANALYTICS_READ = "analytics:read"
     FACILITY_MANAGE = "facility:manage"
     BOOKING_APPROVE = "booking:approve"
     FUNDING_MANAGE = "funding:manage"
@@ -76,6 +77,7 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.PROFILE_VERIFY,
             Permission.PROJECT_REVIEW,
             Permission.REPORT_MODERATE,
+            Permission.ANALYTICS_READ,
             Permission.FACILITY_MANAGE,
             Permission.BOOKING_APPROVE,
             Permission.FUNDING_MANAGE,
@@ -97,6 +99,7 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.STUDENT_DISCOVER,
             Permission.PROJECT_REVIEW,
             Permission.REPORT_MODERATE,
+            Permission.ANALYTICS_READ,
             Permission.FACILITY_MANAGE,
             Permission.BOOKING_APPROVE,
             Permission.FUNDING_MANAGE,

@@ -329,3 +329,24 @@ test("faculty adds a student, who must set their own password first", async ({ b
   await expect(page).toHaveURL(/dashboard|account/);
   await page.context().close();
 });
+
+test("coordinator reads scoped analytics; admin reads the audit log", async ({ browser }) => {
+  const coordinator = await sessionFor(browser, COORDINATOR);
+  await coordinator.goto("/analytics");
+  await expect(coordinator.getByRole("heading", { name: "Analytics" })).toBeVisible();
+  // A coordinator's numbers stop at their department, and the page says so.
+  await expect(coordinator.getByText(/for your department only/i)).toBeVisible();
+  await expect(coordinator.getByText("Collaboration network")).toBeVisible();
+
+  const admin = await sessionFor(browser, ADMIN);
+  await admin.goto("/analytics");
+  await expect(admin.getByText(/across the whole platform/i)).toBeVisible();
+
+  await admin.goto("/admin/audit-logs");
+  await expect(admin.getByRole("heading", { name: "Audit log" })).toBeVisible();
+  await admin.getByLabel("Action").fill("user.role_changed");
+  await expect(admin.getByText("user.role_changed").first()).toBeVisible();
+
+  await admin.goto("/admin/settings");
+  await expect(admin.getByText(/recommendation weights/i)).toBeVisible();
+});
