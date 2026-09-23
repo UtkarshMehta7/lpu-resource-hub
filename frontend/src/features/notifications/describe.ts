@@ -76,6 +76,14 @@ export function describeNotification(notification: AppNotification): Notificatio
         to: `${base}/${str(payload, "item_id")}`,
       };
     }
+    case "admin_promotion_code":
+      // The whole point of the ceremony is that this code is readable here
+      // and nowhere else, so it goes in the line itself, not behind a link.
+      return {
+        text: `${str(payload, "requested_by")} wants to make you an administrator`,
+        to: null,
+        detail: `Your confirmation code is ${str(payload, "code")}. Read it back to them only if you expect this.`,
+      };
     default:
       return { text: "You have a new notification", to: null };
   }

@@ -54,3 +54,47 @@ export async function createDepartment(schoolId: string, name: string): Promise<
   });
   return response.data;
 }
+
+/** Admin-only: create an account of any role, outside the hierarchy. */
+export async function createAccountAsAdmin(payload: {
+  registration_number: string;
+  full_name: string;
+  role: Role;
+  department_id: string | null;
+  email: string | null;
+}): Promise<{ user: AdminUserRead; temporary_password: string }> {
+  const response = await apiClient.post<{ user: AdminUserRead; temporary_password: string }>(
+    "/api/v1/admin/users",
+    payload,
+  );
+  return response.data;
+}
+
+export interface PromotionChallenge {
+  id: string;
+  target_user_id: string;
+  expires_at: string;
+}
+
+/** Sends a one-time code to the person being promoted. Never returns it. */
+export async function requestAdminPromotion(userId: string): Promise<PromotionChallenge> {
+  const response = await apiClient.post<PromotionChallenge>(
+    `/api/v1/admin/users/${userId}/admin-promotion`,
+  );
+  return response.data;
+}
+
+export async function confirmAdminPromotion(userId: string, code: string): Promise<AdminUserRead> {
+  const response = await apiClient.post<AdminUserRead>(
+    `/api/v1/admin/users/${userId}/admin-promotion/confirm`,
+    { code },
+  );
+  return response.data;
+}
+
+export async function stepDownAsAdmin(newRole: Role): Promise<AdminUserRead> {
+  const response = await apiClient.post<AdminUserRead>("/api/v1/admin/me/step-down", {
+    new_role: newRole,
+  });
+  return response.data;
+}

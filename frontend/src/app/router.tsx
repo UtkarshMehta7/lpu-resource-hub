@@ -1,5 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 
+import { AdminCreateAccountPage } from "@/features/admin/AdminCreateAccountPage";
+import { AdminHandoverPage } from "@/features/admin/AdminHandoverPage";
 import { AdministrationPage } from "@/features/admin/AdministrationPage";
 import { AdminUsersPage } from "@/features/admin/AdminUsersPage";
 import { CoordinatorsPage } from "@/features/admin/CoordinatorsPage";
@@ -8,6 +10,7 @@ import { DirectoryPage } from "@/features/directory/DirectoryPage";
 import { ResearcherDetailPage } from "@/features/directory/ResearcherDetailPage";
 import { StudentsPage } from "@/features/directory/StudentsPage";
 import { AccountPage } from "@/features/auth/AccountPage";
+import { AdminLoginPage } from "@/features/auth/AdminLoginPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute";
 import { RoleRoute } from "@/features/auth/RoleRoute";
@@ -59,6 +62,9 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: "login", element: <LoginPage /> },
+      // A separate entrance for administrators. Not a separate set of
+      // permissions: the role on the account is still what decides.
+      { path: "admin/login", element: <AdminLoginPage /> },
       {
         element: <ProtectedRoute />,
         children: [
@@ -130,6 +136,8 @@ export const router = createBrowserRouter([
             children: [
               { path: "admin", element: <AdministrationPage /> },
               { path: "admin/coordinators", element: <CoordinatorsPage /> },
+              { path: "admin/administrators", element: <AdminHandoverPage /> },
+              { path: "admin/accounts/new", element: <AdminCreateAccountPage /> },
               { path: "admin/organisation", element: <OrganisationPage /> },
               { path: "admin/users", element: <AdminUsersPage /> },
               { path: "admin/audit-logs", element: <AuditLogPage /> },
