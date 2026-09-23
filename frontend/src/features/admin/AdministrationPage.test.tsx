@@ -30,13 +30,17 @@ function renderPage(element: React.ReactElement) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // One request per role, so the count comes from `total`, not the page.
-  fetchUsers.mockImplementation(({ role }: { role: string }) =>
+  // One request per role for the active count, plus one for the deactivated
+  // total. The count comes from `total`, not the page.
+  fetchUsers.mockImplementation(({ role, is_active }: { role?: string; is_active?: boolean }) =>
     Promise.resolve({
       items: [],
       page: 1,
       page_size: 1,
-      total: { research_coordinator: 1, faculty: 2, student: 40, admin: 1 }[role] ?? 0,
+      total:
+        is_active === false
+          ? 7
+          : ({ research_coordinator: 1, faculty: 2, student: 40, admin: 1 }[role ?? ""] ?? 0),
     }),
   );
   fetchSchools.mockResolvedValue([{ id: "s1", name: "Engineering" }]);
@@ -63,6 +67,17 @@ describe("AdministrationPage", () => {
     const card = (await screen.findAllByRole("link", { name: /Coordinators/ }))[0];
     await waitFor(() => expect(card).toHaveTextContent("1"));
     expect(screen.getByRole("link", { name: /Faculty/ })).toHaveTextContent("2");
+  });
+
+  it("counts only accounts that can sign in, and says so", async () => {
+    renderPage(<AdministrationPage />);
+
+    // Deactivated accounts are reported, not folded into the totals.
+    expect(await screen.findByText(/Accounts that can sign in/i)).toBeInTheDocument();
+    expect(await screen.findByText(/7 deactivated accounts/i)).toBeInTheDocument();
+    expect(fetchUsers).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "student", is_active: true }),
+    );
   });
 
   it("points at the organisation first when there are no departments", async () => {

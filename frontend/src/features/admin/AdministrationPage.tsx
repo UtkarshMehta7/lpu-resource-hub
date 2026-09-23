@@ -106,23 +106,36 @@ const PRIVILEGES: { group: string; items: { label: string; detail: string; to: s
   },
 ];
 
-/** One count per role, asked of the server rather than tallied from a page:
- * a page of 100 doesn't see the coordinators among 117 accounts. */
-function useRoleCount(role: Role) {
+/**
+ * One count per role, asked of the server rather than tallied from a page: a
+ * page of 100 doesn't see the coordinators among 119 accounts.
+ *
+ * Counts only accounts that can actually sign in. A deactivated account is
+ * not "on the platform" in any sense the reader means -- showing 89 students
+ * when none of them can log in is a lie told in good faith.
+ */
+function useActiveRoleCount(role: Role) {
   return useQuery({
-    queryKey: ["admin", "users", "count", role],
-    queryFn: () => fetchUsers({ role, page_size: 1 }),
+    queryKey: ["admin", "users", "count", role, "active"],
+    queryFn: () => fetchUsers({ role, is_active: true, page_size: 1 }),
     select: (page) => page.total,
   });
 }
 
 export function AdministrationPage() {
   const counts: Record<string, number | undefined> = {
-    research_coordinator: useRoleCount("research_coordinator").data,
-    faculty: useRoleCount("faculty").data,
-    student: useRoleCount("student").data,
-    admin: useRoleCount("admin").data,
+    research_coordinator: useActiveRoleCount("research_coordinator").data,
+    faculty: useActiveRoleCount("faculty").data,
+    student: useActiveRoleCount("student").data,
+    admin: useActiveRoleCount("admin").data,
   };
+  // Deactivated accounts still exist and can be reactivated, so they are
+  // reported -- just not counted as if they were people using the platform.
+  const { data: deactivated } = useQuery({
+    queryKey: ["admin", "users", "count", "deactivated"],
+    queryFn: () => fetchUsers({ is_active: false, page_size: 1 }),
+    select: (page) => page.total,
+  });
   const { data: schools } = useQuery({ queryKey: ["schools"], queryFn: () => fetchSchools() });
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -188,6 +201,7 @@ export function AdministrationPage() {
 
       <section className="mt-6">
         <h2 className="text-sm font-semibold">On the platform</h2>
+        <p className="mt-1 text-xs text-ink-muted">Accounts that can sign in.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {ROLE_CARDS.map((card) => (
             <Link
@@ -218,6 +232,14 @@ export function AdministrationPage() {
             <span className="mt-1 block text-2xl font-semibold">{departments?.length ?? 0}</span>
           </Link>
         </div>
+        {deactivated ? (
+          <p className="mt-2 text-xs text-ink-muted">
+            <Link to="/admin/users" className="hover:underline">
+              {deactivated} deactivated {deactivated === 1 ? "account" : "accounts"}
+            </Link>{" "}
+            are not counted above — they cannot sign in until reactivated.
+          </p>
+        ) : null}
       </section>
 
       <section className="mt-8">
