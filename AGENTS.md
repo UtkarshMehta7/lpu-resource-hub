@@ -79,7 +79,10 @@ so the refresh cookie stays first-party).
 - Migrations are a release step: `backend/scripts/release.sh`, run from a
   workstation. Never on container start.
 - Do not install the `ml` extra in production; it exceeds a free instance.
-- Docker images have NEVER been built. Nothing has been deployed.
+- **Deployed 24 Sep 2026.** API live on Render (Docker service, root
+  directory `backend`) against Neon; health, readiness, login and the
+  production headers all verified. Netlify still to do.
+- The Docker images HAVE now been built, by Render. Never built locally.
 
 ## Commands
 Backend (backend/, venv active): ruff check . && ruff format --check . && mypy && pytest
