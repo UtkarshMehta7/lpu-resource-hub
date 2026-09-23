@@ -11,6 +11,7 @@ import uuid
 from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.orm import Session
 
+from app.modules.admin.models import Department
 from app.modules.profiles.models import (
     ResearcherProfile,
     StudentProfile,
@@ -42,6 +43,14 @@ class ResearchAreaNotFoundError(Exception):
     """Raised when a referenced research area id does not exist."""
 
 
+class DepartmentNotFoundError(Exception):
+    """Raised when the department id on a profile does not exist."""
+
+
+class DepartmentLockedError(Exception):
+    """Raised when a verified researcher tries to move themselves."""
+
+
 def get_profile(db: Session, user: User) -> StudentProfile | ResearcherProfile:
     profile: StudentProfile | ResearcherProfile | None
     if user.role is UserRole.STUDENT:
@@ -53,7 +62,31 @@ def get_profile(db: Session, user: User) -> StudentProfile | ResearcherProfile:
     return profile
 
 
+def department_is_locked(db: Session, user: User) -> bool:
+    """Whether the user may still state their own department.
+
+    A verified researcher's department has been confirmed by a coordinator,
+    so from then on it is the institution's record and only an admin changes
+    it. Everyone else may still say where they belong.
+    """
+    if user.role is UserRole.STUDENT:
+        return False
+    profile = db.get(ResearcherProfile, user.id)
+    return profile is not None and profile.verification_status is VerificationStatus.VERIFIED
+
+
+def _apply_department(db: Session, user: User, department_id: uuid.UUID | None) -> None:
+    if department_id is None or department_id == user.department_id:
+        return
+    if department_is_locked(db, user):
+        raise DepartmentLockedError
+    if db.get(Department, department_id) is None:
+        raise DepartmentNotFoundError
+    user.department_id = department_id
+
+
 def upsert_student_profile(db: Session, user: User, data: StudentProfileUpdate) -> StudentProfile:
+    _apply_department(db, user, data.department_id)
     profile = db.get(StudentProfile, user.id)
     if profile is None:
         profile = StudentProfile(user_id=user.id)
@@ -78,6 +111,7 @@ def upsert_researcher_profile(
     verification queue. An already-VERIFIED profile keeps its status:
     editing a bio should not silently revoke verification.
     """
+    _apply_department(db, user, data.department_id)
     links = [item.model_dump() for item in data.links] if data.links is not None else None
     profile = db.get(ResearcherProfile, user.id)
     if profile is None:

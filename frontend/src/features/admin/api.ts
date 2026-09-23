@@ -1,7 +1,7 @@
 import type { Role } from "@/features/auth/types";
 import { apiClient } from "@/lib/api/client";
 
-import type { AdminUserRead, AdminUserUpdate, Page } from "./types";
+import type { AdminUserRead, AdminUserUpdate, Page, TemporaryPasswordRead } from "./types";
 
 export interface ListUsersParams {
   page?: number;
@@ -24,6 +24,13 @@ export async function changeUserRole(userId: string, role: Role): Promise<AdminU
   const response = await apiClient.post<AdminUserRead>(`/api/v1/admin/users/${userId}/role`, {
     role,
   });
+  return response.data;
+}
+
+export async function resetTemporaryPassword(userId: string): Promise<TemporaryPasswordRead> {
+  const response = await apiClient.post<TemporaryPasswordRead>(
+    `/api/v1/admin/users/${userId}/temporary-password`,
+  );
   return response.data;
 }
 

@@ -11,6 +11,8 @@ role-conditional body type on one route declaratively.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
@@ -38,9 +40,12 @@ from app.modules.profiles.schemas import (
     StudentProfileUpdate,
 )
 from app.modules.profiles.service import (
+    DepartmentLockedError,
+    DepartmentNotFoundError,
     ProfileNotFoundError,
     ResearchAreaNotFoundError,
     SkillNotFoundError,
+    department_is_locked,
     get_profile,
     set_research_areas,
     set_skills,
@@ -56,10 +61,34 @@ router = APIRouter(prefix="/me", tags=["profiles"])
 ProfileRead = StudentProfileRead | ResearcherProfileRead
 
 
-def _to_read_schema(profile: StudentProfile | ResearcherProfile) -> ProfileRead:
+def _to_read_schema(
+    db: Session, user: User, profile: StudentProfile | ResearcherProfile
+) -> ProfileRead:
+    """The department lives on the user, not the profile row, but it is edited
+    on the profile form -- so it is answered here alongside it."""
+    extra = {
+        "department_id": user.department_id,
+        "department_locked": department_is_locked(db, user),
+    }
     if isinstance(profile, StudentProfile):
-        return StudentProfileRead.model_validate(profile)
-    return ResearcherProfileRead.model_validate(profile)
+        return StudentProfileRead.model_validate(profile).model_copy(update=extra)
+    return ResearcherProfileRead.model_validate(profile).model_copy(update=extra)
+
+
+@contextmanager
+def _department_errors() -> Iterator[None]:
+    try:
+        yield
+    except DepartmentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Department not found."
+        ) from exc
+    except DepartmentLockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your department was set when your profile was verified. "
+            "Ask an admin to change it.",
+        ) from exc
 
 
 @router.get("/profile", response_model=StudentProfileRead | ResearcherProfileRead)
@@ -74,7 +103,7 @@ def read_my_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile not created yet. PUT /api/v1/me/profile to create it.",
         ) from exc
-    return _to_read_schema(profile)
+    return _to_read_schema(db, current_user, profile)
 
 
 @router.put("/profile", response_model=StudentProfileRead | ResearcherProfileRead)
@@ -93,7 +122,9 @@ async def update_my_profile(
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.errors()
             ) from exc
-        return _to_read_schema(upsert_student_profile(db, current_user, student_data))
+        with _department_errors():
+            student_profile = upsert_student_profile(db, current_user, student_data)
+        return _to_read_schema(db, current_user, student_profile)
 
     try:
         researcher_data = ResearcherProfileUpdate.model_validate(body)
@@ -101,10 +132,11 @@ async def update_my_profile(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.errors()
         ) from exc
-    profile = upsert_researcher_profile(db, current_user, researcher_data)
+    with _department_errors():
+        profile = upsert_researcher_profile(db, current_user, researcher_data)
     # The profile text feeds semantic search, so re-embed it after replying.
     schedule_embedding(request, background, EntityType.RESEARCHER, current_user.id)
-    return _to_read_schema(profile)
+    return _to_read_schema(db, current_user, profile)
 
 
 @router.put("/skills", response_model=list[SkillEntry])

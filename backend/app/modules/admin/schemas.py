@@ -61,6 +61,7 @@ class AdminUserRead(BaseModel):
     role: UserRole
     is_active: bool
     must_change_password: bool
+    department_id: uuid.UUID | None
     coordinator_scope_type: CoordinatorScopeType | None
     coordinator_scope_id: uuid.UUID | None
     created_at: datetime
@@ -69,8 +70,19 @@ class AdminUserRead(BaseModel):
 
 class AdminUserUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=1, max_length=200)
+    # Someone who self-registered has no department, which leaves them unable
+    # to do anything department-scoped. An admin places them here; an explicit
+    # null clears it again.
+    department_id: uuid.UUID | None = None
     coordinator_scope_type: CoordinatorScopeType | None = None
     coordinator_scope_id: uuid.UUID | None = None
+
+
+class TemporaryPasswordRead(BaseModel):
+    """The one and only time a reset password is readable."""
+
+    user: AdminUserRead
+    temporary_password: str
 
 
 class RoleChangeRequest(BaseModel):

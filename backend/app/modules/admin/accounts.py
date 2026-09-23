@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.core.security import hash_password
 from app.modules.admin.models import Department
 from app.modules.audit import service as audit_service
+from app.modules.profiles.models import ResearcherProfile, VerificationStatus
 from app.modules.users.models import CoordinatorScopeType, User, UserRole
 
 # Long enough that a temporary password isn't the weak link, short enough to
@@ -33,6 +34,14 @@ class NotAllowedRoleError(Exception):
 
 class OutOfScopeError(Exception):
     """The creator may not add people to that department."""
+
+
+class NoDepartmentError(Exception):
+    """The creator has no department of their own to add anyone to."""
+
+
+class NotVerifiedError(Exception):
+    """The creator's researcher profile has not been verified yet."""
 
 
 class DepartmentRequiredError(Exception):
@@ -59,14 +68,30 @@ def generate_temporary_password() -> str:
 
 
 def _creator_department(creator: User) -> uuid.UUID | None:
-    """Which department this creator may add people to."""
-    if (
-        creator.role is UserRole.RESEARCH_COORDINATOR
-        and creator.coordinator_scope_type is CoordinatorScopeType.DEPARTMENT
-        and creator.coordinator_scope_id is not None
-    ):
-        return creator.coordinator_scope_id
+    """Which department this creator may add people to.
+
+    A coordinator's authority comes from the scope an admin gave them, so it
+    is the only thing read here: their own `department_id` says where they
+    work, not what they oversee, and it may have been self-declared.
+    """
+    if creator.role is UserRole.RESEARCH_COORDINATOR:
+        if (
+            creator.coordinator_scope_type is CoordinatorScopeType.DEPARTMENT
+            and creator.coordinator_scope_id is not None
+        ):
+            return creator.coordinator_scope_id
+        return None
     return creator.department_id
+
+
+def _may_create_in_own_department(db: Session, creator: User) -> bool:
+    """Faculty state their own department, so that claim alone can't be what
+    lets them create accounts in it — a coordinator has to have verified the
+    profile first. Coordinators are placed by an admin, so they're exempt."""
+    if creator.role is not UserRole.FACULTY:
+        return True
+    profile = db.get(ResearcherProfile, creator.id)
+    return profile is not None and profile.verification_status is VerificationStatus.VERIFIED
 
 
 def create_account(
@@ -84,9 +109,11 @@ def create_account(
         # Faculty and coordinators create students, in their own department.
         if role is not UserRole.STUDENT:
             raise NotAllowedRoleError
+        if not _may_create_in_own_department(db, creator):
+            raise NotVerifiedError
         scope = _creator_department(creator)
         if scope is None:
-            raise OutOfScopeError
+            raise NoDepartmentError
         if department_id is not None and department_id != scope:
             raise OutOfScopeError
         department_id = scope
