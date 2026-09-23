@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, update
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
@@ -23,8 +22,7 @@ from app.core.security import (
     verify_password,
 )
 from app.modules.auth.models import RefreshToken
-from app.modules.auth.schemas import RegisterRequest
-from app.modules.users.models import User, UserRole
+from app.modules.users.models import User
 from app.modules.users.service import get_by_id, get_by_registration_number
 
 
@@ -54,24 +52,6 @@ class IssuedTokens:
     access_token: str
     refresh_token: str
     expires_in: int
-
-
-def register_user(db: Session, data: RegisterRequest) -> User:
-    user = User(
-        registration_number=data.registration_number,
-        email=data.email.lower() if data.email else None,
-        password_hash=hash_password(data.password),
-        full_name=data.full_name,
-        role=UserRole(data.role),
-    )
-    db.add(user)
-    try:
-        db.commit()
-    except IntegrityError as exc:
-        db.rollback()
-        raise RegistrationNumberTakenError from exc
-    db.refresh(user)
-    return user
 
 
 def authenticate(db: Session, registration_number: str, password: str) -> User:

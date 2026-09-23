@@ -1,9 +1,14 @@
-"""Creating accounts for other people.
+"""Provisioning accounts down the institutional hierarchy.
 
-Students don't self-register (ADR 0015): their department creates the
-account and hands over a temporary password, which the new user must replace
-at first sign-in. Faculty and coordinators may only create accounts in the
-department they belong to or oversee; admins anywhere, for any role.
+Nobody signs themselves up (ADR 0019). An admin appoints research
+coordinators, a coordinator appoints the faculty of the department they
+oversee, and a faculty member enrols the students of their own department.
+Each new account gets a temporary password its creator hands over once, and
+which the new user must replace before they can use anything.
+
+The role of a new account is *derived* from the creator's role via
+`creatable_role`; it is never read from the request. There is therefore no
+client-supplied role to validate, and none to forge.
 """
 
 from __future__ import annotations
@@ -16,6 +21,7 @@ from dataclasses import dataclass
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.permissions import creatable_role
 from app.core.security import hash_password
 from app.modules.admin.models import Department
 from app.modules.audit import service as audit_service
@@ -29,7 +35,7 @@ _ALPHABET = string.ascii_letters + string.digits
 
 
 class NotAllowedRoleError(Exception):
-    """This creator may not create an account with that role."""
+    """This role may not bring anyone into the platform."""
 
 
 class OutOfScopeError(Exception):
@@ -100,15 +106,24 @@ def create_account(
     *,
     registration_number: str,
     full_name: str,
-    role: UserRole,
     department_id: uuid.UUID | None,
     email: str | None,
     ip: str | None,
 ) -> CreatedAccount:
-    if creator.role is not UserRole.ADMIN:
-        # Faculty and coordinators create students, in their own department.
-        if role is not UserRole.STUDENT:
-            raise NotAllowedRoleError
+    """Create the one role this creator may create, in a department they may
+    reach. `role` is deliberately not a parameter: see the module docstring."""
+    role = creatable_role(creator.role)
+    if role is None:
+        raise NotAllowedRoleError
+
+    if creator.role is UserRole.ADMIN:
+        # An admin appoints coordinators anywhere, but a coordinator with no
+        # department oversees nothing, so the department is required here.
+        if department_id is None:
+            raise DepartmentRequiredError
+    else:
+        # Everyone else works inside their own department, and may not name
+        # another one.
         if not _may_create_in_own_department(db, creator):
             raise NotVerifiedError
         scope = _creator_department(creator)
@@ -118,9 +133,7 @@ def create_account(
             raise OutOfScopeError
         department_id = scope
 
-    if role is UserRole.STUDENT and department_id is None:
-        raise DepartmentRequiredError
-    if department_id is not None and db.get(Department, department_id) is None:
+    if db.get(Department, department_id) is None:
         raise UnknownDepartmentError
 
     temporary_password = generate_temporary_password()
@@ -132,7 +145,14 @@ def create_account(
         department_id=department_id,
         password_hash=hash_password(temporary_password),
         must_change_password=True,
+        created_by=creator.id,
     )
+    if role is UserRole.RESEARCH_COORDINATOR:
+        # A coordinator with no scope can do nothing, and the department just
+        # chosen is the one they are being appointed to oversee. Setting it
+        # here saves a second admin step that is only ever done one way.
+        user.coordinator_scope_type = CoordinatorScopeType.DEPARTMENT
+        user.coordinator_scope_id = department_id
     db.add(user)
     try:
         db.flush()

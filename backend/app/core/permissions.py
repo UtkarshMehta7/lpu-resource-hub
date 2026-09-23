@@ -121,6 +121,27 @@ ROLE_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
 }
 
 
+# Accounts are provisioned down the institutional hierarchy, one rung at a
+# time: an admin appoints coordinators, a coordinator appoints the faculty of
+# their department, a faculty member enrols their students. Nobody creates a
+# peer, nobody creates upwards, and students create nobody.
+#
+# This table is the single authority on it. The role of a new account is
+# *derived* from its creator and never read from the request, so there is no
+# client-supplied role to validate -- or to forge.
+CREATABLE_ROLE: dict[UserRole, UserRole | None] = {
+    UserRole.ADMIN: UserRole.RESEARCH_COORDINATOR,
+    UserRole.RESEARCH_COORDINATOR: UserRole.FACULTY,
+    UserRole.FACULTY: UserRole.STUDENT,
+    UserRole.STUDENT: None,
+}
+
+
+def creatable_role(creator_role: UserRole) -> UserRole | None:
+    """The one role this role may bring into the platform, or None."""
+    return CREATABLE_ROLE[creator_role]
+
+
 def require_permission(permission: Permission) -> Callable[..., User]:
     """FastAPI dependency factory: 401 if unauthenticated, 403 if lacking `permission`."""
 

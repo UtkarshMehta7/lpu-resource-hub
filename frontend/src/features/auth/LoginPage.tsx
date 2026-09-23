@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { toApiError } from "@/lib/api/errors";
@@ -106,10 +106,8 @@ export function LoginPage() {
       </form>
 
       <p className="mt-4 text-sm text-ink-muted">
-        Don&apos;t have an account?{" "}
-        <Link to="/register" className="font-medium text-brand-700 hover:underline">
-          Register
-        </Link>
+        Accounts are created for you by your department. If you don&apos;t have one yet, ask your
+        research coordinator or supervisor.
       </p>
     </div>
   );

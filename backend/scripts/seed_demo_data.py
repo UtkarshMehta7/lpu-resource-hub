@@ -284,6 +284,23 @@ def _demo_registration_number(email: str) -> str:
     return "".join(character for character in local_part if character.isalnum()).upper()
 
 
+def _coordinator_for(coordinators: list[User], department: Department) -> User | None:
+    """The coordinator whose scope is this department, if the demo has one."""
+    for coordinator in coordinators:
+        if coordinator.coordinator_scope_id == department.id:
+            return coordinator
+    return coordinators[0] if coordinators else None
+
+
+def _faculty_for(faculty: list[User], department: Department) -> User | None:
+    """A faculty member of the same department, so students hang off someone
+    who could actually have enrolled them."""
+    for member in faculty:
+        if member.department_id == department.id:
+            return member
+    return faculty[0] if faculty else None
+
+
 def _seed_user(
     db: Session,
     existing: dict[str, User],
@@ -295,6 +312,7 @@ def _seed_user(
     password_hash: str,
     department: Department | None = None,
     coordinator_scope: Department | None = None,
+    created_by: User | None = None,
 ) -> User:
     user = existing.get(email)
     if user is not None:
@@ -313,6 +331,9 @@ def _seed_user(
             CoordinatorScopeType.DEPARTMENT if coordinator_scope is not None else None
         ),
         coordinator_scope_id=coordinator_scope.id if coordinator_scope is not None else None,
+        # The provisioning chain the demo is meant to show: admin appoints
+        # coordinators, who appoint faculty, who enrol students.
+        created_by=created_by.id if created_by is not None else None,
     )
     db.add(user)
     existing[email] = user
@@ -412,22 +433,30 @@ def seed(db: Session, password_hash: str) -> SeedSummary:
         password_hash=password_hash,
     )
 
+    db.flush()  # the admin needs an id before anyone can point at it
+
+    coordinators: list[User] = []
     for index in range(1, COORDINATOR_COUNT + 1):
         department = departments[index - 1]
-        _seed_user(
-            db,
-            existing_users,
-            summary,
-            email=f"demo.coordinator{index:02d}@example.com",
-            full_name=f"Demo Coordinator {index}",
-            role=UserRole.RESEARCH_COORDINATOR,
-            password_hash=password_hash,
-            department=department,
-            coordinator_scope=department,
+        coordinators.append(
+            _seed_user(
+                db,
+                existing_users,
+                summary,
+                email=f"demo.coordinator{index:02d}@example.com",
+                full_name=f"Demo Coordinator {index}",
+                role=UserRole.RESEARCH_COORDINATOR,
+                password_hash=password_hash,
+                department=department,
+                coordinator_scope=department,
+                created_by=admin,
+            )
         )
+    db.flush()
 
     faculty: list[User] = []
     for index in range(1, FACULTY_COUNT + 1):
+        department = departments[index % len(departments)]
         faculty.append(
             _seed_user(
                 db,
@@ -437,12 +466,17 @@ def seed(db: Session, password_hash: str) -> SeedSummary:
                 full_name=f"Demo Faculty {index:02d}",
                 role=UserRole.FACULTY,
                 password_hash=password_hash,
-                department=departments[index % len(departments)],
+                department=department,
+                # Whichever coordinator oversees that department, so the chain
+                # is consistent with the scope rules the API enforces.
+                created_by=_coordinator_for(coordinators, department),
             )
         )
+    db.flush()
 
     students: list[User] = []
     for index in range(1, STUDENT_COUNT + 1):
+        department = departments[index % len(departments)]
         students.append(
             _seed_user(
                 db,
@@ -452,7 +486,8 @@ def seed(db: Session, password_hash: str) -> SeedSummary:
                 full_name=f"Demo Student {index:02d}",
                 role=UserRole.STUDENT,
                 password_hash=password_hash,
-                department=departments[index % len(departments)],
+                department=department,
+                created_by=_faculty_for(faculty, department),
             )
         )
     db.flush()

@@ -1,17 +1,6 @@
 import { apiClient } from "@/lib/api/client";
 
-import type {
-  AccessTokenResponse,
-  ChangePasswordPayload,
-  LoginPayload,
-  RegisterPayload,
-  UserRead,
-} from "./types";
-
-export async function registerRequest(payload: RegisterPayload): Promise<AccessTokenResponse> {
-  const response = await apiClient.post<AccessTokenResponse>("/api/v1/auth/register", payload);
-  return response.data;
-}
+import type { AccessTokenResponse, ChangePasswordPayload, LoginPayload, UserRead } from "./types";
 
 export async function loginRequest(payload: LoginPayload): Promise<AccessTokenResponse> {
   const response = await apiClient.post<AccessTokenResponse>("/api/v1/auth/login", payload);

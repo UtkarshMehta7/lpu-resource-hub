@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } fr
 
 import { refreshAccessToken } from "@/lib/api/client";
 
-import { loginRequest, logoutRequest, registerRequest } from "./api";
+import { loginRequest, logoutRequest } from "./api";
 import { AuthContext, type AuthContextValue } from "./authContext";
 import { clearAuthState, getAuthState, setAuthState, subscribeAuthState } from "./tokenStore";
 
@@ -32,10 +32,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       login: async (payload) => {
         const result = await loginRequest(payload);
-        setAuthState({ accessToken: result.access_token, user: result.user });
-      },
-      register: async (payload) => {
-        const result = await registerRequest(payload);
         setAuthState({ accessToken: result.access_token, user: result.user });
       },
       logout: async () => {

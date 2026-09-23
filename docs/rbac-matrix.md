@@ -29,11 +29,28 @@ action in general — the resource policy layer (loaded-resource ownership +
 scope match, `docs/architecture.md` §6 layer 2) is what enforces *this
 specific* department/project/etc., introduced per-module starting Step 3.
 
+## Account provisioning (ADR 0019)
+
+`user:create` says *whether* you may bring someone in; **who** you create is
+decided by `CREATABLE_ROLE` in `app/core/permissions.py` and never by the
+request, which carries no role field at all.
+
+| Signed in as | Creates | Scope |
+|---|---|---|
+| `ADMIN` | `RESEARCH_COORDINATOR` | any department; it becomes the new coordinator's scope |
+| `RESEARCH_COORDINATOR` | `FACULTY` | the department they oversee |
+| `FACULTY` | `STUDENT` | their own department, verified profile required |
+| `STUDENT` | — | — |
+
+There is no public registration endpoint. Nobody, at any level, can change
+their own role: that is `user:update_role`, an admin action on someone else,
+refused on self and audited.
+
 ## Implemented (Steps 2–13)
 
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
-| `user:create` | | ✅ (students, own dept, **verified profile only**) | ✅ (students, **assigned scope only**) | ✅ (any role) | 13+ |
+| `user:create` | | ✅ → students, own dept, verified profile only | ✅ → faculty, assigned scope only | ✅ → coordinators | 13+ |
 | `user:list` | | | | ✅ | 2 |
 | `user:update` | | | | ✅ | 2 |
 | `user:update_role` | | | | ✅ | 2 |
