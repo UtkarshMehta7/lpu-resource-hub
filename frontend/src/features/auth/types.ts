@@ -32,9 +32,13 @@ export interface AccessTokenResponse {
   user: UserRead;
 }
 
+/** Which sign-in page the request came from; the server enforces the rule. */
+export type Portal = "admin" | "main";
+
 export interface LoginPayload {
   registration_number: string;
   password: string;
+  portal?: Portal;
 }
 
 export interface ChangePasswordPayload {

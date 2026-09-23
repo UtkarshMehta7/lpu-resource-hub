@@ -50,6 +50,10 @@ def _text_filter(q: str) -> ColumnElement[bool]:
     return or_(
         ResearcherProfile.search_document.op("@@")(tsquery),
         func.similarity(User.full_name, q) > NAME_SIMILARITY_THRESHOLD,
+        # A registration number is an identifier, not prose: match it as a
+        # prefix rather than putting it through the language analyser, which
+        # would tokenise "12400942" uselessly.
+        User.registration_number.ilike(f"{q.strip().upper()}%"),
     )
 
 
@@ -138,6 +142,7 @@ def _to_cards(
     return [
         ResearcherCard(
             user_id=user.id,
+            registration_number=user.registration_number,
             full_name=user.full_name,
             designation=profile.designation,
             department_id=user.department_id,
@@ -180,6 +185,7 @@ def cards_for_students(db: Session, user_ids: Sequence[uuid.UUID]) -> list[Stude
     return [
         StudentCard(
             user_id=user.id,
+            registration_number=user.registration_number,
             full_name=user.full_name,
             program=profile.program,
             year=profile.year,
@@ -260,6 +266,7 @@ def get_researcher(db: Session, user_id: uuid.UUID) -> ResearcherDetail:
     areas, skills = _tags_by_user(db, [user.id])
     return ResearcherDetail(
         user_id=user.id,
+        registration_number=user.registration_number,
         full_name=user.full_name,
         designation=profile.designation,
         department_id=user.department_id,
@@ -293,6 +300,7 @@ def list_discoverable_students(
                 User.full_name.ilike(f"%{q}%"),
                 StudentProfile.program.ilike(f"%{q}%"),
                 StudentProfile.interests.ilike(f"%{q}%"),
+                User.registration_number.ilike(f"{q.strip().upper()}%"),
             )
         )
     if department_id is not None:
@@ -309,6 +317,7 @@ def list_discoverable_students(
         items=[
             StudentCard(
                 user_id=user.id,
+                registration_number=user.registration_number,
                 full_name=user.full_name,
                 program=profile.program,
                 year=profile.year,

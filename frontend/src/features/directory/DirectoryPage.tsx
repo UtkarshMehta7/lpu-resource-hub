@@ -66,7 +66,7 @@ export function DirectoryPage() {
               id="q"
               type="search"
               defaultValue={filters.q ?? ""}
-              placeholder="Name, skill or area"
+              placeholder="Name, registration number, skill or area"
               onChange={(event) => setFilter("q", event.target.value)}
               className={FIELD_CLASS}
             />

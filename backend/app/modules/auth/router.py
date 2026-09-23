@@ -28,6 +28,8 @@ from app.modules.auth.service import (
     InvalidCredentialsError,
     InvalidRefreshTokenError,
     IssuedTokens,
+    WrongPortalError,
+    assert_portal_allows,
     authenticate,
     change_password,
     issue_tokens,
@@ -97,6 +99,21 @@ def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             # Deliberately identical whether the account exists or not.
             detail="Incorrect registration number or password.",
+        ) from exc
+
+    try:
+        assert_portal_allows(user, data.portal)
+    except WrongPortalError as exc:
+        # No session is issued, so this refuses rather than redirects. The
+        # message names the other door because the person is already
+        # authenticated -- it tells them nothing they don't know.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "This is the administration sign-in. Use the main sign-in page."
+                if not exc.is_admin
+                else "Administrators sign in on the administration page."
+            ),
         ) from exc
 
     tokens = issue_tokens(db, user, settings)

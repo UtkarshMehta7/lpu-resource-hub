@@ -22,6 +22,9 @@ from app.modules.publications.schemas import PublicationRead
 
 class ResearcherCard(BaseModel):
     user_id: uuid.UUID
+    # The LPU registration/employee number. Shown everywhere a person is
+    # listed: names collide, this does not.
+    registration_number: str
     full_name: str
     designation: str
     department_id: uuid.UUID | None
@@ -41,6 +44,7 @@ class StudentCard(BaseModel):
     """Only ever built for students with is_discoverable = true."""
 
     user_id: uuid.UUID
+    registration_number: str
     full_name: str
     program: str
     year: int

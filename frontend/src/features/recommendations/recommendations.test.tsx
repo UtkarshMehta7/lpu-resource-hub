@@ -59,6 +59,7 @@ suite("describe", () => {
     expect(
       describe({
         user_id: "u9",
+        registration_number: "DEMOFACULTY09",
         full_name: "Dr. Demo",
         designation: "Professor",
         department_id: null,

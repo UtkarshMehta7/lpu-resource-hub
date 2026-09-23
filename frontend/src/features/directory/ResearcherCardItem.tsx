@@ -24,6 +24,9 @@ export function ResearcherCardItem({ researcher }: { researcher: ResearcherCard 
             className="text-sm font-semibold hover:underline"
           >
             {researcher.full_name}
+            <span className="ml-2 font-mono text-xs font-normal text-ink-muted">
+              {researcher.registration_number}
+            </span>
           </Link>
           <p className="text-sm text-ink-muted">{researcher.designation}</p>
         </div>

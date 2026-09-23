@@ -4,6 +4,8 @@ import { apiClient } from "@/lib/api/client";
 /** Matches the backend's public directory schemas (no email, by design). */
 export interface ResearcherCard {
   user_id: string;
+  /** The LPU registration/employee number. Names collide; this does not. */
+  registration_number: string;
   full_name: string;
   designation: string;
   department_id: string | null;
@@ -21,6 +23,7 @@ export interface ResearcherDetail extends ResearcherCard {
 
 export interface StudentCard {
   user_id: string;
+  registration_number: string;
   full_name: string;
   program: string;
   year: number;

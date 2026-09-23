@@ -55,6 +55,16 @@ Current shape: ~119 API operations, 37 tables, 17 migrations, 19 ADRs,
 - `POST /api/v1/admin/users` is the admin override, audited under its own
   action. That is the only place a role may be named.
 - Promoting to admin takes two people: a code goes to the *target's* inbox.
+- **A coordinator's scope IS their department.** `_sync_coordinator_scope`
+  keeps them in step whenever the role or department changes; they must never
+  be set independently by hand again, or the coordinator oversees nothing.
+- **Two sign-in pages, enforced on the server.** `LoginRequest.portal`
+  ("admin" | "main"): administrators only at /admin/login, everyone else only
+  at /login. The check runs *after* the password, so the admin page can never
+  become an oracle for which numbers are administrators.
+- **The registration number is the UID and is shown wherever a person is
+  listed.** Search matches it as a case-insensitive prefix, not through the
+  language analyser -- an identifier is not prose.
 
 ## Gotchas that cost real time here
 - **Tests passing is not the screen working.** The OTP code was delivered and

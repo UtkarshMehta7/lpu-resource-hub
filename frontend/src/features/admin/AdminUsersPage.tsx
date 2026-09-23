@@ -256,7 +256,10 @@ export function AdminUsersPage() {
                         {item.full_name}
                       </button>
                     )}
-                    <span className="block text-xs text-ink-muted">{item.email ?? "—"}</span>
+                    <span className="block font-mono text-xs text-ink-muted">
+                      {item.registration_number}
+                      {item.email ? <span className="font-sans"> · {item.email}</span> : null}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <select
