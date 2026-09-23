@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { z } from "zod";
 
 import { useAuth } from "@/features/auth/authContext";
+import type { Role } from "@/features/auth/types";
 import { fetchDepartments } from "@/features/directory/api-org";
 import { apiClient } from "@/lib/api/client";
 import { toApiError } from "@/lib/api/errors";
@@ -17,7 +18,6 @@ const schema = z.object({
     .min(4, "Registration number is required")
     .max(50, "That's too long for a registration number"),
   full_name: z.string().trim().min(1, "Full name is required").max(200),
-  role: z.enum(["student", "faculty", "research_coordinator", "admin"]),
   department_id: z.string(),
   email: z
     .string()
@@ -31,6 +31,37 @@ interface CreatedAccount {
   user: { id: string; registration_number: string; full_name: string; role: string };
   temporary_password: string;
 }
+
+/**
+ * Who each role brings into the platform. This mirrors CREATABLE_ROLE in
+ * app/core/permissions.py, and only decides wording -- the backend derives
+ * the actual role from the caller, so the form never sends one.
+ */
+const PROVISIONS: Partial<
+  Record<Role, { heading: string; creates: string; blurb: string; idHint: string }>
+> = {
+  admin: {
+    heading: "Add a research coordinator",
+    creates: "research coordinator",
+    blurb:
+      "A coordinator oversees one department: they verify its researchers, review its projects and approve its bookings.",
+    idHint: "e.g. 12345678",
+  },
+  research_coordinator: {
+    heading: "Add a faculty member",
+    creates: "faculty member",
+    blurb:
+      "They join the department you oversee, and can then run projects, post openings and enrol their own students.",
+    idHint: "employee number, e.g. 45678901",
+  },
+  faculty: {
+    heading: "Add a student",
+    creates: "student",
+    blurb:
+      "They join your department and can apply to openings, book equipment and be discovered once they opt in.",
+    idHint: "registration number, e.g. 12400942",
+  },
+};
 
 const FIELD = "mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm";
 
@@ -49,6 +80,7 @@ export function CreateAccountPage() {
   const [copied, setCopied] = useState(false);
 
   const isAdmin = user?.role === "admin";
+  const provision = user ? PROVISIONS[user.role] : undefined;
   const { data: departments } = useQuery({
     queryKey: ["departments"],
     queryFn: () => fetchDepartments(),
@@ -63,7 +95,6 @@ export function CreateAccountPage() {
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      role: "student",
       department_id: "",
       email: "",
       registration_number: "",
@@ -75,19 +106,18 @@ export function CreateAccountPage() {
     setError(null);
     setCopied(false);
     try {
+      // No role is sent: the API derives it from who is asking.
       const response = await apiClient.post<CreatedAccount>("/api/v1/users", {
         registration_number: values.registration_number,
         full_name: values.full_name,
-        role: values.role,
-        // Faculty and coordinators can only add to their own department, and
-        // the API applies that itself.
+        // Only an admin chooses a department; everyone else provisions into
+        // their own, which the API applies itself.
         department_id: isAdmin && values.department_id ? values.department_id : null,
         email: values.email || null,
       });
       setCreated(response.data);
       await queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       reset({
-        role: values.role,
         department_id: values.department_id,
         registration_number: "",
         full_name: "",
@@ -98,13 +128,18 @@ export function CreateAccountPage() {
     }
   });
 
+  if (!provision) {
+    // Only reachable if the route guard and this table ever disagree.
+    return <p className="text-sm text-ink-muted">Your role does not provision accounts.</p>;
+  }
+
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Add a person</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{provision.heading}</h1>
+      <p className="mt-1 text-sm text-ink-muted">{provision.blurb}</p>
       <p className="mt-1 text-sm text-ink-muted">
-        {isAdmin
-          ? "Create an account for anyone. They sign in with their registration number."
-          : "Create a student account in your department. They sign in with their registration number."}
+        They sign in with their registration number and a one-time password you hand over, which
+        they must replace before they can use anything.
       </p>
 
       {created ? (
@@ -154,7 +189,7 @@ export function CreateAccountPage() {
               id="registration_number"
               autoCapitalize="characters"
               spellCheck={false}
-              placeholder="e.g. 12345678"
+              placeholder={provision.idHint}
               className={FIELD}
               {...register("registration_number")}
             />
@@ -174,31 +209,22 @@ export function CreateAccountPage() {
         </div>
 
         {isAdmin ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium">
-                Role
-              </label>
-              <select id="role" className={FIELD} {...register("role")}>
-                <option value="student">Student</option>
-                <option value="faculty">Faculty / researcher</option>
-                <option value="research_coordinator">Research coordinator</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="department_id" className="block text-sm font-medium">
-                Department
-              </label>
-              <select id="department_id" className={FIELD} {...register("department_id")}>
-                <option value="">No department</option>
-                {departments?.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label htmlFor="department_id" className="block text-sm font-medium">
+              Department to oversee
+            </label>
+            <select id="department_id" className={FIELD} {...register("department_id")}>
+              <option value="">Choose a department</option>
+              {departments?.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-ink-muted">
+              The new coordinator&apos;s scope: they verify, review and approve for this department
+              only.
+            </p>
           </div>
         ) : (
           <p className="text-xs text-ink-muted">
@@ -226,7 +252,7 @@ export function CreateAccountPage() {
           disabled={isSubmitting}
           className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
         >
-          {isSubmitting ? "Creating…" : "Create account"}
+          {isSubmitting ? "Creating…" : `Add ${provision.creates}`}
         </button>
       </form>
     </div>

@@ -256,40 +256,54 @@ curl -i http://localhost:8000/health     # still 200: liveness never touches the
 
 ## Authentication API
 
-All business APIs live under `/api/v1`. Self-registration is limited to
-`student` and `faculty` (`admin` and `research_coordinator` accounts are
-created later, by an administrator — see the roadmap). The refresh token is
+All business APIs live under `/api/v1`. **There is no public registration:**
+accounts are provisioned down the institutional hierarchy — an admin appoints
+research coordinators, a coordinator appoints the faculty of the department
+they oversee, a faculty member enrols their students ([ADR 0019](docs/adr/0019-account-provisioning-hierarchy.md)).
+The first admin comes from `scripts/create_admin.py`. The refresh token is
 never returned in a JSON body: it travels only as an `httpOnly` cookie scoped
 to `/api/v1/auth`, rotated on every use, with reuse detection that revokes
 the whole token family (see [ADR 0002](docs/adr/0002-authentication.md)).
 
 | Endpoint | Auth | Notes |
 |---|---|---|
-| `POST /api/v1/auth/register` | none | `{email, password, full_name, role}`, `role` is `student` or `faculty`. Password: 10+ characters, not a common password. Sets the refresh cookie. |
 | `POST /api/v1/auth/login` | none | `{email, password}`. Sets the refresh cookie. |
 | `POST /api/v1/auth/refresh` | refresh cookie + `X-Requested-With` header | Rotates the refresh token, returns a new access token. |
 | `POST /api/v1/auth/logout` | refresh cookie + `X-Requested-With` header | Revokes the session and clears the cookie. |
 | `POST /api/v1/auth/change-password` | `Authorization: Bearer` | `{current_password, new_password}`. Revokes every existing session. |
 | `GET /api/v1/me` | `Authorization: Bearer <access_token>` | Current user's profile. |
 
-`/auth/register` and `/auth/login` are rate-limited (5 requests/minute per
-IP+email, in-memory). `/auth/refresh` and `/auth/logout` require a
+`/auth/login` is rate-limited (5 requests/minute per IP + registration
+number, in-memory). `/auth/refresh` and `/auth/logout` require a
 `X-Requested-With` header (any non-empty value) as CSRF defence, since a
 cross-site HTML form cannot set custom headers.
 
 ```bash
-curl -s -c cookies.txt -X POST http://localhost:8000/api/v1/auth/register \
+curl -s -c cookies.txt -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"jane@example.com","password":"correcthorsebattery","full_name":"Jane Doe","role":"student"}'
+  -d '{"registration_number":"DEMOFACULTY01","password":"<the seed password>"}'
 
 curl -s -b cookies.txt -c cookies.txt -X POST http://localhost:8000/api/v1/auth/refresh \
   -H "X-Requested-With: XMLHttpRequest"
 ```
 
+### Who may create whom
+
+| Signed in as | Provisions | Where |
+|---|---|---|
+| `ADMIN` | `RESEARCH_COORDINATOR` | any department, which becomes that coordinator's scope |
+| `RESEARCH_COORDINATOR` | `FACULTY` | the department they oversee |
+| `FACULTY` | `STUDENT` | their own department, once their profile is verified |
+| `STUDENT` | nobody | — |
+
+The request body carries no role. Sending one changes nothing: the created
+role is `CREATABLE_ROLE[caller.role]`. See
+[ADR 0019](docs/adr/0019-account-provisioning-hierarchy.md).
+
 ### Creating the first admin account
 
-`admin` and `research_coordinator` accounts can't self-register. Create the
-first admin from the command line:
+Nobody self-registers, so the first admin is created from the command line and
+everyone else follows from them:
 
 ```bash
 cd backend && source .venv/bin/activate
@@ -349,7 +363,7 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `GET /api/v1/analytics/network` | `analytics:read` | The collaboration graph: nodes are researchers and opted-in students, edges are co-authorship, shared projects and accepted collaboration requests. Nodes carry a name, role and department — never contact details. |
 | `GET /api/v1/admin/settings` | admin | Read-only view of the configured behaviour (weights, scheduler, token lifetimes). No secrets. |
 | `POST /api/v1/admin/reports/{id}/resolve` | `report:moderate` | Now also takes `hide_target`: archives a reported project or closes a reported opening, recorded in the audit row. |
-| `POST /api/v1/users` | `user:create` (faculty, coordinator, admin) | Creates an account for someone else and returns a temporary password **once**. Faculty may only add students to their own department, and only once their researcher profile is **verified** — a self-declared department is not by itself permission to create accounts in it. A coordinator acts only within the scope an admin assigned. Admins may create any role. Audited. |
+| `POST /api/v1/users` | `user:create` (faculty, coordinator, admin) | Provisions the one role below the caller's own — admin → coordinator, coordinator → faculty, faculty → student — and returns a temporary password **once**. **The request has no `role` field**: the role is derived from the caller, so it cannot be asked for or forged. An admin names the department the new coordinator will oversee; everyone else provisions into their own department only, and faculty must be **verified** first. Records `created_by`. Audited. |
 | `GET /api/v1/search/semantic?q=&limit=` | any signed-in user | Ask in plain language. Full-text and vector rankings are fused with reciprocal rank fusion; visibility rules are the same ones the list endpoints apply. `semantic_used: false` means the optional ML extra isn't installed and the answer is lexical-only. |
 | `GET/POST /api/v1/funding`, `GET/PATCH/DELETE /api/v1/funding/{id}` | any signed-in user reads / `funding:manage` writes | Filters `q`, `status`, `open_only`, `research_area_id`, `deadline_before`. Seeded calls are fictional and flagged `is_demo`. |
 | `GET /api/v1/me/notifications` | any signed-in user | Your own notifications plus the unread count. Others' are never visible (`404` on a foreign id). |

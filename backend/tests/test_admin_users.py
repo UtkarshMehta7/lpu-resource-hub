@@ -239,18 +239,15 @@ def test_deactivate_revokes_the_users_refresh_tokens(
     client: TestClient, seed_user: Callable[..., SeededUser]
 ) -> None:
     admin = seed_user(UserRole.ADMIN)
+    target = seed_user(UserRole.FACULTY, registration_number="TARGET0001")
 
-    register_response = client.post(
-        "/api/v1/auth/register",
-        json={
-            "registration_number": "TARGET0001",
-            "email": "target@example.com",
-            "password": "correcthorsebattery",
-            "full_name": "Target User",
-            "role": "faculty",
-        },
+    # A real session for the target, so there is something to revoke.
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"registration_number": "TARGET0001", "password": "not-used-directly-seeded12"},
     )
-    target_id = register_response.json()["user"]["id"]
+    assert login.status_code == 200
+    target_id = str(target.id)
     refresh_cookie = client.cookies.get("refresh_token")
     assert refresh_cookie is not None
 

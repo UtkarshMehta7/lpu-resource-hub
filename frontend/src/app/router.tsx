@@ -1,13 +1,15 @@
 import { createBrowserRouter } from "react-router-dom";
 
+import { AdministrationPage } from "@/features/admin/AdministrationPage";
 import { AdminUsersPage } from "@/features/admin/AdminUsersPage";
+import { CoordinatorsPage } from "@/features/admin/CoordinatorsPage";
+import { OrganisationPage } from "@/features/admin/OrganisationPage";
 import { DirectoryPage } from "@/features/directory/DirectoryPage";
 import { ResearcherDetailPage } from "@/features/directory/ResearcherDetailPage";
 import { StudentsPage } from "@/features/directory/StudentsPage";
 import { AccountPage } from "@/features/auth/AccountPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute";
-import { RegisterPage } from "@/features/auth/RegisterPage";
 import { RoleRoute } from "@/features/auth/RoleRoute";
 import { HomePage } from "@/features/home/HomePage";
 import { NotFoundPage } from "@/features/home/NotFoundPage";
@@ -57,7 +59,6 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: "login", element: <LoginPage /> },
-      { path: "register", element: <RegisterPage /> },
       {
         element: <ProtectedRoute />,
         children: [
@@ -127,6 +128,9 @@ export const router = createBrowserRouter([
           {
             element: <RoleRoute allow={["admin"]} />,
             children: [
+              { path: "admin", element: <AdministrationPage /> },
+              { path: "admin/coordinators", element: <CoordinatorsPage /> },
+              { path: "admin/organisation", element: <OrganisationPage /> },
               { path: "admin/users", element: <AdminUsersPage /> },
               { path: "admin/audit-logs", element: <AuditLogPage /> },
               { path: "admin/settings", element: <PlatformSettingsPage /> },

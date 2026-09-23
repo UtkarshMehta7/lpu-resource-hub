@@ -292,10 +292,12 @@ ENDPOINTS = (
         frozenset(ALL_ROLES),
         body={},
     ),
-    # Creating accounts for other people: faculty and coordinators (students
-    # in their own department) and admins. The generic fixture's faculty has
-    # no department, so an authorised caller gets 403 from the scope check --
-    # the point of the row is that a student gets 403 before any of that.
+    # Provisioning accounts (ADR 0019). Everyone above student holds
+    # user:create; what they may create is decided by their own role, and the
+    # body carries no role at all. The generic fixture's users have no
+    # department, so an authorised caller falls through to a scope failure --
+    # the point of the row is that a *student* is stopped before any of that.
+    # The full matrix lives in tests/test_account_creation.py.
     Endpoint(
         "POST",
         "/api/v1/users",
@@ -303,9 +305,11 @@ ENDPOINTS = (
         body={
             "registration_number": "MATRIX0001",
             "full_name": "Matrix Person",
-            "role": "faculty",
         },
-        allowed_status=201,
+        # An admin appoints a coordinator and must say which department they
+        # will oversee; the fixture names none, so this is the 422 that says
+        # "authorised, but incomplete" rather than "not allowed".
+        allowed_status=422,
     ),
     # Step 14: analytics and the collaboration network are for coordinators
     # and admins; platform settings are admin-only.

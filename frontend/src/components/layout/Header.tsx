@@ -26,11 +26,11 @@ const NAV: NavItem[] = [
   { to: "/publications", label: "Publications" },
   { to: "/opportunities", label: "Opportunities" },
   { to: "/students", label: "Students", roles: ["faculty", "research_coordinator", "admin"] },
-  {
-    to: "/people/new",
-    label: "Add a person",
-    roles: ["faculty", "research_coordinator", "admin"],
-  },
+  // One route, but the label names who you actually provision, so nobody has
+  // to guess. Mirrors CREATABLE_ROLE on the backend.
+  { to: "/people/new", label: "Add coordinator", roles: ["admin"] },
+  { to: "/people/new", label: "Add faculty", roles: ["research_coordinator"] },
+  { to: "/people/new", label: "Add student", roles: ["faculty"] },
   {
     to: "/collaborations",
     label: "Requests",
@@ -54,7 +54,9 @@ const NAV: NavItem[] = [
   },
   { to: "/analytics", label: "Analytics", roles: ["research_coordinator", "admin"] },
   { to: "/admin/reports", label: "Reports", roles: ["research_coordinator", "admin"] },
-  { to: "/admin/users", label: "Admin", roles: ["admin"] },
+  { to: "/admin", label: "Administration", roles: ["admin"] },
+  { to: "/admin/coordinators", label: "Coordinators", roles: ["admin"] },
+  { to: "/admin/users", label: "Accounts", roles: ["admin"] },
   { to: "/admin/audit-logs", label: "Audit log", roles: ["admin"] },
   { to: "/admin/settings", label: "Settings", roles: ["admin"] },
   { to: "/profile", label: "Profile" },
@@ -84,7 +86,7 @@ export function Header() {
           <>
             <nav aria-label="Main" className="hidden items-center gap-3 lg:flex">
               {items.slice(0, 6).map((item) => (
-                <NavLink key={item.to} to={item.to} className={LINK}>
+                <NavLink key={item.label} to={item.to} className={LINK}>
                   {item.label}
                 </NavLink>
               ))}
@@ -110,17 +112,12 @@ export function Header() {
             </button>
           </>
         ) : (
-          <div className="flex items-center gap-3 text-sm font-medium">
-            <Link to="/login" className="hover:underline">
-              Log in
-            </Link>
-            <Link
-              to="/register"
-              className="rounded-md bg-brand-700 px-3 py-1.5 text-white hover:bg-brand-800"
-            >
-              Register
-            </Link>
-          </div>
+          <Link
+            to="/login"
+            className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
+          >
+            Log in
+          </Link>
         )}
       </div>
 
@@ -132,7 +129,7 @@ export function Header() {
         >
           <ul className="mx-auto grid max-w-5xl gap-2 sm:grid-cols-3">
             {items.map((item) => (
-              <li key={item.to}>
+              <li key={item.label}>
                 <NavLink to={item.to} onClick={() => setMenuOpen(false)} className={LINK}>
                   {item.label}
                 </NavLink>
