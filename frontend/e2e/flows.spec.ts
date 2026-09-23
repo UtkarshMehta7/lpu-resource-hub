@@ -160,13 +160,13 @@ test("admin changes a role and sees platform stats", async ({ browser }) => {
 test("coordinator lists a facility and its equipment", async ({ browser }) => {
   const page = await sessionFor(browser, COORDINATOR);
   await page.goto("/facilities/new");
-  await page.getByLabel("Name").fill(FACILITY);
+  await page.getByLabel("Name", { exact: true }).fill(FACILITY);
   await page.getByLabel(/location/i).fill("Block 32");
   await page.getByRole("button", { name: "Create facility" }).click();
   await expect(page.getByRole("heading", { name: FACILITY })).toBeVisible();
 
   await page.getByRole("link", { name: "Add equipment" }).click();
-  await page.getByLabel("Name").fill(EQUIPMENT);
+  await page.getByLabel("Name", { exact: true }).fill(EQUIPMENT);
   await page.getByLabel(/longest booking/i).fill("4");
   await page.getByRole("button", { name: "Add equipment" }).click();
   await expect(page.getByRole("heading", { name: EQUIPMENT })).toBeVisible();
