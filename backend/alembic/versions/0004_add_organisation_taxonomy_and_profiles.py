@@ -324,3 +324,7 @@ def downgrade() -> None:
     op.drop_table("schools")
     op.drop_index(op.f("ix_research_areas_name"), table_name="research_areas")
     op.drop_table("research_areas")
+    sa.Enum(name="tag_suggestion_status").drop(op.get_bind(), checkfirst=True)
+    sa.Enum(name="tag_suggestion_type").drop(op.get_bind(), checkfirst=True)
+    sa.Enum(name="verification_status").drop(op.get_bind(), checkfirst=True)
+    sa.Enum(name="researcher_availability").drop(op.get_bind(), checkfirst=True)
