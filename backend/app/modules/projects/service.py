@@ -149,12 +149,16 @@ def _tags_by_project(
     return areas, skills
 
 
-def _owner_names(db: Session, owner_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, str]:
+def _owner_names(db: Session, owner_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, tuple[str, str]]:
+    """Name and registration number together: a name alone is ambiguous."""
     if not owner_ids:
         return {}
-    return dict(
-        db.execute(select(User.id, User.full_name).where(User.id.in_(owner_ids))).tuples().all()
-    )
+    return {
+        row[0]: (row[1], row[2])
+        for row in db.execute(
+            select(User.id, User.full_name, User.registration_number).where(User.id.in_(owner_ids))
+        ).all()
+    }
 
 
 def _to_cards(db: Session, projects: Sequence[Project]) -> list[ProjectCard]:
@@ -168,7 +172,8 @@ def _to_cards(db: Session, projects: Sequence[Project]) -> list[ProjectCard]:
             summary=p.summary,
             status=p.status,
             owner_id=p.owner_id,
-            owner_name=owners.get(p.owner_id, ""),
+            owner_name=owners.get(p.owner_id, ("", ""))[0],
+            owner_registration_number=owners.get(p.owner_id, ("", ""))[1],
             department_id=p.department_id,
             start_date=p.start_date,
             end_date=p.end_date,
@@ -181,12 +186,20 @@ def _to_cards(db: Session, projects: Sequence[Project]) -> list[ProjectCard]:
 
 def _members(db: Session, project_id: uuid.UUID) -> list[MemberRead]:
     rows = db.execute(
-        select(ProjectMember.user_id, User.full_name, ProjectMember.member_role)
+        select(
+            ProjectMember.user_id,
+            User.full_name,
+            User.registration_number,
+            ProjectMember.member_role,
+        )
         .join(User, User.id == ProjectMember.user_id)
         .where(ProjectMember.project_id == project_id)
         .order_by(ProjectMember.created_at)
     ).all()
-    return [MemberRead(user_id=uid, full_name=name, member_role=role) for uid, name, role in rows]
+    return [
+        MemberRead(user_id=uid, full_name=name, registration_number=number, member_role=role)
+        for uid, name, number, role in rows
+    ]
 
 
 def _to_read(db: Session, project: Project) -> ProjectRead:

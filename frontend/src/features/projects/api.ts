@@ -13,6 +13,7 @@ export interface ProjectCard {
   status: ProjectStatus;
   owner_id: string;
   owner_name: string;
+  owner_registration_number: string;
   department_id: string | null;
   start_date: string | null;
   end_date: string | null;
@@ -23,6 +24,7 @@ export interface ProjectCard {
 export interface ProjectMember {
   user_id: string;
   full_name: string;
+  registration_number: string;
   member_role: string;
 }
 

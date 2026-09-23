@@ -57,6 +57,7 @@ class OpportunityCard(BaseModel):
     department_id: uuid.UUID | None
     created_by: uuid.UUID
     creator_name: str
+    creator_registration_number: str
     positions: int
     accepted_count: int
     deadline: date

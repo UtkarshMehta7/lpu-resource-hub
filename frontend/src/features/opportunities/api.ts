@@ -14,6 +14,7 @@ export interface OpportunityCard {
   department_id: string | null;
   created_by: string;
   creator_name: string;
+  creator_registration_number: string;
   positions: number;
   accepted_count: number;
   deadline: string;
@@ -57,6 +58,7 @@ export interface Application {
   opportunity_type: OpportunityType;
   applicant_id: string;
   applicant_name: string;
+  applicant_registration_number: string;
   statement: string;
   status: ApplicationStatus;
   note: string | null;

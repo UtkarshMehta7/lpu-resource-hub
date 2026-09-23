@@ -63,8 +63,14 @@ Current shape: ~119 API operations, 37 tables, 17 migrations, 19 ADRs,
   at /login. The check runs *after* the password, so the admin page can never
   become an oracle for which numbers are administrators.
 - **The registration number is the UID and is shown wherever a person is
-  listed.** Search matches it as a case-insensitive prefix, not through the
-  language analyser -- an identifier is not prose.
+  named** -- via `components/ui/Uid`, never a hand-rolled span. Every
+  person-bearing response schema carries `registration_number`; search matches
+  it as a case-insensitive prefix, not through the language analyser -- an
+  identifier is not prose.
+- A fix to the service layer does not fix the rows already in the deployed
+  database. The coordinators appointed before `_sync_coordinator_scope` needed
+  migration 0018 as well, and the users page now shows each coordinator's
+  scope so a missing one is visible instead of silent.
 
 ## Gotchas that cost real time here
 - **Tests passing is not the screen working.** The OTP code was delivered and

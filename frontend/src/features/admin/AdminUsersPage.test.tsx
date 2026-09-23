@@ -132,6 +132,68 @@ describe("AdminUsersPage", () => {
     expect(resetTemporaryPassword).toHaveBeenCalledWith("user-1");
   });
 
+  it("says when a coordinator oversees nothing, and repairs it in one click", async () => {
+    const user = userEvent.setup();
+    fetchUsers.mockResolvedValue({
+      items: [
+        {
+          ...STRANDED,
+          role: "research_coordinator",
+          department_id: "dept-1",
+          coordinator_scope_id: null,
+          coordinator_scope_type: null,
+        },
+      ],
+      page: 1,
+      page_size: 100,
+      total: 1,
+    });
+    renderPage();
+
+    const repair = await screen.findByRole("button", { name: /put them over agriculture/i });
+    await user.click(repair);
+
+    await waitFor(() =>
+      expect(updateUser).toHaveBeenCalledWith("user-1", {
+        coordinator_scope_type: "department",
+        coordinator_scope_id: "dept-1",
+      }),
+    );
+  });
+
+  it("shows what a properly scoped coordinator oversees", async () => {
+    fetchUsers.mockResolvedValue({
+      items: [
+        {
+          ...STRANDED,
+          role: "research_coordinator",
+          department_id: "dept-1",
+          coordinator_scope_id: "dept-1",
+          coordinator_scope_type: "department",
+        },
+      ],
+      page: 1,
+      page_size: 100,
+      total: 1,
+    });
+    renderPage();
+
+    expect(await screen.findByText("Oversees Agriculture")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /put them over/i })).toBeNull();
+  });
+
+  it("asks for a department first when the coordinator has none", async () => {
+    fetchUsers.mockResolvedValue({
+      items: [{ ...STRANDED, role: "research_coordinator" }],
+      page: 1,
+      page_size: 100,
+      total: 1,
+    });
+    renderPage();
+
+    expect(await screen.findByText(/give them a department first/i)).toBeInTheDocument();
+  });
+
   it("surfaces the reason the API refused", async () => {
     const user = userEvent.setup();
     updateUser.mockRejectedValue(new Error("nope"));

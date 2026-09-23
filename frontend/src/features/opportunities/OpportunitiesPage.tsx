@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/authContext";
 import { fetchDepartments } from "@/features/directory/api-org";
 import { searchSkills } from "@/features/taxonomy/api";
+import { Uid } from "@/components/ui/Uid";
 
 import { fetchOpportunities } from "./api";
 import {
@@ -231,8 +232,9 @@ export function OpportunitiesPage({ mine = false }: { mine?: boolean }) {
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-ink-muted">
-                  {o.project_title ? `${o.project_title} · ` : ""}Posted by {o.creator_name} ·
-                  Deadline {o.deadline} · {o.accepted_count}/{o.positions} filled
+                  {o.project_title ? `${o.project_title} · ` : ""}Posted by {o.creator_name}{" "}
+                  <Uid value={o.creator_registration_number} /> · Deadline {o.deadline} ·{" "}
+                  {o.accepted_count}/{o.positions} filled
                 </p>
                 {o.skills.length > 0 ? (
                   <ul className="mt-2 flex flex-wrap gap-1">

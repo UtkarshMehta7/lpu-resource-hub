@@ -22,6 +22,7 @@ class CollaborationCreate(BaseModel):
 class Party(BaseModel):
     id: uuid.UUID
     full_name: str
+    registration_number: str
     role: UserRole
 
 

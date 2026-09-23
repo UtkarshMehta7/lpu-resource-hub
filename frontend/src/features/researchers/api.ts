@@ -6,6 +6,7 @@ import type { VerificationStatus } from "@/features/profiles/types";
 export interface VerificationQueueItem {
   user_id: string;
   full_name: string;
+  registration_number: string;
   email: string;
   designation: string;
   department_id: string | null;

@@ -50,6 +50,8 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Scoped analytics (coordinator = own department, admin = platform), collaboration network graph, audit-log viewer, moderation that can hide content, read-only platform settings | Done |
 | Optional Docker Compose, GitHub Actions CI, security headers and CSP, dependency audits, secret scanning, free-tier deployment guide | Done |
 | Department membership: self-declared until verification locks it, admin can place anyone, replacement temporary passwords, rename from the admin list ([ADR 0018](docs/adr/0018-department-membership.md)) | Done |
+| Provisioning hierarchy with no self-registration, separate administration sign-in, two-person admin promotion ([ADR 0019](docs/adr/0019-account-provisioning-hierarchy.md)) | Done |
+| Registration number shown wherever a person is named and searchable by it; a coordinator's scope follows their department, with the scope visible on the users page ([ADR 0020](docs/adr/0020-identity-on-screen-and-derived-coordinator-scope.md)) | Done |
 
 ## Technology stack
 

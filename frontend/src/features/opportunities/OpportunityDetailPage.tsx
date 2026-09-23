@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Uid } from "@/components/ui/Uid";
 import { ReportButton } from "@/features/reports/ReportButton";
 import { SaveButton } from "@/features/saved/SaveButton";
 import { useAuth } from "@/features/auth/authContext";
@@ -80,7 +81,7 @@ export function OpportunityDetailPage() {
       </p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">{opportunity.title}</h1>
       <p className="mt-2 text-sm text-ink-muted">
-        Posted by {opportunity.creator_name}
+        Posted by {opportunity.creator_name} <Uid value={opportunity.creator_registration_number} />
         {opportunity.project_id && opportunity.project_title ? (
           <>
             {" "}

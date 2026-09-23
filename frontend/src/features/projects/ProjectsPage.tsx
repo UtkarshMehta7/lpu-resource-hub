@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/authContext";
+import { Uid } from "@/components/ui/Uid";
 
 import { fetchProjects, STATUS_LABEL, type ProjectStatus } from "./api";
 
@@ -113,7 +114,9 @@ export function ProjectsPage({ mine = false }: { mine?: boolean }) {
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-ink-muted">{project.summary}</p>
-                <p className="mt-2 text-xs text-ink-muted">Led by {project.owner_name}</p>
+                <p className="mt-2 text-xs text-ink-muted">
+                  Led by {project.owner_name} <Uid value={project.owner_registration_number} />
+                </p>
               </li>
             ))}
           </ul>

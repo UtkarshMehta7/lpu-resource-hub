@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Uid } from "@/components/ui/Uid";
 
 import type { ResearcherCard } from "./api";
 
@@ -24,9 +25,7 @@ export function ResearcherCardItem({ researcher }: { researcher: ResearcherCard 
             className="text-sm font-semibold hover:underline"
           >
             {researcher.full_name}
-            <span className="ml-2 font-mono text-xs font-normal text-ink-muted">
-              {researcher.registration_number}
-            </span>
+            <Uid value={researcher.registration_number} className="ml-2" />
           </Link>
           <p className="text-sm text-ink-muted">{researcher.designation}</p>
         </div>

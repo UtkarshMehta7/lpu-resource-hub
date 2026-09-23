@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/authContext";
 import { toApiError } from "@/lib/api/errors";
+import { Uid } from "@/components/ui/Uid";
 
 import {
   changeApplicationStatus,
@@ -77,7 +78,10 @@ export function ApplicantsPage() {
             <tbody className="divide-y divide-line">
               {applications.map((a) => (
                 <tr key={a.id}>
-                  <td className="py-2 pr-4">{a.applicant_name}</td>
+                  <td className="py-2 pr-4">
+                    {a.applicant_name}
+                    <Uid value={a.applicant_registration_number} className="ml-2" />
+                  </td>
                   <td className="py-2 pr-4">{APPLICATION_STATUS_LABEL[a.status]}</td>
                   <td className="py-2 pr-4">{new Date(a.created_at).toLocaleDateString()}</td>
                   <td className="py-2">
@@ -154,7 +158,10 @@ function ApplicationDrawer({
       className="fixed inset-y-0 right-0 z-20 w-full max-w-md overflow-y-auto border-l border-line bg-surface p-6 shadow-xl"
     >
       <div className="flex items-start justify-between gap-2">
-        <h2 className="text-lg font-semibold">{application.applicant_name}</h2>
+        <h2 className="text-lg font-semibold">
+          {application.applicant_name}
+          <Uid value={application.applicant_registration_number} className="ml-2" />
+        </h2>
         <button type="button" onClick={onClose} className="text-sm text-ink-muted hover:underline">
           Close
         </button>
