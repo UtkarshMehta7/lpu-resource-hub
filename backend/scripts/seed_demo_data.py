@@ -460,6 +460,9 @@ def seed(db: Session, password_hash: str) -> SeedSummary:
     existing_researcher_ids = {p.user_id for p in db.execute(select(ResearcherProfile)).scalars()}
     # Most demo faculty are verified so the directory has content; a few stay
     # PENDING so the coordinator verification queue isn't empty to demo.
+    # Position 0 is Demo Faculty 01, the account the README and the browser
+    # flows sign in as -- it has to be verified, or the whole faculty journey
+    # (submit a project, post an opening) is closed on a fresh install.
     for position, member in enumerate(faculty):
         _attach_expertise(db, member, skills, areas, rng)
         if member.id in existing_researcher_ids:
@@ -471,7 +474,7 @@ def seed(db: Session, password_hash: str) -> SeedSummary:
                 bio=f"Fictional demo researcher profile #{position + 1}.",
                 availability=rng.choice(list(ResearcherAvailability)),
                 verification_status=(
-                    VerificationStatus.PENDING if position % 5 == 0 else VerificationStatus.VERIFIED
+                    VerificationStatus.PENDING if position % 5 == 4 else VerificationStatus.VERIFIED
                 ),
             )
         )
