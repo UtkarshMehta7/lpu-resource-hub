@@ -57,9 +57,11 @@ describe("LoginPage validation", () => {
     await user.type(screen.getByLabelText(/password/i), "correcthorsebattery");
     await user.click(screen.getByRole("button", { name: /log in/i }));
 
+    // The page says which entrance it is; the server enforces the rule.
     expect(login).toHaveBeenCalledWith({
       registration_number: "12345678",
       password: "correcthorsebattery",
+      portal: "main",
     });
   });
 });

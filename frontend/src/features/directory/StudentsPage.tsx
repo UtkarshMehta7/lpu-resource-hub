@@ -26,7 +26,7 @@ export function StudentsPage() {
         type="search"
         aria-label="Search students"
         defaultValue={q}
-        placeholder="Name, programme or interests"
+        placeholder="Name, registration number, programme or interests"
         onChange={(event) => {
           const next = new URLSearchParams(searchParams);
           if (event.target.value) {
@@ -60,7 +60,12 @@ export function StudentsPage() {
             {data.items.map((student) => (
               <li key={student.user_id} className="rounded-card border border-line bg-surface p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="text-sm font-semibold">{student.full_name}</p>
+                  <p className="text-sm font-semibold">
+                    {student.full_name}
+                    <span className="ml-2 font-mono text-xs font-normal text-ink-muted">
+                      {student.registration_number}
+                    </span>
+                  </p>
                   <RequestCollaborationButton
                     recipientId={student.user_id}
                     recipientName={student.full_name}

@@ -22,7 +22,7 @@ from app.core.security import (
     verify_password,
 )
 from app.modules.auth.models import RefreshToken
-from app.modules.users.models import User
+from app.modules.users.models import User, UserRole
 from app.modules.users.service import get_by_id, get_by_registration_number
 
 
@@ -52,6 +52,30 @@ class IssuedTokens:
     access_token: str
     refresh_token: str
     expires_in: int
+
+
+class WrongPortalError(Exception):
+    """Right credentials, wrong entrance."""
+
+    def __init__(self, is_admin: bool) -> None:
+        self.is_admin = is_admin
+        super().__init__("wrong portal")
+
+
+def assert_portal_allows(user: User, portal: str | None) -> None:
+    """Each entrance admits exactly one kind of person.
+
+    Checked after the password, never before: refusing early would turn the
+    admin page into an oracle for which registration numbers are
+    administrators.
+    """
+    if portal is None:
+        return
+    is_admin = user.role is UserRole.ADMIN
+    if portal == "admin" and not is_admin:
+        raise WrongPortalError(is_admin=False)
+    if portal == "main" and is_admin:
+        raise WrongPortalError(is_admin=True)
 
 
 def authenticate(db: Session, registration_number: str, password: str) -> User:

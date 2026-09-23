@@ -39,7 +39,9 @@ export function LoginPage() {
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
     try {
-      await login(values);
+      // The main entrance. An administrator is refused here and told
+      // where to go -- the check is the server's, not this page's.
+      await login({ ...values, portal: "main" });
       void navigate(redirectTo, { replace: true });
     } catch (error) {
       setFormError(toApiError(error).message);

@@ -25,9 +25,19 @@ def _validate_new_password(value: str) -> str:
     return value
 
 
+# Which door someone came through. The two sign-in pages are separate on
+# purpose: administration is not a page an ordinary user should land on by
+# accident, and an administrator signing in at the main entrance would get a
+# dashboard rather than the console they wanted.
+Portal = Literal["admin", "main"]
+
+
 class LoginRequest(BaseModel):
     registration_number: str = Field(min_length=1, max_length=50)
     password: str
+    # Absent means the caller did not say -- accepted, so an API client or an
+    # older build is not locked out by a field it does not know about.
+    portal: Portal | None = None
 
     @field_validator("registration_number")
     @classmethod

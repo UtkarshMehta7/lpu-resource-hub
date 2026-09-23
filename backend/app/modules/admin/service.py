@@ -99,6 +99,28 @@ def get_user_or_raise(db: Session, user_id: uuid.UUID) -> User:
     return user
 
 
+def _sync_coordinator_scope(target: User) -> None:
+    """Keep a coordinator's authority in step with their department.
+
+    A coordinator's scope is the whole of what they may do -- verify, review,
+    approve, appoint. Setting the role or the department from the users page
+    used to leave the scope untouched, so a coordinator created that way
+    oversaw nothing: an empty verification queue and 403 on every decision,
+    with nothing on screen explaining why.
+
+    The platform only has department-level coordinators today (ADR 0015), so
+    the scope is not an independent choice: it is the department. Setting it
+    here means the two can never disagree again.
+    """
+    if target.role is UserRole.RESEARCH_COORDINATOR:
+        target.coordinator_scope_type = CoordinatorScopeType.DEPARTMENT
+        target.coordinator_scope_id = target.department_id
+    else:
+        # Someone who is no longer a coordinator oversees nothing.
+        target.coordinator_scope_type = None
+        target.coordinator_scope_id = None
+
+
 def update_user(
     db: Session, actor: User, target: User, data: AdminUserUpdate, *, ip: str | None
 ) -> User:
@@ -116,6 +138,10 @@ def update_user(
             raise InvalidDepartmentError
         before_department = target.department_id
         target.department_id = data.department_id
+        # An explicit scope in the same request still wins; otherwise the new
+        # department is what they oversee.
+        if "coordinator_scope_id" not in fields_set:
+            _sync_coordinator_scope(target)
 
     resulting_type = (
         data.coordinator_scope_type
@@ -197,6 +223,7 @@ def change_role(
 
     before = {"role": target.role.value}
     target.role = new_role
+    _sync_coordinator_scope(target)
     db.flush()
     audit_service.record(
         db,

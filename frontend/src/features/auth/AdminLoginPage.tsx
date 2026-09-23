@@ -46,7 +46,7 @@ export function AdminLoginPage() {
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
     try {
-      await login(values);
+      await login({ ...values, portal: "admin" });
       // Where you land is decided after the fact, from the role the server
       // returned -- this page cannot grant anything by sending you to /admin.
       void navigate("/admin", { replace: true });
@@ -67,7 +67,7 @@ export function AdminLoginPage() {
         </div>
 
         <p className="mt-4 text-sm text-ink-muted">
-          For platform administrators. Everyone else signs in on the{" "}
+          For platform administrators only. Everyone else signs in on the{" "}
           <Link to="/login" className="font-medium text-brand-700 hover:underline">
             main login
           </Link>
@@ -137,8 +137,8 @@ export function AdminLoginPage() {
       </div>
 
       <p className="mt-4 text-center text-xs text-ink-muted">
-        This page is a separate entrance, not a separate set of permissions — every action is still
-        checked against your role on the server.
+        A separate entrance, enforced on the server: a non-administrator is refused here even with
+        the right password, and administrators are refused on the main page.
       </p>
     </div>
   );
