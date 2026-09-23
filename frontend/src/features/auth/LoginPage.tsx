@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { toApiError } from "@/lib/api/errors";
@@ -108,6 +108,13 @@ export function LoginPage() {
       <p className="mt-4 text-sm text-ink-muted">
         Accounts are created for you by your department. If you don&apos;t have one yet, ask your
         research coordinator or supervisor.
+      </p>
+      <p className="mt-2 text-sm text-ink-muted">
+        Platform administrator?{" "}
+        <Link to="/admin/login" className="font-medium text-brand-700 hover:underline">
+          Sign in to administration
+        </Link>
+        .
       </p>
     </div>
   );
