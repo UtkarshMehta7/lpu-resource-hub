@@ -36,8 +36,16 @@ if [[ "${DATABASE_URL}" != postgresql+psycopg://* ]]; then
   exit 1
 fi
 
+# Prefer the project's virtualenv, so this works whether or not the caller
+# has activated it -- outside one there is no bare `python`, only `python3`.
+PYTHON="python3"
+if [[ -x .venv/bin/python ]]; then
+  PYTHON="$PWD/.venv/bin/python"
+  PATH="$PWD/.venv/bin:$PATH"
+fi
+
 # Never print the URL itself: it carries the password.
-python - <<'PY'
+"$PYTHON" - <<'PY'
 import os
 from urllib.parse import urlsplit
 
