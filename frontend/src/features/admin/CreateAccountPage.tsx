@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { Link } from "react-router-dom";
 import { z } from "zod";
 
 import { useAuth } from "@/features/auth/authContext";
@@ -131,8 +132,8 @@ export function CreateAccountPage() {
             </button>
           </div>
           <p className="mt-2 text-xs text-ink-muted">
-            This is shown once. If it&apos;s lost, create a new password for them from the admin
-            user list.
+            This is shown once. If it&apos;s lost, an admin can issue a new one from the{" "}
+            <strong>Users</strong> page.
           </p>
         </div>
       ) : null}
@@ -201,7 +202,12 @@ export function CreateAccountPage() {
           </div>
         ) : (
           <p className="text-xs text-ink-muted">
-            The account is created as a student in your own department.
+            The account is created as a student in your own department. If you don&apos;t have one
+            yet, set it on your{" "}
+            <Link to="/profile" className="font-medium text-brand-700 hover:underline">
+              profile
+            </Link>
+            .
           </p>
         )}
 

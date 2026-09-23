@@ -33,7 +33,7 @@ specific* department/project/etc., introduced per-module starting Step 3.
 
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
-| `user:create` | | ✅ (students, own dept) | ✅ (students, own dept) | ✅ (any role) | 13+ |
+| `user:create` | | ✅ (students, own dept, **verified profile only**) | ✅ (students, **assigned scope only**) | ✅ (any role) | 13+ |
 | `user:list` | | | | ✅ | 2 |
 | `user:update` | | | | ✅ | 2 |
 | `user:update_role` | | | | ✅ | 2 |

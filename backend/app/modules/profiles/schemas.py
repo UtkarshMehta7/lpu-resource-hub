@@ -31,6 +31,8 @@ class StudentProfileRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     profile_type: str = "student"
+    department_id: uuid.UUID | None = None
+    department_locked: bool = False
     program: str
     year: int
     bio: str | None
@@ -42,6 +44,9 @@ class StudentProfileRead(BaseModel):
 
 class StudentProfileUpdate(BaseModel):
     program: str = Field(min_length=1, max_length=150)
+    # Where you study. Self-declared, because someone who registered for
+    # themselves has no department yet; an admin can correct it.
+    department_id: uuid.UUID | None = None
     year: int = Field(ge=1, le=10)
     bio: str | None = Field(default=None, max_length=5000)
     interests: str | None = Field(default=None, max_length=2000)
@@ -52,6 +57,8 @@ class ResearcherProfileRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     profile_type: str = "researcher"
+    department_id: uuid.UUID | None = None
+    department_locked: bool = False
     designation: str
     bio: str | None
     availability: ResearcherAvailability
@@ -65,6 +72,10 @@ class ResearcherProfileRead(BaseModel):
 
 class ResearcherProfileUpdate(BaseModel):
     designation: str = Field(min_length=1, max_length=150)
+    # Self-declared, and only until a coordinator verifies the profile --
+    # after that it is the institution's fact, not a claim, and only an admin
+    # may change it.
+    department_id: uuid.UUID | None = None
     bio: str | None = Field(default=None, max_length=5000)
     availability: ResearcherAvailability = ResearcherAvailability.AVAILABLE
     links: list[LinkItem] | None = None

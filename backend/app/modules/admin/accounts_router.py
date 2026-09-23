@@ -33,6 +33,16 @@ _ERROR_MAP: dict[type[Exception], tuple[int, str]] = {
         status.HTTP_403_FORBIDDEN,
         "You can only add people to your own department.",
     ),
+    accounts.NoDepartmentError: (
+        status.HTTP_403_FORBIDDEN,
+        "Your account is not in a department yet, so there is nowhere to add "
+        "anyone. Set your department on your profile, or ask an admin.",
+    ),
+    accounts.NotVerifiedError: (
+        status.HTTP_403_FORBIDDEN,
+        "A research coordinator has to verify your researcher profile before "
+        "you can add people to your department.",
+    ),
     accounts.UnknownDepartmentError: (status.HTTP_404_NOT_FOUND, "Department not found."),
     accounts.DepartmentRequiredError: (
         status.HTTP_422_UNPROCESSABLE_CONTENT,

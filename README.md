@@ -49,6 +49,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Sign in with the LPU registration number (UMS-style); students are added by their department with a temporary password they must replace | Done |
 | Scoped analytics (coordinator = own department, admin = platform), collaboration network graph, audit-log viewer, moderation that can hide content, read-only platform settings | Done |
 | Optional Docker Compose, GitHub Actions CI, security headers and CSP, dependency audits, secret scanning, free-tier deployment guide | Done |
+| Department membership: self-declared until verification locks it, admin can place anyone, replacement temporary passwords, rename from the admin list ([ADR 0018](docs/adr/0018-department-membership.md)) | Done |
 
 ## Technology stack
 
@@ -310,7 +311,8 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | Endpoint | Notes |
 |---|---|
 | `GET /api/v1/admin/users` | Paginated, filter by `role`/`is_active`. |
-| `PATCH /api/v1/admin/users/{id}` | `full_name`, `coordinator_scope_type`, `coordinator_scope_id` only — role and activation are never mass-assignable here. A `department` scope id must name a real department. |
+| `PATCH /api/v1/admin/users/{id}` | `full_name`, `department_id`, `coordinator_scope_type`, `coordinator_scope_id` only — role and activation are never mass-assignable here. A `department` scope id, and `department_id` itself, must name a real department. A department change is audited (`user.department_changed`). |
+| `POST /api/v1/admin/users/{id}/temporary-password` | Issues a replacement temporary password, returned **once**. Revokes every session, puts the account back behind the change-password gate, and is audited. Refuses on your own account (`409`) — use `/auth/change-password`. |
 | `POST /api/v1/admin/users/{id}/role` | `{role}`. Rejects changing your own role, and rejects any change that would leave zero active admins. |
 | `POST /api/v1/admin/users/{id}/activate` / `/deactivate` | Deactivating revokes every refresh token for that user. Rejects removing the last active admin. |
 | `GET /api/v1/admin/audit-logs` | Paginated, filter by `entity_type`/`entity_id`/`actor_id`/`action`. Role/activation changes and verification decisions are recorded here. |
@@ -321,7 +323,7 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 
 | Endpoint | Auth | Notes |
 |---|---|---|
-| `GET/PUT /api/v1/me/profile` | any signed-in user | Shape depends on your role (student vs researcher); responses carry a `profile_type` discriminator. `GET` is `404` until you create one. Saving a *researcher* profile submits it for verification. |
+| `GET/PUT /api/v1/me/profile` | any signed-in user | Shape depends on your role (student vs researcher); responses carry a `profile_type` discriminator. `GET` is `404` until you create one. Saving a *researcher* profile submits it for verification. `department_id` says where you belong — self-declared until a coordinator verifies you, then `409` and `department_locked: true` (an admin can still change it). See [ADR 0018](docs/adr/0018-department-membership.md). |
 | `PUT /api/v1/me/skills` | any signed-in user | `[{skill_id, proficiency}]`, replaces the whole set. |
 | `PUT /api/v1/me/research-areas` | any signed-in user | `[{research_area_id, is_expertise}]`, replaces the whole set. |
 | `GET /api/v1/skills?q=`, `GET /api/v1/research-areas?q=&parent_id=` | any signed-in user | Name search; an exact alias hit (`ML`) also returns its canonical tag. |
@@ -347,7 +349,7 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `GET /api/v1/analytics/network` | `analytics:read` | The collaboration graph: nodes are researchers and opted-in students, edges are co-authorship, shared projects and accepted collaboration requests. Nodes carry a name, role and department — never contact details. |
 | `GET /api/v1/admin/settings` | admin | Read-only view of the configured behaviour (weights, scheduler, token lifetimes). No secrets. |
 | `POST /api/v1/admin/reports/{id}/resolve` | `report:moderate` | Now also takes `hide_target`: archives a reported project or closes a reported opening, recorded in the audit row. |
-| `POST /api/v1/users` | `user:create` (faculty, coordinator, admin) | Creates an account for someone else and returns a temporary password **once**. Faculty/coordinators may only add students to their own department; admins may create any role. Audited. |
+| `POST /api/v1/users` | `user:create` (faculty, coordinator, admin) | Creates an account for someone else and returns a temporary password **once**. Faculty may only add students to their own department, and only once their researcher profile is **verified** — a self-declared department is not by itself permission to create accounts in it. A coordinator acts only within the scope an admin assigned. Admins may create any role. Audited. |
 | `GET /api/v1/search/semantic?q=&limit=` | any signed-in user | Ask in plain language. Full-text and vector rankings are fused with reciprocal rank fusion; visibility rules are the same ones the list endpoints apply. `semantic_used: false` means the optional ML extra isn't installed and the answer is lexical-only. |
 | `GET/POST /api/v1/funding`, `GET/PATCH/DELETE /api/v1/funding/{id}` | any signed-in user reads / `funding:manage` writes | Filters `q`, `status`, `open_only`, `research_area_id`, `deadline_before`. Seeded calls are fictional and flagged `is_demo`. |
 | `GET /api/v1/me/notifications` | any signed-in user | Your own notifications plus the unread count. Others' are never visible (`404` on a foreign id). |

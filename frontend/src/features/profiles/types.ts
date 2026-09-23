@@ -11,6 +11,8 @@ export interface ProfileLink {
 
 export interface StudentProfile {
   profile_type: "student";
+  department_id: string | null;
+  department_locked: boolean;
   program: string;
   year: number;
   bio: string | null;
@@ -22,6 +24,8 @@ export interface StudentProfile {
 
 export interface ResearcherProfile {
   profile_type: "researcher";
+  department_id: string | null;
+  department_locked: boolean;
   designation: string;
   bio: string | null;
   availability: Availability;
@@ -37,6 +41,7 @@ export type Profile = StudentProfile | ResearcherProfile;
 
 export interface StudentProfileUpdate {
   program: string;
+  department_id?: string | null;
   year: number;
   bio?: string | null;
   interests?: string | null;
@@ -45,6 +50,7 @@ export interface StudentProfileUpdate {
 
 export interface ResearcherProfileUpdate {
   designation: string;
+  department_id?: string | null;
   bio?: string | null;
   availability: Availability;
   links?: ProfileLink[] | null;
