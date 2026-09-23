@@ -28,22 +28,22 @@ describe("LoginPage validation", () => {
     renderLoginPage();
     await user.click(screen.getByRole("button", { name: /log in/i }));
 
-    expect(await screen.findByText(/email is required/i)).toBeInTheDocument();
+    expect(await screen.findByText(/registration number is required/i)).toBeInTheDocument();
     expect(screen.getByText(/password is required/i)).toBeInTheDocument();
     expect(login).not.toHaveBeenCalled();
   });
 
-  it("rejects a malformed email without calling login", async () => {
+  it("rejects a registration number that is too long", async () => {
     const login = vi.fn();
     useAuthMock.mockReturnValue({ login });
     const user = userEvent.setup();
 
     renderLoginPage();
-    await user.type(screen.getByLabelText(/email/i), "not-an-email");
+    await user.type(screen.getByLabelText(/registration number/i), "X".repeat(51));
     await user.type(screen.getByLabelText(/password/i), "whatever");
     await user.click(screen.getByRole("button", { name: /log in/i }));
 
-    expect(await screen.findByText(/enter a valid email address/i)).toBeInTheDocument();
+    expect(await screen.findByText(/too long for a registration number/i)).toBeInTheDocument();
     expect(login).not.toHaveBeenCalled();
   });
 
@@ -53,12 +53,12 @@ describe("LoginPage validation", () => {
     const user = userEvent.setup();
 
     renderLoginPage();
-    await user.type(screen.getByLabelText(/email/i), "jane@example.com");
+    await user.type(screen.getByLabelText(/registration number/i), "12345678");
     await user.type(screen.getByLabelText(/password/i), "correcthorsebattery");
     await user.click(screen.getByRole("button", { name: /log in/i }));
 
     expect(login).toHaveBeenCalledWith({
-      email: "jane@example.com",
+      registration_number: "12345678",
       password: "correcthorsebattery",
     });
   });

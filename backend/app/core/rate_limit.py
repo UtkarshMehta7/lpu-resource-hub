@@ -101,12 +101,18 @@ def client_ip(request: Request) -> str:
     return client.host if client else "unknown"
 
 
-def enforce_auth_rate_limit(request: Request, email: str) -> None:
-    """Rate-limits by IP+email, so one abusive IP can't lock out every account
-    on it, and one targeted email can't be brute-forced from many IPs alone
-    (each IP still gets its own budget against that email)."""
+def enforce_auth_rate_limit(request: Request, identifier: str) -> None:
+    """Rate-limits by IP + the identifier being tried (a registration number).
+
+    Keyed on both so one abusive IP can't lock out every account behind it,
+    and one targeted account can't be brute-forced from many IPs alone (each
+    IP still gets its own budget against that account). This matters more now
+    that the identifier is a registration number: those are sequential and
+    semi-public, so guessing the *account* is trivial and only the password
+    is secret.
+    """
     limiter = get_auth_rate_limiter(request)
-    key = f"{client_ip(request)}:{email.lower()}"
+    key = f"{client_ip(request)}:{identifier.lower()}"
     if not limiter.allow(key):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

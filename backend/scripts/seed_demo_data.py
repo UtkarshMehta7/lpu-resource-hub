@@ -279,6 +279,11 @@ def _seed_taxonomy(db: Session, summary: SeedSummary) -> tuple[list[Skill], list
     return list(existing_skills.values()), list(existing_areas.values())
 
 
+def _demo_registration_number(email: str) -> str:
+    local_part = email.split("@", 1)[0]
+    return "".join(character for character in local_part if character.isalnum()).upper()
+
+
 def _seed_user(
     db: Session,
     existing: dict[str, User],
@@ -295,6 +300,9 @@ def _seed_user(
     if user is not None:
         return user
     user = User(
+        # Obviously fake, so a demo row can never be mistaken for a real LPU
+        # registration number: demo.faculty01@example.com -> DEMOFACULTY01.
+        registration_number=_demo_registration_number(email),
         email=email,
         password_hash=password_hash,
         full_name=full_name,

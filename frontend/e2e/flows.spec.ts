@@ -6,11 +6,11 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
  */
 
 const PASSWORD = process.env.E2E_PASSWORD ?? "demoseedpassword1";
-const FACULTY = "demo.faculty01@example.com";
-// The coordinator whose department scope covers demo.faculty01.
-const COORDINATOR = "demo.coordinator02@example.com";
-const STUDENT = "demo.student01@example.com";
-const ADMIN = "demo.admin@example.com";
+const FACULTY = "DEMOFACULTY01";
+// The coordinator whose department scope covers DEMOFACULTY01.
+const COORDINATOR = "DEMOCOORDINATOR02";
+const STUDENT = "DEMOSTUDENT01";
+const ADMIN = "DEMOADMIN";
 
 const RUN = Date.now().toString().slice(-6);
 const PROJECT = `E2E soil sensors ${RUN}`;
@@ -22,21 +22,21 @@ const FUNDING = `E2E demo seed grant ${RUN}`;
 /**
  * One signed-in page per role, reused across the flows below. Logging in
  * again for every test would hit the login rate limiter (5/minute per
- * IP+email, Step 1), and these flows deliberately revisit the same roles.
+ * IP + registration number, Step 1), and these flows revisit the same roles.
  */
 const sessions = new Map<string, Page>();
 
-async function sessionFor(browser: Browser, email: string): Promise<Page> {
-  const existing = sessions.get(email);
+async function sessionFor(browser: Browser, registrationNumber: string): Promise<Page> {
+  const existing = sessions.get(registrationNumber);
   if (existing) return existing;
 
   const page = await (await browser.newContext()).newPage();
   await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Registration number").fill(registrationNumber);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(page).toHaveURL(/\/(dashboard|account|onboarding)/);
-  sessions.set(email, page);
+  sessions.set(registrationNumber, page);
   return page;
 }
 
@@ -289,4 +289,43 @@ test("smart search answers a question in plain language", async ({ browser }) =>
   await student.getByRole("button", { name: "Keyword" }).click();
   await expect(student.getByText(/matches the exact words/i)).toBeVisible();
   await expect(student).toHaveURL(/mode=keyword/);
+});
+
+test("faculty adds a student, who must set their own password first", async ({ browser }) => {
+  const faculty = await sessionFor(browser, FACULTY);
+  await faculty.goto("/people/new");
+  const registrationNumber = `E2E${RUN}`;
+  await faculty.getByLabel("Registration number").fill(registrationNumber);
+  await faculty.getByLabel("Full name").fill(`E2E Student ${RUN}`);
+  await faculty.getByRole("button", { name: "Create account" }).click();
+
+  await expect(faculty.getByText(/account created for/i)).toBeVisible();
+  const temporaryPassword = (await faculty.locator("code").first().innerText()).trim();
+  expect(temporaryPassword.length).toBeGreaterThan(8);
+
+  // The new student can sign in, but lands on the password screen and can go
+  // nowhere else until they choose one.
+  const page = await (await browser.newContext()).newPage();
+  await page.goto("/login");
+  await page.getByLabel("Registration number").fill(registrationNumber);
+  await page.getByLabel("Password").fill(temporaryPassword);
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page).toHaveURL(/set-password/);
+
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/set-password/);
+
+  const chosenPassword = `chosen-${RUN}-password`;
+  await page.getByLabel("Temporary password").fill(temporaryPassword);
+  await page.getByLabel("New password", { exact: true }).fill(chosenPassword);
+  await page.getByLabel("Confirm new password").fill(chosenPassword);
+  await page.getByRole("button", { name: "Set my password" }).click();
+
+  // Changing it signs every session out, so they sign in with their own.
+  await expect(page).toHaveURL(/login/);
+  await page.getByLabel("Registration number").fill(registrationNumber);
+  await page.getByLabel("Password").fill(chosenPassword);
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page).toHaveURL(/dashboard|account/);
+  await page.context().close();
 });

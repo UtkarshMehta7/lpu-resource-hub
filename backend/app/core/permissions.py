@@ -20,6 +20,7 @@ from app.modules.users.models import User, UserRole
 
 
 class Permission(StrEnum):
+    USER_CREATE = "user:create"
     USER_LIST = "user:list"
     USER_UPDATE = "user:update"
     USER_UPDATE_ROLE = "user:update_role"
@@ -58,6 +59,9 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
     UserRole.FACULTY: frozenset(
         {
             Permission.STUDENT_DISCOVER,
+            # Faculty create student accounts for their own department; the
+            # department limit is a resource policy, not a permission.
+            Permission.USER_CREATE,
             Permission.PROJECT_CREATE,
             Permission.PUBLICATION_CREATE,
             Permission.OPPORTUNITY_CREATE,
@@ -79,6 +83,7 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
     ),
     UserRole.ADMIN: frozenset(
         {
+            Permission.USER_CREATE,
             Permission.USER_LIST,
             Permission.USER_UPDATE,
             Permission.USER_UPDATE_ROLE,

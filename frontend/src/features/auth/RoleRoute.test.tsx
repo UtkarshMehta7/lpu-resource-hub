@@ -14,6 +14,7 @@ vi.mock("./authContext", () => ({
 const ADMIN_USER: UserRead = {
   id: "1",
   email: "admin@example.com",
+  registration_number: "TEST000001",
   full_name: "Admin User",
   role: "admin",
   is_active: true,
@@ -21,6 +22,7 @@ const ADMIN_USER: UserRead = {
   coordinator_scope_type: null,
   coordinator_scope_id: null,
   onboarding_complete: false,
+  must_change_password: false,
   created_at: "2026-01-01T00:00:00Z",
 };
 

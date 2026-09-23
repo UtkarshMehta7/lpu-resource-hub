@@ -11,6 +11,7 @@ This is the living source of truth for the approved architecture. Change it thro
 | Submission scope | MVP, then facilities/equipment/booking, then funding/notifications/deadline reminders. Semantic AI, analytics and advanced moderation are advanced scope. |
 | Roles | `STUDENT`, `FACULTY` (researcher), `RESEARCH_COORDINATOR`, `ADMIN` |
 | Faculty onboarding | Faculty self-register. A Research Coordinator must verify the researcher profile before the faculty member can publish projects or opportunities. |
+| Accounts and sign-in | Everyone signs in with their LPU registration number (UMS-style); email is optional contact information. Faculty self-register; students are created by an admin, coordinator or faculty member in their department, with a temporary password they must replace before using anything (ADR 0015). |
 | Coordinator scope | Department-level initially. Stored so it can extend to school-level or university-wide without schema redesign. |
 | Student discoverability | Opt-in. Faculty and coordinators can discover opted-in students; only public profile fields are exposed. |
 | Project approval | Every project passes coordinator review (`PENDING_REVIEW`) before it becomes `ACTIVE` and can accept applications. |

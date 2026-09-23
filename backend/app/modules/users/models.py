@@ -44,7 +44,20 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
-    email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
+    # The LPU registration / employee number: what people log in with, the
+    # same identifier they use in UMS. Stored upper-cased and trimmed, unique,
+    # and never changed after creation (an identifier people can edit isn't
+    # one -- an admin correction is an audited action).
+    registration_number: Mapped[str] = mapped_column(
+        String(50), unique=True, nullable=False, index=True
+    )
+    # Optional contact address. Not a credential: nobody logs in with it.
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True, index=True)
+    # True until a user replaces the temporary password their creator set.
+    # While true, every endpoint except /me and /auth/change-password is closed.
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
     role: Mapped[UserRole] = mapped_column(

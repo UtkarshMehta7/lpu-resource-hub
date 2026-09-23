@@ -9,7 +9,11 @@ import { toApiError } from "@/lib/api/errors";
 import { useAuth } from "./authContext";
 
 const loginSchema = z.object({
-  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+  registration_number: z
+    .string()
+    .trim()
+    .min(1, "Registration number is required")
+    .max(50, "That's too long for a registration number"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -45,22 +49,28 @@ export function LoginPage() {
   return (
     <div className="mx-auto max-w-sm">
       <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
-      <p className="mt-1 text-sm text-ink-muted">Sign in to your account.</p>
+      <p className="mt-1 text-sm text-ink-muted">
+        Sign in with your LPU registration number, the same one you use for UMS.
+      </p>
 
       <form onSubmit={(event) => void onSubmit(event)} className="mt-6 space-y-4" noValidate>
         <div>
-          <label htmlFor="email" className="block text-sm font-medium">
-            Email
+          <label htmlFor="registration_number" className="block text-sm font-medium">
+            Registration number
           </label>
           <input
-            id="email"
-            type="email"
-            autoComplete="email"
+            id="registration_number"
+            type="text"
+            inputMode="text"
+            autoComplete="username"
+            autoCapitalize="characters"
+            spellCheck={false}
+            placeholder="e.g. 12345678"
             className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
-            {...register("email")}
+            {...register("registration_number")}
           />
-          {errors.email ? (
-            <p className="mt-1 text-xs text-red-700">{errors.email.message}</p>
+          {errors.registration_number ? (
+            <p className="mt-1 text-xs text-red-700">{errors.registration_number.message}</p>
           ) : null}
         </div>
 
