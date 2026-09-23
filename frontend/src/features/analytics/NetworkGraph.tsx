@@ -7,8 +7,8 @@ const HEIGHT = 420;
 const RADIUS = 168;
 
 const KIND_COLOUR: Record<string, string> = {
-  co_authorship: "#1a5b65",
-  project: "#8a6d1f",
+  co_authorship: "#b74a09",
+  project: "#2a6f7a",
   collaboration: "#6b4a8a",
 };
 
@@ -101,7 +101,7 @@ export function NetworkGraph({ graph }: { graph: CollaborationNetwork }) {
                 cx={point.x}
                 cy={point.y}
                 r={5 + Math.min(node.degree, 6)}
-                fill={node.role === "student" ? "#8a6d1f" : "#1a5b65"}
+                fill={node.role === "student" ? "#2a6f7a" : "#b74a09"}
               />
               <text
                 x={point.x}
@@ -121,7 +121,7 @@ export function NetworkGraph({ graph }: { graph: CollaborationNetwork }) {
           Researcher
         </span>
         <span>
-          <span className="mr-1 inline-block size-2 rounded-full bg-[#8a6d1f]" />
+          <span className="mr-1 inline-block size-2 rounded-full bg-[#2a6f7a]" />
           Student (opted in)
         </span>
         <span>Line colour shows how they are connected; thickness, how often.</span>

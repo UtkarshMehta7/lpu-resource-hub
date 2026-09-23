@@ -19,9 +19,10 @@ import { SkeletonList } from "@/components/ui/Skeleton";
 import { applicationStages, fetchNetwork, fetchOverview, statusCounts } from "./api";
 import { NetworkGraph } from "./NetworkGraph";
 
-const BRAND = "#1a5b65";
-const ACCENT = "#8a6d1f";
-const MUTED = "#6b8a90";
+// Kept in sync with the tokens in index.css (Recharts needs real values).
+const BRAND = "#b74a09";
+const ACCENT = "#2a6f7a";
+const MUTED = "#9a7f6c";
 
 export function AnalyticsPage() {
   const { data, isPending, isError } = useQuery({
@@ -116,7 +117,7 @@ export function AnalyticsPage() {
                       stage.label === "Accepted"
                         ? BRAND
                         : stage.label === "Rejected"
-                          ? "#a24a4a"
+                          ? "#9a2f2f"
                           : MUTED
                     }
                   />
