@@ -86,6 +86,7 @@ class ResearcherProfile(Base):
     )
     # List of {"label": str, "url": str}, validated in the Pydantic schema.
     links: Mapped[list[dict[str, str]] | None] = mapped_column(JSONB, nullable=True)
+    # The coordinator queue and the analytics backlog both filter on this.
     verification_status: Mapped[VerificationStatus] = mapped_column(
         Enum(
             VerificationStatus,
@@ -94,6 +95,7 @@ class ResearcherProfile(Base):
         ),
         nullable=False,
         server_default=VerificationStatus.UNVERIFIED.value,
+        index=True,
     )
     verified_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True

@@ -87,7 +87,12 @@ class User(Base):
     # Nullable for every role, not just admin: nothing here forces a
     # student/faculty to have one at registration time.
     department_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True),
+        ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True,
+        # Scoped analytics and the verification queue filter people by
+        # department, so this is a lookup column, not just a reference.
+        index=True,
     )
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     # Recomputed (not just read) whenever user_skills/user_research_areas
