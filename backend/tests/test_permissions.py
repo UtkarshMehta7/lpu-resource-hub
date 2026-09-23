@@ -17,6 +17,7 @@ def test_faculty_has_exactly_its_own_grants() -> None:
     assert ROLE_PERMISSIONS[UserRole.FACULTY] == frozenset(
         {
             Permission.STUDENT_DISCOVER,
+            Permission.USER_CREATE,
             Permission.PROJECT_CREATE,
             Permission.PUBLICATION_CREATE,
             Permission.OPPORTUNITY_CREATE,
@@ -38,6 +39,7 @@ def test_coordinator_inherits_faculty_grants_on_top_of_its_own() -> None:
             Permission.FACILITY_MANAGE,
             Permission.BOOKING_APPROVE,
             Permission.FUNDING_MANAGE,
+            Permission.USER_CREATE,  # inherited from FACULTY
             Permission.STUDENT_DISCOVER,  # inherited from FACULTY
             Permission.PROJECT_CREATE,  # inherited from FACULTY
             Permission.PUBLICATION_CREATE,  # inherited from FACULTY
@@ -51,6 +53,7 @@ def test_coordinator_inherits_faculty_grants_on_top_of_its_own() -> None:
 def test_admin_has_exactly_its_own_grants() -> None:
     assert ROLE_PERMISSIONS[UserRole.ADMIN] == frozenset(
         {
+            Permission.USER_CREATE,
             Permission.USER_LIST,
             Permission.USER_UPDATE,
             Permission.USER_UPDATE_ROLE,

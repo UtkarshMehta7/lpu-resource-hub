@@ -286,6 +286,21 @@ ENDPOINTS = (
         frozenset(ALL_ROLES),
         body={},
     ),
+    # Creating accounts for other people: faculty and coordinators (students
+    # in their own department) and admins. The generic fixture's faculty has
+    # no department, so an authorised caller gets 403 from the scope check --
+    # the point of the row is that a student gets 403 before any of that.
+    Endpoint(
+        "POST",
+        "/api/v1/users",
+        frozenset({UserRole.ADMIN}),
+        body={
+            "registration_number": "MATRIX0001",
+            "full_name": "Matrix Person",
+            "role": "faculty",
+        },
+        allowed_status=201,
+    ),
     # Students must not be able to browse other students.
     Endpoint(
         "GET",

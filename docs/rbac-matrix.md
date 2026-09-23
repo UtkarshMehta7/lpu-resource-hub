@@ -29,10 +29,11 @@ action in general — the resource policy layer (loaded-resource ownership +
 scope match, `docs/architecture.md` §6 layer 2) is what enforces *this
 specific* department/project/etc., introduced per-module starting Step 3.
 
-## Implemented (Steps 2–12)
+## Implemented (Steps 2–13)
 
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
+| `user:create` | | ✅ (students, own dept) | ✅ (students, own dept) | ✅ (any role) | 13+ |
 | `user:list` | | | | ✅ | 2 |
 | `user:update` | | | | ✅ | 2 |
 | `user:update_role` | | | | ✅ | 2 |
