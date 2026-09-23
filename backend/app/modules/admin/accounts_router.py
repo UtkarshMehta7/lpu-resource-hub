@@ -1,7 +1,8 @@
-"""Account creation endpoint, mounted under /api/v1.
+"""Account provisioning endpoint, mounted under /api/v1.
 
-Not under /admin: faculty and coordinators use it too, for students in their
-own department. Admins may create any role anywhere.
+Not under /admin: every role above student uses it. What gets created is
+decided by the caller's own role (see app/core/permissions.CREATABLE_ROLE),
+not by anything in the request body.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ Creator = Annotated[User, Depends(require_permission(Permission.USER_CREATE))]
 _ERROR_MAP: dict[type[Exception], tuple[int, str]] = {
     accounts.NotAllowedRoleError: (
         status.HTTP_403_FORBIDDEN,
-        "You can only create student accounts.",
+        "Your role cannot create accounts.",
     ),
     accounts.OutOfScopeError: (
         status.HTTP_403_FORBIDDEN,
@@ -46,7 +47,7 @@ _ERROR_MAP: dict[type[Exception], tuple[int, str]] = {
     accounts.UnknownDepartmentError: (status.HTTP_404_NOT_FOUND, "Department not found."),
     accounts.DepartmentRequiredError: (
         status.HTTP_422_UNPROCESSABLE_CONTENT,
-        "A student account needs a department.",
+        "Choose the department this person belongs to.",
     ),
     accounts.RegistrationNumberTakenError: (
         status.HTTP_409_CONFLICT,
@@ -82,7 +83,6 @@ def create_account(
             creator,
             registration_number=data.registration_number,
             full_name=data.full_name,
-            role=data.role,
             department_id=data.department_id,
             email=data.email,
             ip=client_ip(request),

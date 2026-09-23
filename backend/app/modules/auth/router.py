@@ -22,19 +22,16 @@ from app.modules.auth.schemas import (
     AccessTokenResponse,
     ChangePasswordRequest,
     LoginRequest,
-    RegisterRequest,
 )
 from app.modules.auth.service import (
     IncorrectPasswordError,
     InvalidCredentialsError,
     InvalidRefreshTokenError,
     IssuedTokens,
-    RegistrationNumberTakenError,
     authenticate,
     change_password,
     issue_tokens,
     logout,
-    register_user,
     rotate_refresh_token,
 )
 from app.modules.users.models import User
@@ -82,32 +79,6 @@ def require_csrf_header(x_requested_with: Annotated[str | None, Header()] = None
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Missing X-Requested-With header.",
         )
-
-
-@router.post(
-    "/register",
-    response_model=AccessTokenResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def register(
-    data: RegisterRequest,
-    request: Request,
-    response: Response,
-    db: Annotated[Session, Depends(get_db)],
-    settings: Annotated[Settings, Depends(get_app_settings)],
-) -> AccessTokenResponse:
-    enforce_auth_rate_limit(request, data.registration_number)
-    try:
-        user = register_user(db, data)
-    except RegistrationNumberTakenError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="An account with this registration number already exists.",
-        ) from exc
-
-    tokens = issue_tokens(db, user, settings)
-    _set_refresh_cookie(response, tokens.refresh_token, settings)
-    return _token_response(user, tokens)
 
 
 @router.post("/login", response_model=AccessTokenResponse)

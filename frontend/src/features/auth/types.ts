@@ -32,14 +32,6 @@ export interface AccessTokenResponse {
   user: UserRead;
 }
 
-export interface RegisterPayload {
-  registration_number: string;
-  email?: string | null;
-  password: string;
-  full_name: string;
-  role: SelfRegisterableRole;
-}
-
 export interface LoginPayload {
   registration_number: string;
   password: string;

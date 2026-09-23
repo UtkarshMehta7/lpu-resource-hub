@@ -28,6 +28,7 @@ vi.mock("@/features/auth/authContext", () => ({ useAuth: useAuthMock }));
 
 const STRANDED: AdminUserRead = {
   id: "user-1",
+  registration_number: "DEMOFACULTY01",
   email: "someone@example.com",
   full_name: "Demo Faculty 01",
   role: "faculty",
@@ -36,6 +37,7 @@ const STRANDED: AdminUserRead = {
   department_id: null,
   coordinator_scope_type: null,
   coordinator_scope_id: null,
+  created_by: null,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
 };
