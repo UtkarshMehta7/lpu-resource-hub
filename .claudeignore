@@ -1,0 +1,17 @@
+# Paths not worth reading into a session. Keeping them out of searches keeps
+# context spent on source rather than on generated noise.
+node_modules/
+.venv/
+dist/
+build/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+frontend/test-results/
+frontend/playwright-report/
+*.lock
+package-lock.json
+uv.lock
+lpu-logo.png

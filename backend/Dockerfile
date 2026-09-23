@@ -26,11 +26,17 @@ COPY scripts ./scripts
 RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
 USER appuser
 
+# Hosts inject the port to bind ($PORT on Render); 8000 is only the local
+# default. Binding a hardcoded port means the platform's health check hits
+# nothing and the deploy is marked failed.
+ENV PORT=8000
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s \
-    CMD curl -fsS http://localhost:8000/health || exit 1
+    CMD curl -fsS "http://localhost:${PORT}/health" || exit 1
 
 # Migrations are deliberately NOT run here: a container that migrates on
 # start races with itself when scaled. Run `alembic upgrade head` as a
 # release step (see docs/deployment.md).
-CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+# Shell form on purpose: $PORT has to be expanded at runtime, and exec keeps
+# uvicorn as PID 1 so signals still reach it.
+CMD exec uvicorn app.main:create_app --factory --host 0.0.0.0 --port "${PORT}"

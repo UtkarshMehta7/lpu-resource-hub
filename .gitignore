@@ -45,3 +45,6 @@ Thumbs.db
 !.vscode/extensions.json
 *.swp
 *~
+
+# Local deployment secrets (Neon connection string). Never committed.
+backend/.env.production
