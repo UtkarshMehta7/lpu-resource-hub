@@ -64,13 +64,36 @@ class Settings(BaseSettings):
     enable_scheduler: bool = False
     reminder_interval_minutes: int = Field(default=60, ge=5, le=1440)
 
+    @field_validator("database_url", "test_database_url", mode="before")
+    @classmethod
+    def _normalise_db_scheme(cls, value: object) -> object:
+        """Accept the URL every provider actually hands out.
+
+        Neon, Supabase, Heroku and Render all give you `postgres://` or
+        `postgresql://`. Which driver SQLAlchemy loads is our implementation
+        detail, not something an operator pasting a connection string should
+        have to know -- and getting it wrong only surfaced as a crash at
+        startup, after a deploy.
+
+        So the driver is added here rather than demanded of the reader.
+        Anything that is not PostgreSQL at all is still refused below.
+        """
+        if not isinstance(value, str):
+            return value
+        raw = value.strip().strip('"').strip("'")
+        for bare in ("postgresql://", "postgres://"):
+            if raw.startswith(bare):
+                return f"{REQUIRED_DB_SCHEME}://{raw[len(bare) :]}"
+        return raw
+
     @field_validator("database_url", "test_database_url")
     @classmethod
     def _require_psycopg_driver(cls, value: PostgresDsn | None) -> PostgresDsn | None:
         if value is not None and value.scheme != REQUIRED_DB_SCHEME:
             msg = (
-                f"must use the '{REQUIRED_DB_SCHEME}://' scheme "
-                f"(psycopg 3 driver), got '{value.scheme}://'"
+                f"must be a PostgreSQL URL; the '{REQUIRED_DB_SCHEME}://' driver is "
+                f"added automatically for postgresql:// and postgres://, but got "
+                f"'{value.scheme}://'"
             )
             raise ValueError(msg)
         return value
