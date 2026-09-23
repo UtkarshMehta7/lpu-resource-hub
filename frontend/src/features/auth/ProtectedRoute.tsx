@@ -4,7 +4,7 @@ import { useAuth } from "./authContext";
 
 /** Redirects to /login when signed out. Security is enforced on the backend. */
 export function ProtectedRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -17,6 +17,13 @@ export function ProtectedRoute() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+
+  // An account created with a temporary password can't use anything until it
+  // is replaced (the API returns 403 for everything else), so there is only
+  // one place to be.
+  if (user?.must_change_password && location.pathname !== "/set-password") {
+    return <Navigate to="/set-password" replace />;
   }
 
   return <Outlet />;

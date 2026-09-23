@@ -21,12 +21,16 @@ from app.main import create_app
 
 pytestmark = pytest.mark.db
 
+# Faculty self-register; students are created for them (ADR 0015). The
+# registration number is what you log in with, email is optional contact.
 REGISTER_PAYLOAD = {
-    "email": "Student1@Example.com",
+    "registration_number": "demo123456",
+    "email": "Faculty1@Example.com",
     "password": "correcthorsebattery",
-    "full_name": "Student One",
-    "role": "student",
+    "full_name": "Faculty One",
+    "role": "faculty",
 }
+LOGIN_PAYLOAD = {"registration_number": "DEMO123456", "password": "correcthorsebattery"}
 
 
 @pytest.fixture
@@ -48,15 +52,16 @@ def test_register_creates_user_and_sets_refresh_cookie(client: TestClient) -> No
 
     assert response.status_code == 201
     body = response.json()
-    assert body["user"]["email"] == "student1@example.com"  # normalised to lowercase
-    assert body["user"]["role"] == "student"
+    assert body["user"]["registration_number"] == "DEMO123456"  # normalised to upper case
+    assert body["user"]["email"] == "faculty1@example.com"  # normalised to lowercase
+    assert body["user"]["role"] == "faculty"
     assert "password" not in body["user"]
     assert "password_hash" not in body["user"]
     assert body["token_type"] == "bearer"
     assert response.cookies.get("refresh_token") is not None
 
 
-def test_register_rejects_duplicate_email(client: TestClient) -> None:
+def test_register_rejects_duplicate_registration_number(client: TestClient) -> None:
     _register(client)
 
     response = _register(client, full_name="Someone Else")
@@ -64,10 +69,12 @@ def test_register_rejects_duplicate_email(client: TestClient) -> None:
     assert response.status_code == 409
 
 
-def test_register_rejects_email_differing_only_by_case(client: TestClient) -> None:
+def test_register_rejects_a_registration_number_differing_only_by_case(
+    client: TestClient,
+) -> None:
     _register(client)
 
-    response = _register(client, email="STUDENT1@EXAMPLE.COM")
+    response = _register(client, registration_number="DEMO123456", email="other@example.com")
 
     assert response.status_code == 409
 
@@ -84,7 +91,7 @@ def test_login_succeeds_with_correct_credentials(client: TestClient) -> None:
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "student1@example.com", "password": "correcthorsebattery"},
+        json=LOGIN_PAYLOAD,
     )
 
     assert response.status_code == 200
@@ -96,29 +103,30 @@ def test_login_fails_with_wrong_password(client: TestClient) -> None:
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "student1@example.com", "password": "wrong-password"},
+        json={**LOGIN_PAYLOAD, "password": "wrong-password"},
     )
 
     assert response.status_code == 401
 
 
-def test_login_failure_message_is_identical_for_unknown_email_and_wrong_password(
+def test_login_failure_message_is_identical_for_unknown_account_and_wrong_password(
     client: TestClient,
 ) -> None:
-    """No user enumeration: an unregistered email and a wrong password look the same."""
+    """No user enumeration: registration numbers are sequential and semi-public,
+    so an unknown one and a wrong password must look identical."""
     _register(client)
 
-    unknown_email = client.post(
+    unknown_account = client.post(
         "/api/v1/auth/login",
-        json={"email": "nobody@example.com", "password": "whatever12345"},
+        json={"registration_number": "NOBODY000", "password": "whatever12345"},
     )
     wrong_password = client.post(
         "/api/v1/auth/login",
-        json={"email": "student1@example.com", "password": "wrong-password"},
+        json={**LOGIN_PAYLOAD, "password": "wrong-password"},
     )
 
-    assert unknown_email.status_code == wrong_password.status_code == 401
-    assert unknown_email.json() == wrong_password.json()
+    assert unknown_account.status_code == wrong_password.status_code == 401
+    assert unknown_account.json() == wrong_password.json()
 
 
 def test_users_me_requires_authentication(client: TestClient) -> None:
@@ -139,7 +147,7 @@ def test_users_me_returns_the_authenticated_profile(client: TestClient) -> None:
     response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {access_token}"})
 
     assert response.status_code == 200
-    assert response.json()["email"] == "student1@example.com"
+    assert response.json()["registration_number"] == "DEMO123456"
 
 
 def test_refresh_issues_a_usable_access_token_and_rotates_the_refresh_cookie(
@@ -245,13 +253,16 @@ def test_register_ignores_mass_assigned_fields(client: TestClient) -> None:
     assert body["id"] != "11111111-1111-1111-1111-111111111111"
 
 
-def _deactivate(db_settings: Settings, email: str) -> None:
+def _deactivate(db_settings: Settings, registration_number: str) -> None:
     engine = create_engine(str(db_settings.database_url))
     try:
         with engine.begin() as connection:
             connection.execute(
-                text("UPDATE users SET is_active = false WHERE email = :email"),
-                {"email": email},
+                text(
+                    "UPDATE users SET is_active = false "
+                    "WHERE registration_number = :registration_number"
+                ),
+                {"registration_number": registration_number},
             )
     finally:
         engine.dispose()
@@ -259,11 +270,11 @@ def _deactivate(db_settings: Settings, email: str) -> None:
 
 def test_login_rejects_a_deactivated_user(client: TestClient, db_settings: Settings) -> None:
     _register(client)
-    _deactivate(db_settings, "student1@example.com")
+    _deactivate(db_settings, "DEMO123456")
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "student1@example.com", "password": "correcthorsebattery"},
+        json=LOGIN_PAYLOAD,
     )
 
     assert response.status_code == 401
@@ -274,7 +285,7 @@ def test_me_rejects_a_deactivated_user_even_with_a_still_valid_token(
 ) -> None:
     access_token = _register(client).json()["access_token"]
 
-    _deactivate(db_settings, "student1@example.com")
+    _deactivate(db_settings, "DEMO123456")
 
     response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {access_token}"})
 
@@ -292,7 +303,8 @@ def test_editing_the_role_claim_in_a_token_has_no_effect(
     response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {forged_token}"})
 
     assert response.status_code == 200
-    assert response.json()["role"] == "student"
+    # The registered account is faculty; the forged "admin" claim is ignored.
+    assert response.json()["role"] == "faculty"
 
 
 def test_login_rate_limit_triggers_after_repeated_attempts(client: TestClient) -> None:
@@ -301,7 +313,7 @@ def test_login_rate_limit_triggers_after_repeated_attempts(client: TestClient) -
     responses = [
         client.post(
             "/api/v1/auth/login",
-            json={"email": "student1@example.com", "password": "wrong-password"},
+            json={**LOGIN_PAYLOAD, "password": "wrong-password"},
         )
         for _ in range(6)
     ]
@@ -326,13 +338,13 @@ def test_change_password_succeeds_and_revokes_every_session(client: TestClient) 
 
     old_password_login = client.post(
         "/api/v1/auth/login",
-        json={"email": "student1@example.com", "password": "correcthorsebattery"},
+        json=LOGIN_PAYLOAD,
     )
     assert old_password_login.status_code == 401
 
     new_password_login = client.post(
         "/api/v1/auth/login",
-        json={"email": "student1@example.com", "password": "newcorrecthorsebattery"},
+        json={**LOGIN_PAYLOAD, "password": "newcorrecthorsebattery"},
     )
     assert new_password_login.status_code == 200
 

@@ -14,7 +14,9 @@ class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    email: str
+    registration_number: str
+    # Optional contact address; never used to sign in.
+    email: str | None
     full_name: str
     role: UserRole
     is_active: bool
@@ -22,4 +24,6 @@ class UserRead(BaseModel):
     coordinator_scope_type: CoordinatorScopeType | None
     coordinator_scope_id: uuid.UUID | None
     onboarding_complete: bool
+    # True until the temporary password set by an admin/faculty is replaced.
+    must_change_password: bool
     created_at: datetime

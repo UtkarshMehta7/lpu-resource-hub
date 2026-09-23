@@ -27,6 +27,8 @@ import { FacilityFormPage } from "@/features/facilities/FacilityFormPage";
 import { FacilitiesPage } from "@/features/facilities/FacilitiesPage";
 import { FacilityDetailPage } from "@/features/facilities/FacilityDetailPage";
 import { MyBookingsPage } from "@/features/facilities/MyBookingsPage";
+import { ChangePasswordRequiredPage } from "@/features/auth/ChangePasswordRequiredPage";
+import { CreateAccountPage } from "@/features/admin/CreateAccountPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ModerationQueuePage } from "@/features/reports/ModerationQueuePage";
 import { SavedPage } from "@/features/saved/SavedPage";
@@ -57,6 +59,7 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute />,
         children: [
           { path: "account", element: <AccountPage /> },
+          { path: "set-password", element: <ChangePasswordRequiredPage /> },
           { path: "researchers", element: <DirectoryPage /> },
           { path: "researchers/:userId", element: <ResearcherDetailPage /> },
           { path: "onboarding", element: <OnboardingPage /> },
@@ -104,7 +107,10 @@ export const router = createBrowserRouter([
           },
           {
             element: <RoleRoute allow={["faculty", "research_coordinator", "admin"]} />,
-            children: [{ path: "students", element: <StudentsPage /> }],
+            children: [
+              { path: "students", element: <StudentsPage /> },
+              { path: "people/new", element: <CreateAccountPage /> },
+            ],
           },
           {
             element: <RoleRoute allow={["faculty", "research_coordinator"]} />,

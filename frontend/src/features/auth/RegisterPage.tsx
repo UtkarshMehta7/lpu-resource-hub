@@ -10,9 +10,16 @@ import { useAuth } from "./authContext";
 
 const registerSchema = z.object({
   fullName: z.string().min(1, "Full name is required").max(200, "Full name is too long"),
-  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+  registrationNumber: z
+    .string()
+    .trim()
+    .min(4, "Registration number is required")
+    .max(50, "That's too long for a registration number"),
+  email: z
+    .string()
+    .trim()
+    .refine((value) => !value || /.+@.+\..+/.test(value), "Enter a valid email address"),
   password: z.string().min(10, "Password must be at least 10 characters"),
-  role: z.enum(["student", "faculty"], { message: "Choose a role" }),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -28,17 +35,18 @@ export function RegisterPage() {
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { role: "student" },
+    defaultValues: { fullName: "", registrationNumber: "", email: "", password: "" },
   });
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
     try {
       await registerUser({
-        email: values.email,
+        registration_number: values.registrationNumber,
+        email: values.email || null,
         password: values.password,
         full_name: values.fullName,
-        role: values.role,
+        role: "faculty",
       });
       void navigate("/account", { replace: true });
     } catch (error) {
@@ -48,8 +56,14 @@ export function RegisterPage() {
 
   return (
     <div className="mx-auto max-w-sm">
-      <h1 className="text-2xl font-semibold tracking-tight">Create an account</h1>
-      <p className="mt-1 text-sm text-ink-muted">For students and faculty.</p>
+      <h1 className="text-2xl font-semibold tracking-tight">Create a faculty account</h1>
+      <p className="mt-1 text-sm text-ink-muted">
+        For LPU faculty and researchers. A research coordinator verifies your profile afterwards.
+      </p>
+      <p className="mt-2 rounded-card border border-line bg-surface px-3 py-2 text-xs text-ink-muted">
+        Students don&apos;t sign up here — your department creates your account and gives you a
+        temporary password.
+      </p>
 
       <form onSubmit={(event) => void onSubmit(event)} className="mt-6 space-y-4" noValidate>
         <div>
@@ -69,8 +83,28 @@ export function RegisterPage() {
         </div>
 
         <div>
+          <label htmlFor="registrationNumber" className="block text-sm font-medium">
+            Registration / employee number
+          </label>
+          <input
+            id="registrationNumber"
+            type="text"
+            autoComplete="username"
+            autoCapitalize="characters"
+            spellCheck={false}
+            placeholder="e.g. 12345678"
+            className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
+            {...register("registrationNumber")}
+          />
+          <p className="mt-1 text-xs text-ink-muted">This is what you&apos;ll sign in with.</p>
+          {errors.registrationNumber ? (
+            <p className="mt-1 text-xs text-red-700">{errors.registrationNumber.message}</p>
+          ) : null}
+        </div>
+
+        <div>
           <label htmlFor="email" className="block text-sm font-medium">
-            Email
+            Email <span className="font-normal text-ink-muted">(optional)</span>
           </label>
           <input
             id="email"
@@ -98,21 +132,6 @@ export function RegisterPage() {
           {errors.password ? (
             <p className="mt-1 text-xs text-red-700">{errors.password.message}</p>
           ) : null}
-        </div>
-
-        <div>
-          <label htmlFor="role" className="block text-sm font-medium">
-            I am a
-          </label>
-          <select
-            id="role"
-            className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
-            {...register("role")}
-          >
-            <option value="student">Student</option>
-            <option value="faculty">Faculty / researcher</option>
-          </select>
-          {errors.role ? <p className="mt-1 text-xs text-red-700">{errors.role.message}</p> : null}
         </div>
 
         {formError ? (
