@@ -7,7 +7,8 @@
 # would start to apply, and sign-in would break in ways that look like a
 # backend bug. One origin avoids all of it.
 #
-# Replace REPLACE-ME with the Render service hostname after the API deploys.
+# Points at the Render service named lpu-resource-hub. If Render gives the
+# service a different hostname, change both `to =` lines below to match.
 #
 # This file must live at the REPOSITORY ROOT: Netlify reads it before it knows
 # anything about the project, so a copy inside frontend/ is never found -- the
@@ -29,13 +30,13 @@
 # or every request would be answered with index.html.
 [[redirects]]
   from = "/api/*"
-  to = "https://REPLACE-ME.onrender.com/api/:splat"
+  to = "https://lpu-resource-hub.onrender.com/api/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/health"
-  to = "https://REPLACE-ME.onrender.com/health"
+  to = "https://lpu-resource-hub.onrender.com/health"
   status = 200
   force = true
 
