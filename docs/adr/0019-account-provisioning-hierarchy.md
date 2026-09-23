@@ -114,6 +114,35 @@ account, not on a second device: it proves *the target participated*, not that
 a phone was in someone's hand. That is the property worth having here — it is
 what stops one compromised admin session from quietly minting another admin.
 
+## Bootstrapping, which is where this kind of rule usually breaks
+
+A hierarchy is a set of preconditions, and every precondition is a way to get
+stuck. Three real deadlocks showed up and are now closed, each with a test:
+
+- **No schools or departments.** The endpoints existed from Step 3 with no UI,
+  so a fresh install could not create the department a coordinator must be
+  appointed to. `/admin/organisation` fixes that.
+- **A faculty member in a department with no coordinator.** "A coordinator
+  must verify you" leaves nobody who can. An admin has always been able to
+  verify anyone — the queue is unfiltered for them and the scope policy is a
+  no-op — but the error message named only the coordinator, so the way out was
+  invisible. The message now names both.
+- **A self-registered account with no department at all.** Covered by
+  [ADR 0018](0018-department-membership.md), and the message points at the
+  profile.
+
+`tests/test_bootstrap_walkthrough.py` walks an empty database all the way to a
+working student using only calls a person could make from the UI: admin →
+school → department → coordinator → faculty → verification → student → sign in
+→ replace password → use the platform. A permission matrix cannot catch this
+class of bug, because every row of it starts from a world someone else already
+built.
+
+The same reasoning applies to the administration entrance: `/admin/login` is
+linked from the footer of every page and from the main login form. A door
+nobody can find is not a feature, and hiding it was never the security
+property — the role check on the server is.
+
 ## Consequences
 
 **Good**

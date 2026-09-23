@@ -59,12 +59,16 @@ _ERROR_MAP: dict[type[Exception], tuple[int, str]] = {
     accounts.NoDepartmentError: (
         status.HTTP_403_FORBIDDEN,
         "Your account is not in a department yet, so there is nowhere to add "
-        "anyone. Set your department on your profile, or ask an admin.",
+        "anyone. Set your department on your profile, then ask your research "
+        "coordinator or an administrator to verify you.",
     ),
+    # Naming only the coordinator was a dead end for anyone in a department
+    # that has none: an admin can verify anybody, and has to be offered.
     accounts.NotVerifiedError: (
         status.HTTP_403_FORBIDDEN,
-        "A research coordinator has to verify your researcher profile before "
-        "you can add people to your department.",
+        "Your researcher profile has not been verified yet. Your department's "
+        "research coordinator can verify it — or any administrator, if your "
+        "department has no coordinator yet.",
     ),
     accounts.UnknownDepartmentError: (status.HTTP_404_NOT_FOUND, "Department not found."),
     accounts.DepartmentRequiredError: (
