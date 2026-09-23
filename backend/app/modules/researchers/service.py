@@ -27,6 +27,7 @@ def to_queue_item(user: User, profile: ResearcherProfile) -> VerificationQueueIt
     return VerificationQueueItem(
         user_id=user.id,
         full_name=user.full_name,
+        registration_number=user.registration_number,
         email=user.email,
         designation=profile.designation,
         department_id=user.department_id,

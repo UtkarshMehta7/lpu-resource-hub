@@ -1,13 +1,17 @@
 export type Role = "student" | "faculty" | "research_coordinator" | "admin";
 
-export type SelfRegisterableRole = Extract<Role, "student" | "faculty">;
+// Students don't self-register: their department creates the account.
+export type SelfRegisterableRole = Extract<Role, "faculty">;
 
 export type CoordinatorScopeType = "department" | "school" | "university";
 
 /** Matches the backend's UserRead schema exactly (see app/modules/users/schemas.py). */
 export interface UserRead {
   id: string;
-  email: string;
+  /** The LPU registration number: what you sign in with. */
+  registration_number: string;
+  /** Optional contact address; never a credential. */
+  email: string | null;
   full_name: string;
   role: Role;
   is_active: boolean;
@@ -15,6 +19,8 @@ export interface UserRead {
   coordinator_scope_type: CoordinatorScopeType | null;
   coordinator_scope_id: string | null;
   onboarding_complete: boolean;
+  /** True until a temporary password is replaced; the app is locked until then. */
+  must_change_password: boolean;
   created_at: string;
 }
 
@@ -27,14 +33,15 @@ export interface AccessTokenResponse {
 }
 
 export interface RegisterPayload {
-  email: string;
+  registration_number: string;
+  email?: string | null;
   password: string;
   full_name: string;
   role: SelfRegisterableRole;
 }
 
 export interface LoginPayload {
-  email: string;
+  registration_number: string;
   password: string;
 }
 

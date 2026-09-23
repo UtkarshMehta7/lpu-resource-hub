@@ -25,15 +25,20 @@ from app.core.security import (
 from app.modules.auth.models import RefreshToken
 from app.modules.auth.schemas import RegisterRequest
 from app.modules.users.models import User, UserRole
-from app.modules.users.service import get_by_email, get_by_id
+from app.modules.users.service import get_by_id, get_by_registration_number
 
 
-class EmailAlreadyRegisteredError(Exception):
-    """Raised when registering with an email that already has an account."""
+class RegistrationNumberTakenError(Exception):
+    """Raised when the registration number (or email) is already taken."""
 
 
 class InvalidCredentialsError(Exception):
-    """Failed login: unknown email or wrong password. Always the same message."""
+    """Failed login: unknown registration number or wrong password.
+
+    Registration numbers are semi-public and sequential, so the message must
+    never distinguish "no such account" from "wrong password" -- otherwise
+    the login form becomes a roster-enumeration oracle.
+    """
 
 
 class InvalidRefreshTokenError(Exception):
@@ -53,7 +58,8 @@ class IssuedTokens:
 
 def register_user(db: Session, data: RegisterRequest) -> User:
     user = User(
-        email=data.email.lower(),
+        registration_number=data.registration_number,
+        email=data.email.lower() if data.email else None,
         password_hash=hash_password(data.password),
         full_name=data.full_name,
         role=UserRole(data.role),
@@ -63,13 +69,13 @@ def register_user(db: Session, data: RegisterRequest) -> User:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise EmailAlreadyRegisteredError from exc
+        raise RegistrationNumberTakenError from exc
     db.refresh(user)
     return user
 
 
-def authenticate(db: Session, email: str, password: str) -> User:
-    user = get_by_email(db, email)
+def authenticate(db: Session, registration_number: str, password: str) -> User:
+    user = get_by_registration_number(db, registration_number)
     if user is None or not user.is_active or not verify_password(password, user.password_hash):
         raise InvalidCredentialsError
     return user
@@ -129,6 +135,8 @@ def change_password(db: Session, user: User, current_password: str, new_password
         raise IncorrectPasswordError
 
     user.password_hash = hash_password(new_password)
+    # Whatever temporary password they were given is now gone.
+    user.must_change_password = False
     revoke_all_sessions(db, user.id)
     db.commit()
 

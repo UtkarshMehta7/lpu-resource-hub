@@ -243,10 +243,11 @@ def test_deactivate_revokes_the_users_refresh_tokens(
     register_response = client.post(
         "/api/v1/auth/register",
         json={
+            "registration_number": "TARGET0001",
             "email": "target@example.com",
             "password": "correcthorsebattery",
             "full_name": "Target User",
-            "role": "student",
+            "role": "faculty",
         },
     )
     target_id = register_response.json()["user"]["id"]

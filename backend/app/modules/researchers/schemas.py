@@ -16,7 +16,8 @@ class VerificationQueueItem(BaseModel):
 
     user_id: uuid.UUID
     full_name: str
-    email: str
+    registration_number: str
+    email: str | None
     designation: str
     department_id: uuid.UUID | None
     verification_status: VerificationStatus

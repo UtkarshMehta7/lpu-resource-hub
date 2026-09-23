@@ -16,7 +16,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 13: semantic search.** What exists today:
+**Step 13 + registration-number sign-in.** What exists today:
 
 | Area | Status |
 |---|---|
@@ -46,6 +46,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Lovely Professional University branding across the frontend (full name, LPU shortform in tight spaces) | Done |
 | Funding calls (fictional demo data), saveable, with in-app notifications from domain events and 7/1-day deadline reminders | Done |
 | Natural-language search: sentence embeddings in pgvector, fused with full-text search (optional install; falls back cleanly) | Done |
+| Sign in with the LPU registration number (UMS-style); students are added by their department with a temporary password they must replace | Done |
 | Analytics and deployment | **Not implemented yet** (see [roadmap](#development-roadmap)) |
 
 ## Technology stack
@@ -341,6 +342,7 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `POST /api/v1/projects/{id}/review` | `project:review` | `{decision: approve\|reject, comment}` — comment required to reject. Own-department only; never your own project. Audited. |
 | `GET/POST /api/v1/projects/{id}/members`, `DELETE …/members/{user_id}` | owner for writes | Team members can see the project even while it's a draft. |
 | `GET /api/v1/coordinator/review-queue` | `project:review` | Pending projects in your department (admin: all). |
+| `POST /api/v1/users` | `user:create` (faculty, coordinator, admin) | Creates an account for someone else and returns a temporary password **once**. Faculty/coordinators may only add students to their own department; admins may create any role. Audited. |
 | `GET /api/v1/search/semantic?q=&limit=` | any signed-in user | Ask in plain language. Full-text and vector rankings are fused with reciprocal rank fusion; visibility rules are the same ones the list endpoints apply. `semantic_used: false` means the optional ML extra isn't installed and the answer is lexical-only. |
 | `GET/POST /api/v1/funding`, `GET/PATCH/DELETE /api/v1/funding/{id}` | any signed-in user reads / `funding:manage` writes | Filters `q`, `status`, `open_only`, `research_area_id`, `deadline_before`. Seeded calls are fictional and flagged `is_demo`. |
 | `GET /api/v1/me/notifications` | any signed-in user | Your own notifications plus the unread count. Others' are never visible (`404` on a foreign id). |
@@ -470,6 +472,14 @@ accounts:
 ```bash
 cd backend && python -m scripts.seed_demo_data      # once, if not already seeded
 cd frontend && E2E_PASSWORD='<seed password>' npx playwright test
+```
+
+The flows sign in with the seeded demo **registration numbers** (`DEMOSTUDENT01`,
+`DEMOFACULTY01`, `DEMOCOORDINATOR02`, `DEMOADMIN`), which the seed script
+derives from each demo account's address — they are deliberately unmistakable
+for real LPU numbers.
+
+```bash
 ```
 
 The config starts the Vite dev server and the API for you (and reuses them

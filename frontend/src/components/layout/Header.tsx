@@ -27,6 +27,11 @@ const NAV: NavItem[] = [
   { to: "/opportunities", label: "Opportunities" },
   { to: "/students", label: "Students", roles: ["faculty", "research_coordinator", "admin"] },
   {
+    to: "/people/new",
+    label: "Add a person",
+    roles: ["faculty", "research_coordinator", "admin"],
+  },
+  {
     to: "/collaborations",
     label: "Requests",
     roles: ["student", "faculty", "research_coordinator"],

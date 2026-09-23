@@ -15,7 +15,7 @@ from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, 
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.core.deps import get_app_settings, get_current_user
+from app.core.deps import get_app_settings, get_authenticated_user
 from app.core.rate_limit import enforce_auth_rate_limit
 from app.db.session import get_db
 from app.modules.auth.schemas import (
@@ -25,11 +25,11 @@ from app.modules.auth.schemas import (
     RegisterRequest,
 )
 from app.modules.auth.service import (
-    EmailAlreadyRegisteredError,
     IncorrectPasswordError,
     InvalidCredentialsError,
     InvalidRefreshTokenError,
     IssuedTokens,
+    RegistrationNumberTakenError,
     authenticate,
     change_password,
     issue_tokens,
@@ -96,13 +96,13 @@ def register(
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> AccessTokenResponse:
-    enforce_auth_rate_limit(request, data.email)
+    enforce_auth_rate_limit(request, data.registration_number)
     try:
         user = register_user(db, data)
-    except EmailAlreadyRegisteredError as exc:
+    except RegistrationNumberTakenError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="An account with this email already exists.",
+            detail="An account with this registration number already exists.",
         ) from exc
 
     tokens = issue_tokens(db, user, settings)
@@ -118,13 +118,14 @@ def login(
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> AccessTokenResponse:
-    enforce_auth_rate_limit(request, data.email)
+    enforce_auth_rate_limit(request, data.registration_number)
     try:
-        user = authenticate(db, data.email, data.password)
+        user = authenticate(db, data.registration_number, data.password)
     except InvalidCredentialsError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password.",
+            # Deliberately identical whether the account exists or not.
+            detail="Incorrect registration number or password.",
         ) from exc
 
     tokens = issue_tokens(db, user, settings)
@@ -180,7 +181,7 @@ def change_password_route(
     response: Response,
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_authenticated_user)],
 ) -> None:
     try:
         change_password(db, current_user, data.current_password, data.new_password)
