@@ -329,6 +329,20 @@ test("faculty adds a student, who must set their own password first", async ({ b
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(page).toHaveURL(/dashboard|account/);
   await page.context().close();
+
+  // ...and the faculty member who enrolled them can remove them again, which
+  // is also how this run cleans up after itself: E2E runs against the
+  // development database, so an account per run would accumulate forever.
+  await faculty.goto("/people");
+  const row = faculty.locator("tr", { hasText: registrationNumber });
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: /^Delete/ }).click();
+  // The cascade is stated before it happens (ADR 0021).
+  await expect(
+    faculty.getByText(/nothing else is deleted with it|Deleted along with/i),
+  ).toBeVisible();
+  await faculty.getByRole("button", { name: "Delete permanently" }).click();
+  await expect(faculty.locator("tr", { hasText: registrationNumber })).toHaveCount(0);
 });
 
 test("coordinator reads scoped analytics; admin reads the audit log", async ({ browser }) => {

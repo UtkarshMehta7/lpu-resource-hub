@@ -2,7 +2,13 @@ import type { Role } from "@/features/auth/types";
 import type { Department, School } from "@/features/directory/api-org";
 import { apiClient } from "@/lib/api/client";
 
-import type { AdminUserRead, AdminUserUpdate, Page, TemporaryPasswordRead } from "./types";
+import type {
+  AdminUserRead,
+  AdminUserUpdate,
+  DeletionImpact,
+  Page,
+  TemporaryPasswordRead,
+} from "./types";
 
 export interface ListUsersParams {
   page?: number;
@@ -39,6 +45,30 @@ export async function setUserActive(userId: string, isActive: boolean): Promise<
   const path = isActive ? "activate" : "deactivate";
   const response = await apiClient.post<AdminUserRead>(`/api/v1/admin/users/${userId}/${path}`);
   return response.data;
+}
+
+/**
+ * The people the caller is responsible for -- the ones they may remove.
+ * Distinct from fetchUsers, which is every account and admin-only.
+ */
+export async function fetchManageableUsers(
+  params: { page?: number; page_size?: number } = {},
+): Promise<Page<AdminUserRead>> {
+  const response = await apiClient.get<Page<AdminUserRead>>("/api/v1/users", { params });
+  return response.data;
+}
+
+/**
+ * What a deletion would destroy. Not under /admin: every role above student
+ * may remove the people below them, so the hierarchy decides, not the path.
+ */
+export async function fetchDeletionImpact(userId: string): Promise<DeletionImpact> {
+  const response = await apiClient.get<DeletionImpact>(`/api/v1/users/${userId}/deletion-impact`);
+  return response.data;
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  await apiClient.delete(`/api/v1/users/${userId}`);
 }
 
 /** Organisation structure. Admin-only writes; the reads are public lists. */

@@ -71,7 +71,15 @@ def _register(client: TestClient, **overrides: object) -> Response:
 )
 def test_there_is_no_public_registration_endpoint(client: TestClient, path: str) -> None:
     """The whole self-service door, closed. Not 403 with a role check behind
-    it -- the route does not exist."""
+    it -- there is nothing to post to.
+
+    404 for a path that matches no route. 405 for /users/register, which
+    matches the pattern of `DELETE /users/{user_id}` (ADR 0021) and so is
+    answered as a method that path does not accept -- still "no such
+    endpoint", and no account is created either way. What must never appear
+    is a 2xx, or a 401/403, which would mean a registration endpoint exists
+    and merely refused this caller.
+    """
     response = client.post(
         path,
         json={
@@ -82,7 +90,7 @@ def test_there_is_no_public_registration_endpoint(client: TestClient, path: str)
         },
     )
 
-    assert response.status_code == 404
+    assert response.status_code in {404, 405}
 
 
 def test_the_openapi_schema_advertises_no_registration(client: TestClient) -> None:

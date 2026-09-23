@@ -10,20 +10,23 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import asdict
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.pagination import Page, PageParams
 from app.core.permissions import Permission, require_permission
 from app.core.rate_limit import client_ip
 from app.db.session import get_db
-from app.modules.admin import accounts, promotions
+from app.modules.admin import accounts, deletion, promotions
 from app.modules.admin.schemas import (
     AccountCreateRequest,
     AdminAccountCreateRequest,
     AdminUserRead,
     CreatedAccountRead,
+    DeletionImpactRead,
     PromotionChallengeRead,
     PromotionConfirmRequest,
     StepDownRequest,
@@ -234,3 +237,105 @@ def step_down_as_admin(
     """Give up your own admin role, once somebody else holds it."""
     with _promotion_errors():
         return promotions.step_down(db, actor, new_role=data.new_role, ip=client_ip(request))
+
+
+_DELETION_ERRORS: dict[type[Exception], tuple[int, str]] = {
+    deletion.SelfDeletionError: (
+        status.HTTP_409_CONFLICT,
+        "You cannot delete your own account.",
+    ),
+    deletion.NotAllowedRoleError: (
+        status.HTTP_403_FORBIDDEN,
+        "Your role cannot delete this account.",
+    ),
+    deletion.OutOfScopeError: (
+        status.HTTP_403_FORBIDDEN,
+        "You can only remove people from your own department.",
+    ),
+    deletion.NoDepartmentError: (
+        status.HTTP_403_FORBIDDEN,
+        "Your account is not in a department yet, so there is nobody you are responsible for.",
+    ),
+    deletion.NotVerifiedError: (
+        status.HTTP_403_FORBIDDEN,
+        "Your researcher profile has not been verified yet, so you cannot remove anyone.",
+    ),
+}
+
+
+@contextmanager
+def _deletion_errors() -> Iterator[None]:
+    try:
+        yield
+    except tuple(_DELETION_ERRORS) as exc:
+        code, detail = _DELETION_ERRORS[type(exc)]
+        raise HTTPException(status_code=code, detail=detail) from exc
+
+
+Remover = Annotated[User, Depends(require_permission(Permission.USER_DELETE))]
+
+
+@router.get("/users/{user_id}/deletion-impact", response_model=DeletionImpactRead)
+def read_deletion_impact(
+    user_id: uuid.UUID,
+    db: Annotated[Session, Depends(get_db)],
+    actor: Remover,
+) -> DeletionImpactRead:
+    """What deleting this account would destroy, before anyone confirms it.
+
+    Runs exactly the same authority check as the deletion, so it cannot be
+    used to count somebody else's work: no permission, no numbers.
+    """
+    target = _load_user(db, user_id)
+    with _deletion_errors():
+        deletion.assert_may_delete(db, actor, target)
+    impact = deletion.deletion_impact(db, target)
+    return DeletionImpactRead(
+        registration_number=target.registration_number,
+        full_name=target.full_name,
+        role=target.role,
+        destroys_content=impact.destroys_content,
+        **asdict(impact),
+    )
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account_route(
+    user_id: uuid.UUID,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    actor: Remover,
+) -> None:
+    """Delete an account, and whatever the database cascades from it.
+
+    Removal follows the same hierarchy as creation (admin -> coordinator ->
+    faculty -> student), except that an administrator answers for the whole
+    platform and may remove anyone but themselves. Deactivation remains the
+    right answer for somebody who has simply left: it keeps their work and
+    their name on the decisions they made.
+    """
+    target = _load_user(db, user_id)
+    with _deletion_errors():
+        deletion.delete_account(db, actor, target, ip=client_ip(request))
+
+
+@router.get("/users", response_model=Page[AdminUserRead])
+def list_manageable_users(
+    db: Annotated[Session, Depends(get_db)],
+    actor: Remover,
+    params: Annotated[PageParams, Depends()],
+) -> Page[AdminUserRead]:
+    """The people the caller is responsible for -- the ones they may remove.
+
+    Distinct from GET /admin/users, which is every account on the platform and
+    admin-only. This is a coordinator's department, or a faculty member's
+    students: the same rule that decides the deletion decides the list, so no
+    row here can produce a 403 on the button beside it.
+    """
+    rows, total = deletion.list_manageable(db, actor, params)
+    return Page[AdminUserRead](
+        items=[AdminUserRead.model_validate(user) for user in rows],
+        page=params.page,
+        page_size=params.page_size,
+        total=total,
+    )

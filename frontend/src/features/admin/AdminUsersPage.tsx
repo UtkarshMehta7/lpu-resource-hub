@@ -9,11 +9,15 @@ import { toApiError } from "@/lib/api/errors";
 
 import {
   changeUserRole,
+  deleteUser,
+  fetchDeletionImpact,
   fetchUsers,
   resetTemporaryPassword,
   setUserActive,
   updateUser,
 } from "./api";
+import { DeletionDetails } from "./DeletionDetails";
+import { mayDelete } from "./hierarchy";
 import type { AdminUserRead, CoordinatorScopeType } from "./types";
 
 const ROLE_OPTIONS: Role[] = ["student", "faculty", "research_coordinator", "admin"];
@@ -28,7 +32,8 @@ const ROLE_LABELS: Record<Role, string> = {
 type PendingAction =
   | { type: "role"; user: AdminUserRead; newRole: Role }
   | { type: "activate" | "deactivate"; user: AdminUserRead }
-  | { type: "reset"; user: AdminUserRead };
+  | { type: "reset"; user: AdminUserRead }
+  | { type: "delete"; user: AdminUserRead };
 
 const USERS_QUERY_KEY = ["admin", "users"] as const;
 
@@ -105,6 +110,25 @@ export function AdminUsersPage() {
     onError: onMutationError,
   });
 
+  // Counted only once the deletion is actually being considered: it is a
+  // handful of COUNT queries, and asking for every row on every render would
+  // be a lot of work to answer a question nobody asked.
+  const deletionTarget = pending?.type === "delete" ? pending.user.id : null;
+  const { data: impact, isPending: impactPending } = useQuery({
+    queryKey: ["admin", "deletion-impact", deletionTarget],
+    queryFn: () => fetchDeletionImpact(deletionTarget as string),
+    enabled: deletionTarget !== null,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (userId: string) => deleteUser(userId),
+    onSuccess: () => {
+      setPending(null);
+      void invalidateUsers();
+    },
+    onError: onMutationError,
+  });
+
   const resetMutation = useMutation({
     mutationFn: (userId: string) => resetTemporaryPassword(userId),
     onSuccess: (result) => {
@@ -120,6 +144,7 @@ export function AdminUsersPage() {
     roleMutation.isPending ||
     activeMutation.isPending ||
     detailsMutation.isPending ||
+    deleteMutation.isPending ||
     resetMutation.isPending;
 
   const handleConfirm = () => {
@@ -127,6 +152,8 @@ export function AdminUsersPage() {
     if (!pending) return;
     if (pending.type === "role") {
       roleMutation.mutate({ userId: pending.user.id, role: pending.newRole });
+    } else if (pending.type === "delete") {
+      deleteMutation.mutate(pending.user.id);
     } else if (pending.type === "reset") {
       resetMutation.mutate(pending.user.id);
     } else {
@@ -360,6 +387,20 @@ export function AdminUsersPage() {
                       >
                         New password
                       </button>
+                      {mayDelete(currentUser, item) ? (
+                        <button
+                          type="button"
+                          disabled={isMutating}
+                          onClick={() => {
+                            setActionError(null);
+                            setPending({ type: "delete", user: item });
+                          }}
+                          className="rounded-md border border-red-300 bg-surface px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          aria-label={`Delete ${item.full_name}`}
+                        >
+                          Delete
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -373,10 +414,15 @@ export function AdminUsersPage() {
         open={pending !== null}
         title={pending ? _confirmTitle(pending) : ""}
         description={pending ? _confirmDescription(pending) : ""}
+        confirmLabel={pending?.type === "delete" ? "Delete permanently" : "Confirm"}
         isConfirming={isMutating}
         onConfirm={handleConfirm}
         onCancel={() => setPending(null)}
-      />
+      >
+        {pending?.type === "delete" ? (
+          <DeletionDetails impact={impact} loading={impactPending} />
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }
@@ -391,6 +437,8 @@ function _confirmTitle(pending: PendingAction): string {
       return "Deactivate account?";
     case "reset":
       return "Issue a new temporary password?";
+    case "delete":
+      return "Delete this account permanently?";
   }
 }
 
@@ -404,6 +452,8 @@ function _confirmDescription(pending: PendingAction): string {
       return `${pending.user.full_name} will be signed out everywhere and unable to sign in.`;
     case "reset":
       return `${pending.user.full_name}'s current password will stop working and they will be signed out everywhere. You'll see the new one once.`;
+    case "delete":
+      return `${pending.user.full_name} (${pending.user.registration_number}) will be removed for good. This cannot be undone — deactivate instead if they have simply left.`;
   }
 }
 

@@ -76,6 +76,23 @@ ENDPOINTS = (
         frozenset({UserRole.ADMIN}),
         needs_target=True,
     ),
+    # Removal follows the creation hierarchy. The target here is a freshly
+    # seeded student with no department, so only an admin -- who is scoped to
+    # everything -- reaches it; a coordinator or faculty member is refused on
+    # scope, and a student has no such permission at all.
+    Endpoint(
+        "GET",
+        "/api/v1/users/{id}/deletion-impact",
+        frozenset({UserRole.ADMIN}),
+        needs_target=True,
+    ),
+    Endpoint(
+        "DELETE",
+        "/api/v1/users/{id}",
+        frozenset({UserRole.ADMIN}),
+        needs_target=True,
+        allowed_status=204,
+    ),
     # Step 3: organisation
     Endpoint("GET", "/api/v1/admin/schools", frozenset({UserRole.ADMIN})),
     Endpoint(

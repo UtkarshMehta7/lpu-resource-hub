@@ -37,6 +37,7 @@ import { AnalyticsPage } from "@/features/analytics/AnalyticsPage";
 import { AuditLogPage } from "@/features/admin/AuditLogPage";
 import { PlatformSettingsPage } from "@/features/admin/PlatformSettingsPage";
 import { CreateAccountPage } from "@/features/admin/CreateAccountPage";
+import { PeoplePage } from "@/features/admin/PeoplePage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ModerationQueuePage } from "@/features/reports/ModerationQueuePage";
 import { SavedPage } from "@/features/saved/SavedPage";
@@ -120,6 +121,7 @@ export const router = createBrowserRouter([
             element: <RoleRoute allow={["faculty", "research_coordinator", "admin"]} />,
             children: [
               { path: "students", element: <StudentsPage /> },
+              { path: "people", element: <PeoplePage /> },
               { path: "people/new", element: <CreateAccountPage /> },
             ],
           },
