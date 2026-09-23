@@ -9,6 +9,8 @@ export interface AdminUserRead {
   full_name: string;
   role: Role;
   is_active: boolean;
+  must_change_password: boolean;
+  department_id: string | null;
   coordinator_scope_type: CoordinatorScopeType | null;
   coordinator_scope_id: string | null;
   created_at: string;
@@ -25,8 +27,15 @@ export interface Page<T> {
 
 export interface AdminUserUpdate {
   full_name?: string;
+  department_id?: string | null;
   coordinator_scope_type?: CoordinatorScopeType | null;
   coordinator_scope_id?: string | null;
+}
+
+/** Returned once, when an admin issues a replacement temporary password. */
+export interface TemporaryPasswordRead {
+  user: AdminUserRead;
+  temporary_password: string;
 }
 
 export interface AuditLogRead {

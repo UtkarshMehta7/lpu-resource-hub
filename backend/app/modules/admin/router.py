@@ -14,7 +14,11 @@ from app.core.permissions import Permission, require_permission
 from app.core.rate_limit import client_ip
 from app.db.session import get_db
 from app.modules.admin.models import Department, School
-from app.modules.admin.policies import LastActiveAdminError, SelfRoleChangeError
+from app.modules.admin.policies import (
+    LastActiveAdminError,
+    SelfPasswordResetError,
+    SelfRoleChangeError,
+)
 from app.modules.admin.schemas import (
     AdminUserRead,
     AdminUserUpdate,
@@ -25,11 +29,13 @@ from app.modules.admin.schemas import (
     SchoolCreate,
     SchoolRead,
     SchoolUpdate,
+    TemporaryPasswordRead,
 )
 from app.modules.admin.service import (
     DepartmentNameTakenError,
     DepartmentNotFoundError,
     InvalidCoordinatorScopeError,
+    InvalidDepartmentError,
     SchoolNameTakenError,
     SchoolNotFoundError,
     UserNotFoundError,
@@ -44,6 +50,7 @@ from app.modules.admin.service import (
     list_departments,
     list_schools,
     list_users,
+    reset_temporary_password,
     set_active,
     update_department,
     update_school,
@@ -82,24 +89,50 @@ def read_users(
     return list_users(db, params, role=role, is_active=is_active)
 
 
-@router.patch(
-    "/{user_id}",
-    response_model=AdminUserRead,
-    dependencies=[Depends(require_permission(Permission.USER_UPDATE))],
-)
+@router.patch("/{user_id}", response_model=AdminUserRead)
 def patch_user(
     user_id: uuid.UUID,
     data: AdminUserUpdate,
+    request: Request,
     db: Annotated[Session, Depends(get_db)],
+    actor: Annotated[User, Depends(require_permission(Permission.USER_UPDATE))],
 ) -> User:
     target = _load_target(db, user_id)
     try:
-        return update_user(db, target, data)
+        return update_user(db, actor, target, data, ip=client_ip(request))
     except InvalidCoordinatorScopeError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="coordinator_scope_id does not name a real department.",
         ) from exc
+    except InvalidDepartmentError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="department_id does not name a real department.",
+        ) from exc
+
+
+@router.post("/{user_id}/temporary-password", response_model=TemporaryPasswordRead)
+def reset_user_password(
+    user_id: uuid.UUID,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    actor: Annotated[User, Depends(require_permission(Permission.USER_UPDATE))],
+) -> TemporaryPasswordRead:
+    """Hand out a new temporary password when the first one was lost."""
+    target = _load_target(db, user_id)
+    try:
+        user, temporary_password = reset_temporary_password(
+            db, actor, target, ip=client_ip(request)
+        )
+    except SelfPasswordResetError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Change your own password from your account page instead.",
+        ) from exc
+    return TemporaryPasswordRead(
+        user=AdminUserRead.model_validate(user), temporary_password=temporary_password
+    )
 
 
 @router.post("/{user_id}/role", response_model=AdminUserRead)

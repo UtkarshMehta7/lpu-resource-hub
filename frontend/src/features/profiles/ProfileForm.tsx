@@ -1,8 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
+import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { z } from "zod";
 
 import type { Role } from "@/features/auth/types";
+import { fetchDepartments } from "@/features/directory/api-org";
 
 import type { Profile, ResearcherProfileUpdate, StudentProfileUpdate } from "./types";
 
@@ -16,6 +18,7 @@ const studentSchema = z.object({
   bio: z.string().max(5000, "Bio is too long"),
   interests: z.string().max(2000, "Interests are too long"),
   is_discoverable: z.boolean(),
+  department_id: z.string(),
 });
 
 const researcherSchema = z.object({
@@ -23,6 +26,7 @@ const researcherSchema = z.object({
   bio: z.string().max(5000, "Bio is too long"),
   availability: z.enum(["available", "limited", "unavailable"]),
   link: z.union([z.literal(""), z.string().url("Enter a full URL, e.g. https://example.com")]),
+  department_id: z.string(),
 });
 
 type StudentFormValues = z.infer<typeof studentSchema>;
@@ -31,6 +35,53 @@ type ResearcherFormValues = z.infer<typeof researcherSchema>;
 const FIELD_CLASS = "mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm";
 const SUBMIT_CLASS =
   "rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50";
+
+/**
+ * Where you belong. Someone who registered for themselves has no department,
+ * which leaves everything department-scoped closed to them -- so they state it
+ * here. Once a coordinator has verified a researcher it stops being a claim,
+ * and only an admin can change it.
+ */
+function DepartmentField({
+  locked,
+  register,
+}: {
+  locked: boolean;
+  register: UseFormRegisterReturn;
+}) {
+  const { data: departments } = useQuery({
+    queryKey: ["departments"],
+    queryFn: () => fetchDepartments(),
+    enabled: !locked,
+  });
+
+  if (locked) {
+    return (
+      <p className="text-xs text-ink-muted">
+        Your department was confirmed when your profile was verified. Ask an admin to change it.
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      <label htmlFor="department_id" className="block text-sm font-medium">
+        Department
+      </label>
+      <select id="department_id" className={FIELD_CLASS} {...register}>
+        <option value="">Not set</option>
+        {departments?.map((department) => (
+          <option key={department.id} value={department.id}>
+            {department.name}
+          </option>
+        ))}
+      </select>
+      <p className="mt-1 text-xs text-ink-muted">
+        Your department decides which coordinator reviews your work.
+      </p>
+    </div>
+  );
+}
 
 interface ProfileFormProps {
   role: Role;
@@ -61,6 +112,7 @@ function StudentForm({ profile, submitLabel, onSubmit }: Omit<ProfileFormProps, 
       bio: existing?.bio ?? "",
       interests: existing?.interests ?? "",
       is_discoverable: existing?.is_discoverable ?? false,
+      department_id: existing?.department_id ?? "",
     },
   });
 
@@ -71,6 +123,7 @@ function StudentForm({ profile, submitLabel, onSubmit }: Omit<ProfileFormProps, 
       bio: values.bio || null,
       interests: values.interests || null,
       is_discoverable: values.is_discoverable,
+      department_id: values.department_id || null,
     });
   });
 
@@ -100,6 +153,11 @@ function StudentForm({ profile, submitLabel, onSubmit }: Omit<ProfileFormProps, 
         />
         {errors.year ? <p className="mt-1 text-xs text-red-700">{errors.year.message}</p> : null}
       </div>
+
+      <DepartmentField
+        locked={existing?.department_locked ?? false}
+        register={register("department_id")}
+      />
 
       <div>
         <label htmlFor="bio" className="block text-sm font-medium">
@@ -150,6 +208,7 @@ function ResearcherForm({ profile, submitLabel, onSubmit }: Omit<ProfileFormProp
       bio: existing?.bio ?? "",
       availability: existing?.availability ?? "available",
       link: existing?.links?.[0]?.url ?? "",
+      department_id: existing?.department_id ?? "",
     },
   });
 
@@ -159,6 +218,7 @@ function ResearcherForm({ profile, submitLabel, onSubmit }: Omit<ProfileFormProp
       bio: values.bio || null,
       availability: values.availability,
       links: values.link ? [{ label: "Profile", url: values.link }] : null,
+      department_id: values.department_id || null,
     });
   });
 
@@ -173,6 +233,11 @@ function ResearcherForm({ profile, submitLabel, onSubmit }: Omit<ProfileFormProp
           <p className="mt-1 text-xs text-red-700">{errors.designation.message}</p>
         ) : null}
       </div>
+
+      <DepartmentField
+        locked={existing?.department_locked ?? false}
+        register={register("department_id")}
+      />
 
       <div>
         <label htmlFor="availability" className="block text-sm font-medium">
