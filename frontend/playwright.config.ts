@@ -36,7 +36,10 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: ".venv/bin/uvicorn app.main:create_app --factory --port 8000",
+      // Locally the backend lives in backend/.venv; in CI it is installed
+      // into the runner's own Python and `uvicorn` is already on PATH.
+      // Putting the venv first covers both without a second config.
+      command: 'PATH="$PWD/.venv/bin:$PATH" uvicorn app.main:create_app --factory --port 8000',
       cwd: "../backend",
       url: "http://localhost:8000/health",
       reuseExistingServer: true,
