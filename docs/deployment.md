@@ -57,6 +57,23 @@ risk you accept is browser policy: some browsers already block third-party
 cookies by default, and a blocked refresh cookie means people get signed out
 when their access token expires.
 
+## Status: deployed (24 September 2026)
+
+The API is live on Render's free tier against a Neon database, verified end
+to end:
+
+| Check | Result |
+|---|---|
+| `GET /health` | `{"status":"ok"}` |
+| `GET /health/ready` | `{"status":"ok","database":"ok"}` — the API reaches Neon |
+| `POST /auth/login` | authenticates the bootstrap administrator |
+| `GET /docs` | `404` — interactive docs are off in production, as intended |
+| Response headers | HSTS, `default-src 'none'` CSP and `nosniff` all present |
+
+Built as a Docker service with the root directory set to `backend`; the
+image binds `$PORT`, which Render injects. The source build in `render.yaml`
+remains the simpler alternative.
+
 ## The adopted pathway: Neon + Render + Netlify, no cost
 
 This is the path the repository is configured for. Two files do most of the
