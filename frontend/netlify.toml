@@ -1,0 +1,41 @@
+# Netlify: the static bundle, plus a proxy that puts the API on the same
+# origin as the app.
+#
+# Why the proxy matters: the refresh token is an httpOnly cookie. Served from
+# one origin it stays a first-party cookie and `SameSite=lax` is enough. Split
+# across two domains it would need `SameSite=none`, third-party cookie rules
+# would start to apply, and sign-in would break in ways that look like a
+# backend bug. One origin avoids all of it.
+#
+# Replace REPLACE-ME with the Render service hostname after the API deploys.
+
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # A path prefix means "same origin": the browser calls /api/... on this
+  # domain and Netlify forwards it. See src/lib/config.ts.
+  VITE_API_BASE_URL = "/"
+
+# Order matters: the API rules must come before the single-page fallback,
+# or every request would be answered with index.html.
+[[redirects]]
+  from = "/api/*"
+  to = "https://REPLACE-ME.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/health"
+  to = "https://REPLACE-ME.onrender.com/health"
+  status = 200
+  force = true
+
+# Client-side routing: anything that isn't a real file is the app shell.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
