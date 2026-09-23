@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Uid } from "@/components/ui/Uid";
 import { toApiError } from "@/lib/api/errors";
 
 import {
@@ -84,7 +85,10 @@ export function VerificationQueuePage() {
             <tbody className="divide-y divide-line">
               {data.map((item) => (
                 <tr key={item.user_id}>
-                  <td className="px-4 py-3">{item.full_name}</td>
+                  <td className="px-4 py-3">
+                    {item.full_name}
+                    <Uid value={item.registration_number} className="ml-2" />
+                  </td>
                   <td className="px-4 py-3 text-ink-muted">{item.email}</td>
                   <td className="px-4 py-3">{item.designation}</td>
                   <td className="px-4 py-3">

@@ -35,6 +35,7 @@ const PROJECT = {
   status: "active" as const,
   owner_id: "u1",
   owner_name: "Dr. Demo",
+  owner_registration_number: "DEMOFACULTY07",
   department_id: null,
   start_date: null,
   end_date: null,

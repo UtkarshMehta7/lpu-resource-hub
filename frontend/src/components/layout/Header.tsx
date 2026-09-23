@@ -7,6 +7,7 @@ import { NotificationBell } from "@/features/notifications/NotificationBell";
 
 import { Brand } from "./Brand";
 import type { Role } from "@/features/auth/types";
+import { Uid } from "@/components/ui/Uid";
 
 interface NavItem {
   to: string;
@@ -138,7 +139,7 @@ export function Header() {
             ))}
             <li>
               <Link to="/account" className={LINK} onClick={() => setMenuOpen(false)}>
-                {user.full_name}
+                {user.full_name} <Uid value={user.registration_number} />
               </Link>
             </li>
             <li>

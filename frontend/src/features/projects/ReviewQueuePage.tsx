@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Uid } from "@/components/ui/Uid";
 import { toApiError } from "@/lib/api/errors";
 
 import { fetchReviewQueue, reviewProject, type ProjectCard } from "./api";
@@ -76,7 +77,9 @@ export function ReviewQueuePage() {
                 {project.title}
               </Link>
               <p className="mt-1 text-sm text-ink-muted">{project.summary}</p>
-              <p className="mt-1 text-xs text-ink-muted">Led by {project.owner_name}</p>
+              <p className="mt-1 text-xs text-ink-muted">
+                Led by {project.owner_name} <Uid value={project.owner_registration_number} />
+              </p>
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"

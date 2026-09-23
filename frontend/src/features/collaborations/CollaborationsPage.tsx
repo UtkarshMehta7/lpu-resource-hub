@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { toApiError } from "@/lib/api/errors";
+import { Uid } from "@/components/ui/Uid";
 
 import {
   COLLABORATION_STATUS_LABEL,
@@ -141,10 +142,13 @@ function RequestItem({
           {box === "inbox" ? "From " : "To "}
           {profileLink ? (
             <Link to={profileLink} className="font-semibold hover:underline">
-              {other.full_name}
+              {other.full_name} <Uid value={other.registration_number} />
             </Link>
           ) : (
-            <span className="font-semibold">{other.full_name}</span>
+            <>
+              <span className="font-semibold">{other.full_name}</span>{" "}
+              <Uid value={other.registration_number} />
+            </>
           )}
           {request.project_id && request.project_title ? (
             <>

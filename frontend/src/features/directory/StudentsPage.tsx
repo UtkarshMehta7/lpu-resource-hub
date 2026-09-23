@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 
 import { RequestCollaborationButton } from "@/features/collaborations/RequestCollaborationButton";
+import { Uid } from "@/components/ui/Uid";
 
 import { fetchDiscoverableStudents } from "./api";
 
@@ -62,9 +63,7 @@ export function StudentsPage() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <p className="text-sm font-semibold">
                     {student.full_name}
-                    <span className="ml-2 font-mono text-xs font-normal text-ink-muted">
-                      {student.registration_number}
-                    </span>
+                    <Uid value={student.registration_number} className="ml-2" />
                   </p>
                   <RequestCollaborationButton
                     recipientId={student.user_id}

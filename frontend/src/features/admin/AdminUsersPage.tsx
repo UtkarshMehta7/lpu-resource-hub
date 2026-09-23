@@ -14,7 +14,7 @@ import {
   setUserActive,
   updateUser,
 } from "./api";
-import type { AdminUserRead } from "./types";
+import type { AdminUserRead, CoordinatorScopeType } from "./types";
 
 const ROLE_OPTIONS: Role[] = ["student", "faculty", "research_coordinator", "admin"];
 
@@ -53,6 +53,9 @@ export function AdminUsersPage() {
     queryFn: () => fetchDepartments(),
   });
 
+  const departmentName = (id: string | null) =>
+    departments?.find((department) => department.id === id)?.name ?? null;
+
   const invalidateUsers = () => queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
   const onMutationError = (error: unknown) => setActionError(toApiError(error).message);
 
@@ -80,14 +83,20 @@ export function AdminUsersPage() {
       userId,
       full_name,
       department_id,
+      coordinator_scope_type,
+      coordinator_scope_id,
     }: {
       userId: string;
       full_name?: string;
       department_id?: string | null;
+      coordinator_scope_type?: CoordinatorScopeType | null;
+      coordinator_scope_id?: string | null;
     }) =>
       updateUser(userId, {
         ...(full_name ? { full_name } : {}),
         ...(department_id !== undefined ? { department_id } : {}),
+        ...(coordinator_scope_type !== undefined ? { coordinator_scope_type } : {}),
+        ...(coordinator_scope_id !== undefined ? { coordinator_scope_id } : {}),
       }),
     onSuccess: () => {
       setEditingName(null);
@@ -303,6 +312,20 @@ export function AdminUsersPage() {
                         </option>
                       ))}
                     </select>
+                    {item.role === "research_coordinator" ? (
+                      <CoordinatorScope
+                        user={item}
+                        departmentName={departmentName}
+                        busy={isMutating}
+                        onRepair={() =>
+                          detailsMutation.mutate({
+                            userId: item.id,
+                            coordinator_scope_type: "department",
+                            coordinator_scope_id: item.department_id,
+                          })
+                        }
+                      />
+                    ) : null}
                   </td>
                   <td className="px-4 py-3">
                     {item.is_active ? "Active" : "Inactive"}
@@ -382,4 +405,45 @@ function _confirmDescription(pending: PendingAction): string {
     case "reset":
       return `${pending.user.full_name}'s current password will stop working and they will be signed out everywhere. You'll see the new one once.`;
   }
+}
+
+/**
+ * What a coordinator actually oversees, shown where their role is set.
+ *
+ * The scope is the whole of a coordinator's authority: no scope means an
+ * empty verification queue and 403 on every decision, with nothing on the
+ * coordinator's own screen saying why. It now follows the department
+ * automatically, but accounts appointed before that still need repairing --
+ * so when it is missing, say so here and offer the one click that fixes it.
+ */
+function CoordinatorScope({
+  user,
+  departmentName,
+  busy,
+  onRepair,
+}: {
+  user: AdminUserRead;
+  departmentName: (id: string | null) => string | null;
+  busy: boolean;
+  onRepair: () => void;
+}) {
+  const scope = departmentName(user.coordinator_scope_id);
+  if (scope) {
+    return <span className="mt-1 block text-xs text-ink-muted">Oversees {scope}</span>;
+  }
+  if (!user.department_id) {
+    return (
+      <span className="mt-1 block text-xs text-red-700">
+        Oversees nothing — give them a department first
+      </span>
+    );
+  }
+  return (
+    <span className="mt-1 block text-xs text-red-700">
+      Oversees nothing —{" "}
+      <button type="button" disabled={busy} onClick={onRepair} className="font-medium underline">
+        put them over {departmentName(user.department_id)}
+      </button>
+    </span>
+  );
 }

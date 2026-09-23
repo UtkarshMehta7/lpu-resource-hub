@@ -58,7 +58,12 @@ def _to_reads(
         return []
     user_ids = {r.sender_id for r in rows} | {r.recipient_id for r in rows}
     parties = {
-        u.id: Party(id=u.id, full_name=u.full_name, role=u.role)
+        u.id: Party(
+            id=u.id,
+            full_name=u.full_name,
+            registration_number=u.registration_number,
+            role=u.role,
+        )
         for u in db.execute(select(User).where(User.id.in_(user_ids))).scalars()
     }
     project_ids = {r.project_id for r in rows if r.project_id is not None}

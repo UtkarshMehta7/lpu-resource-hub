@@ -64,6 +64,7 @@ class MemberCreate(BaseModel):
 class MemberRead(BaseModel):
     user_id: uuid.UUID
     full_name: str
+    registration_number: str
     member_role: str
 
 
@@ -74,6 +75,7 @@ class ProjectCard(BaseModel):
     status: ProjectStatus
     owner_id: uuid.UUID
     owner_name: str
+    owner_registration_number: str
     department_id: uuid.UUID | None
     start_date: date | None
     end_date: date | None

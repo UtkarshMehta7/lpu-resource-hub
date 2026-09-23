@@ -40,6 +40,7 @@ class ApplicationRead(BaseModel):
     opportunity_type: OpportunityType
     applicant_id: uuid.UUID
     applicant_name: str
+    applicant_registration_number: str
     statement: str
     status: ApplicationStatus
     note: str | None

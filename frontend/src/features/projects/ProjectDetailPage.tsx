@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Uid } from "@/components/ui/Uid";
 import { useAuth } from "@/features/auth/authContext";
 import { RequestCollaborationButton } from "@/features/collaborations/RequestCollaborationButton";
 import { ReportButton } from "@/features/reports/ReportButton";
@@ -119,7 +120,7 @@ export function ProjectDetailPage() {
           <p className="mt-1 text-sm text-ink-muted">
             Led by{" "}
             <Link to={`/researchers/${project.owner_id}`} className="hover:underline">
-              {project.owner_name}
+              {project.owner_name} <Uid value={project.owner_registration_number} />
             </Link>
           </p>
           {!isOwner ? (
@@ -211,7 +212,8 @@ export function ProjectDetailPage() {
             {project.members.map((member) => (
               <li key={member.user_id} className="flex items-center justify-between px-4 py-2">
                 <span className="text-sm">
-                  {member.full_name} <span className="text-ink-muted">· {member.member_role}</span>
+                  {member.full_name} <Uid value={member.registration_number} />{" "}
+                  <span className="text-ink-muted">· {member.member_role}</span>
                 </span>
                 {isOwner ? (
                   <button

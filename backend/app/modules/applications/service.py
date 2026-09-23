@@ -99,10 +99,12 @@ def _to_reads(
         events[event.application_id].append(
             ApplicationEventRead(status=event.status, note=event.note, created_at=event.created_at)
         )
-    names: dict[uuid.UUID, str] = {
-        uid: name
-        for uid, name in db.execute(
-            select(User.id, User.full_name).where(User.id.in_({a.applicant_id for a, _ in rows}))
+    names: dict[uuid.UUID, tuple[str, str]] = {
+        uid: (name, number)
+        for uid, name, number in db.execute(
+            select(User.id, User.full_name, User.registration_number).where(
+                User.id.in_({a.applicant_id for a, _ in rows})
+            )
         ).all()
     }
     return [
@@ -112,7 +114,8 @@ def _to_reads(
             opportunity_title=o.title,
             opportunity_type=o.opportunity_type,
             applicant_id=a.applicant_id,
-            applicant_name=names.get(a.applicant_id, ""),
+            applicant_name=names.get(a.applicant_id, ("", ""))[0],
+            applicant_registration_number=names.get(a.applicant_id, ("", ""))[1],
             statement=a.statement,
             status=a.status,
             note=a.note,

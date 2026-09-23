@@ -155,10 +155,12 @@ def _to_cards(db: Session, viewer: User, rows: Sequence[Opportunity]) -> list[Op
     ).all():
         skills[opp_id].append(SkillTag(id=sid, name=name, is_required=required))
 
-    creators: dict[uuid.UUID, str] = {
-        uid: name
-        for uid, name in db.execute(
-            select(User.id, User.full_name).where(User.id.in_({o.created_by for o in rows}))
+    creators: dict[uuid.UUID, tuple[str, str]] = {
+        uid: (name, number)
+        for uid, name, number in db.execute(
+            select(User.id, User.full_name, User.registration_number).where(
+                User.id.in_({o.created_by for o in rows})
+            )
         ).all()
     }
     project_ids = {o.project_id for o in rows if o.project_id is not None}
@@ -195,7 +197,8 @@ def _to_cards(db: Session, viewer: User, rows: Sequence[Opportunity]) -> list[Op
             project_title=projects.get(o.project_id) if o.project_id else None,
             department_id=o.department_id,
             created_by=o.created_by,
-            creator_name=creators.get(o.created_by, ""),
+            creator_name=creators.get(o.created_by, ("", ""))[0],
+            creator_registration_number=creators.get(o.created_by, ("", ""))[1],
             positions=o.positions,
             accepted_count=accepted.get(o.id, 0),
             deadline=o.deadline,

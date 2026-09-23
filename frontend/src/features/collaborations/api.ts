@@ -14,6 +14,7 @@ export const COLLABORATION_STATUS_LABEL: Record<CollaborationStatus, string> = {
 interface Party {
   id: string;
   full_name: string;
+  registration_number: string;
   role: Role;
 }
 

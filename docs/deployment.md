@@ -109,6 +109,12 @@ minutes, so the Blueprint builds from source. See [Docker](#docker-optional).
    administrator; every other account is provisioned from it through the UI
    (ADR 0019).
 
+   Re-run `alembic upgrade head` (or `backend/scripts/release.sh`) after every
+   deploy that adds a migration — including data repairs. Migration 0018 is
+   one: it gives the coordinators appointed before the scope fix the
+   department they oversee, and until it runs, those accounts see an empty
+   verification queue and get 403 on every decision (ADR 0020).
+
 3. **Render.** New Blueprint from the repository -- it reads `render.yaml`.
    Paste `DATABASE_URL` and `CORS_ORIGINS` when prompted; `JWT_SECRET_KEY` is
    generated for you and never appears in the repository. Note the service
