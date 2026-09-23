@@ -33,10 +33,13 @@ class AccountCreateRequest(BaseModel):
     department_id: uuid.UUID | None = None
     email: EmailStr | None = None
 
-    @field_validator("registration_number")
+    # Before the pattern, not after: a number typed with a stray space is the
+    # same person, and should collide as a duplicate rather than be rejected
+    # as malformed.
+    @field_validator("registration_number", mode="before")
     @classmethod
     def _normalise(cls, value: str) -> str:
-        return normalise_registration_number(value)
+        return normalise_registration_number(value) if isinstance(value, str) else value
 
     @field_validator("full_name")
     @classmethod

@@ -1,10 +1,9 @@
-"""CLI to create an admin or research-coordinator account.
+"""CLI to create the first administrator (or a research coordinator).
 
-`admin` and `research_coordinator` cannot self-register through the public
-API (see app/modules/auth/schemas.py: SelfRegisterableRole). This is the
-only way to create one. The password is always prompted (getpass, never
-echoed, never a CLI argument or env var) so it can't end up in shell history
-or process listings.
+Nobody self-registers (ADR 0019), so this is how a platform gets its first
+account: everyone else is provisioned from it, down the hierarchy. The
+password is always prompted (getpass, never echoed, never a CLI argument or
+environment variable) so it can't end up in shell history or a process list.
 
 Usage (from backend/, with the venv active):
     python -m scripts.create_admin
@@ -15,22 +14,44 @@ from __future__ import annotations
 import getpass
 import sys
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.security import MIN_PASSWORD_LENGTH, hash_password, is_common_password
 from app.db.session import create_db_engine, create_session_factory
+from app.modules.auth.schemas import normalise_registration_number
 from app.modules.users.models import User, UserRole
 
 ROLE_CHOICES = (UserRole.ADMIN, UserRole.RESEARCH_COORDINATOR)
 
 
-def _prompt_email(db: Session) -> str:
+def _prompt_registration_number(db: Session) -> str:
+    """What they will sign in with. Unique, and compared case-insensitively
+    because it is always stored upper-cased."""
     while True:
-        email = input("Email: ").strip().lower()
-        if not email or "@" not in email:
-            print("Enter a valid email address.")
+        raw = input("Registration number: ").strip()
+        if len(raw) < 4:
+            print("Enter the registration or employee number they sign in with.")
+            continue
+        registration_number = normalise_registration_number(raw)
+        existing = db.execute(
+            select(User).where(func.upper(User.registration_number) == registration_number.upper())
+        ).scalar_one_or_none()
+        if existing is not None:
+            print(f"'{registration_number}' already belongs to {existing.full_name}.")
+            continue
+        return registration_number
+
+
+def _prompt_email(db: Session) -> str | None:
+    """Optional contact address. Nobody signs in with it."""
+    while True:
+        email = input("Email (optional, press enter to skip): ").strip().lower()
+        if not email:
+            return None
+        if "@" not in email:
+            print("Enter a valid email address, or press enter to skip.")
             continue
         existing = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
         if existing is not None:
@@ -82,20 +103,26 @@ def main() -> int:
     try:
         with session_factory() as db:
             print(f"Creating an account in {settings.database_summary()}\n")
-            email = _prompt_email(db)
+            registration_number = _prompt_registration_number(db)
             full_name = _prompt_full_name()
+            email = _prompt_email(db)
             role = _prompt_role()
             password = _prompt_password()
 
             user = User(
+                registration_number=registration_number,
                 email=email,
                 password_hash=hash_password(password),
                 full_name=full_name,
                 role=role,
+                # They chose this password themselves, so there is nothing to
+                # replace at first sign-in.
+                must_change_password=False,
             )
             db.add(user)
             db.commit()
-            print(f"\nCreated {role.value} account for {email}.")
+            print(f"\nCreated {role.value} account {registration_number} for {full_name}.")
+            print("They sign in with that number and the password you just set.")
         return 0
     finally:
         engine.dispose()

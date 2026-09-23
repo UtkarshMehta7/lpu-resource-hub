@@ -270,7 +270,8 @@ def test_a_new_account_is_walled_off_until_the_password_is_changed(
 
 def test_a_duplicate_registration_number_is_refused(client: TestClient, world: World) -> None:
     assert _create(client, world.faculty)[0] == 201
-    # Same number, different case.
+    # The same number again. Case-insensitive uniqueness has its own file:
+    # tests/test_registration_number_uniqueness.py.
     assert _create(client, world.faculty, registration_number="12345678")[0] == 409
 
 
