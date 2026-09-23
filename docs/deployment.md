@@ -32,15 +32,17 @@ under the frontend's own domain, e.g. `https://app.example.org/api/*` →
 `https://api.example.org/*`. The cookie stays `SameSite=Lax`, and nothing
 depends on third-party cookies, which browsers increasingly block.
 
-```json
-// frontend/vercel.json — rewrite /api/* to the backend
-{
-  "rewrites": [{ "source": "/api/:path*", "destination": "https://YOUR-BACKEND/api/:path*" }]
-}
+```toml
+# frontend/netlify.toml — proxy /api/* to the backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://YOUR-BACKEND/api/:splat"
+  status = 200
+  force = true
 ```
 
-Then build the frontend with `VITE_API_BASE_URL=""` (same origin) and set
-`CORS_ORIGINS=https://app.example.org`.
+Then build the frontend with `VITE_API_BASE_URL=/` (same origin — a path
+prefix, see `src/lib/config.ts`) and set `CORS_ORIGINS` to the site's URL.
 
 **Option B — cross-site.** Frontend and API on different domains:
 
@@ -55,11 +57,62 @@ risk you accept is browser policy: some browsers already block third-party
 cookies by default, and a blocked refresh cookie means people get signed out
 when their access token expires.
 
-## A worked free-tier example
+## The adopted pathway: Neon + Render + Netlify, no cost
 
-| Piece | Service | What to know (September 2026) |
+This is the path the repository is configured for. Two files do most of the
+work: [`render.yaml`](../render.yaml) and
+[`frontend/netlify.toml`](../frontend/netlify.toml).
+
+```
+Neon      Postgres + pgvector          free tier
+Render    FastAPI, built from source   free web service
+Netlify   static bundle + /api proxy   free tier
+```
+
+No Docker, no registry, no card. Docker remains available and is also free on
+Render's Docker runtime -- it simply buys nothing here and costs build
+minutes, so the Blueprint builds from source. See [Docker](#docker-optional).
+
+### Step by step
+
+1. **Neon.** Create a project. Run `CREATE EXTENSION vector;` once. Copy the
+   connection string and change the scheme to `postgresql+psycopg://`.
+
+2. **Migrate and create the first admin from your own machine**, pointed at
+   Neon. The API image deliberately does not migrate on start, and Render's
+   pre-deploy hook is not on the free tier, so this is the release step:
+
+   ```bash
+   cd backend
+   DATABASE_URL="postgresql+psycopg://…neon…" alembic upgrade head
+   DATABASE_URL="postgresql+psycopg://…neon…" python -m scripts.create_admin
+   ```
+
+   **Do not seed demo data into production.** Production starts with one
+   administrator; every other account is provisioned from it through the UI
+   (ADR 0019).
+
+3. **Render.** New Blueprint from the repository -- it reads `render.yaml`.
+   Paste `DATABASE_URL` and `CORS_ORIGINS` when prompted; `JWT_SECRET_KEY` is
+   generated for you and never appears in the repository. Note the service
+   hostname it gives you.
+
+4. **Netlify.** New site from the repository -- it reads
+   `frontend/netlify.toml`. Replace both occurrences of `REPLACE-ME` with the
+   Render hostname from step 3, commit, and let it rebuild.
+
+5. **Close the loop.** Set `CORS_ORIGINS` on Render to the Netlify URL.
+
+Because Netlify proxies `/api` to Render, the browser only ever talks to one
+origin: the refresh cookie stays first-party, `SameSite=lax` is correct, and
+none of the third-party-cookie rules apply. That is Option A above, and it is
+why it is the recommended one.
+
+## Service notes (September 2026)
+
+| Piece | Service | What to know |
 |---|---|---|
-| Frontend | Vercel or Netlify | Static build; set `VITE_API_BASE_URL` at build time. |
+| Frontend | Netlify | Static build plus proxy redirects; `netlify.toml` sets `VITE_API_BASE_URL=/`. |
 | Backend | Render (free web service) | Spins down after **15 minutes** of inactivity and takes ~1 minute to wake; 750 instance-hours per workspace per month. |
 | Database | Neon (free) | ~0.5 GB storage, compute auto-suspends after ~5 minutes idle and resumes in well under a second. pgvector available. |
 | Database (alternative) | Supabase (free) | pgvector on all plans; projects **pause after 7 days of inactivity**, and only two active free projects per organisation. |
@@ -70,14 +123,18 @@ Neon or Supabase for the database even when the API runs on Render.
 
 ### Backend on Render
 
+`render.yaml` encodes this, so there is nothing to type:
+
 ```
-Build:   pip install -e "."
-Release: alembic upgrade head
+Build:   pip install --upgrade pip && pip install -e "."
 Start:   uvicorn app.main:create_app --factory --host 0.0.0.0 --port $PORT
+Health:  /health          (liveness only -- it never touches the database)
+Release: alembic upgrade head, run from your machine (see step 2 above)
 ```
 
 Environment: `APP_ENV=production`, `DATABASE_URL`, `JWT_SECRET_KEY`,
-`CORS_ORIGINS`, and `REFRESH_COOKIE_SAMESITE=none` if you chose Option B.
+`CORS_ORIGINS`, and `REFRESH_COOKIE_SAMESITE=none` only if you abandon the
+proxy and split the domains.
 
 ### Memory, and what to do about the ML extra
 

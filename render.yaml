@@ -1,0 +1,42 @@
+# Render Blueprint: the API, built from source on the free instance type.
+#
+# Free by design -- no Docker build minutes, no registry, no card. The
+# frontend is not here: it is a static bundle on Netlify, which also proxies
+# /api to this service so the browser only ever sees one origin (see
+# frontend/netlify.toml and docs/deployment.md).
+#
+# Deliberately NOT installing the `ml` extra: sentence-transformers is
+# hundreds of megabytes and would exceed a free instance. Semantic search
+# falls back to full-text search and reports `semantic_used: false`.
+services:
+  - type: web
+    name: lpu-research-hub-api
+    runtime: python
+    plan: free
+    # Closest free region to Punjab; Render also offers oregon and frankfurt.
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -e "."
+    # $PORT is injected by Render and must be bound, not assumed.
+    startCommand: uvicorn app.main:create_app --factory --host 0.0.0.0 --port $PORT
+    # Liveness only: it never touches the database, so a database blip
+    # doesn't cause Render to restart a healthy process.
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: APP_ENV
+        value: production
+      # Settings validation refuses to start in production without these, so
+      # a misconfiguration fails at deploy rather than at the first request.
+      - key: DATABASE_URL
+        sync: false # paste the Neon connection string, postgresql+psycopg://…
+      - key: CORS_ORIGINS
+        sync: false # the Netlify domain, e.g. https://lpu-research-hub.netlify.app
+      - key: JWT_SECRET_KEY
+        generateValue: true # Render generates it; it is never in the repo
+      # The frontend is same-origin via the Netlify proxy, so the refresh
+      # cookie stays first-party and `lax` is correct. Only set this to
+      # `none` (and only over HTTPS) if you split the domains.
+      - key: REFRESH_COOKIE_SAMESITE
+        value: lax
