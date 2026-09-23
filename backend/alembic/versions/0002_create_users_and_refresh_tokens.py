@@ -96,3 +96,6 @@ def downgrade() -> None:
     op.drop_table("refresh_tokens")
     op.drop_index(op.f("ix_users_email"), table_name="users")
     op.drop_table("users")
+    # drop_table leaves the enum type behind, which makes a downgrade/upgrade
+    # round-trip fail on "type already exists".
+    sa.Enum(name="user_role").drop(op.get_bind(), checkfirst=True)

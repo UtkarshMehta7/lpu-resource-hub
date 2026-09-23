@@ -187,3 +187,4 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_projects_owner_id"), table_name="projects")
     op.drop_index(op.f("ix_projects_department_id"), table_name="projects")
     op.drop_table("projects")
+    sa.Enum(name="project_status").drop(op.get_bind(), checkfirst=True)
