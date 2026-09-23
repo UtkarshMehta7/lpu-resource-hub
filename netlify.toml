@@ -8,6 +8,11 @@
 # backend bug. One origin avoids all of it.
 #
 # Replace REPLACE-ME with the Render service hostname after the API deploys.
+#
+# This file must live at the REPOSITORY ROOT: Netlify reads it before it knows
+# anything about the project, so a copy inside frontend/ is never found -- the
+# build then runs at the root, finds no package.json, and fails during "init".
+# `base` below is what points it at the frontend; `publish` is relative to it.
 
 [build]
   base = "frontend"
