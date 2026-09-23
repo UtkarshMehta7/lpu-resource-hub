@@ -16,7 +16,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 
 ## Current development status
 
-**Step 14: analytics, network, audit UI and moderation.** What exists today:
+**Complete: all 16 roadmap steps (v1.0.0).** What exists today:
 
 | Area | Status |
 |---|---|
@@ -48,7 +48,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Natural-language search: sentence embeddings in pgvector, fused with full-text search (optional install; falls back cleanly) | Done |
 | Sign in with the LPU registration number (UMS-style); students are added by their department with a temporary password they must replace | Done |
 | Scoped analytics (coordinator = own department, admin = platform), collaboration network graph, audit-log viewer, moderation that can hide content, read-only platform settings | Done |
-| Deployment and hardening | **Not implemented yet** (see [roadmap](#development-roadmap)) |
+| Optional Docker Compose, GitHub Actions CI, security headers and CSP, dependency audits, secret scanning, free-tier deployment guide | Done |
 
 ## Technology stack
 
@@ -468,6 +468,39 @@ lpu-research-hub/
 └── README.md
 ```
 
+## Running it with Docker (optional)
+
+```bash
+docker compose up --build
+docker compose exec backend alembic upgrade head
+docker compose exec backend python -m scripts.seed_demo_data
+```
+
+Frontend on <http://localhost:8080>, API on <http://localhost:8000>. The
+compose file is a local convenience with a throwaway secret — see
+[docs/deployment.md](docs/deployment.md) for real deployments.
+
+## Deploying
+
+[docs/deployment.md](docs/deployment.md) covers what any host must provide
+(PostgreSQL with `pgvector`, migrations as a release step, secrets from the
+environment), the cookie decision for split-domain hosting, a worked
+free-tier example, and a post-deploy checklist.
+
+## Continuous integration
+
+GitHub Actions runs the same commands you run locally: backend lint, type
+check and tests against a real PostgreSQL service, a migration round-trip,
+frontend typecheck/lint/format/test/build, a separate job for the optional
+ML extra, and Playwright on `main` or on a PR labelled `e2e`. A weekly
+security workflow runs `pip-audit`, `npm audit` and a full-history secret
+scan.
+
+## Diagrams
+
+[docs/diagrams.md](docs/diagrams.md) — a system diagram and an entity
+relationship diagram, both Mermaid so they render on GitHub.
+
 ## End-to-end tests
 
 Playwright drives the four MVP flows (faculty → coordinator → student →
@@ -509,14 +542,26 @@ project and opportunity, so they can be run repeatedly.
 | 11 | Facilities, equipment and booking calendar, double-booking prevented in the database |
 | 12 | Funding calls, event-driven notifications, deadline reminders |
 | 13 | Embeddings, pgvector, hybrid semantic search |
-| **14** | **Research analytics, collaboration network, audit-log UI, moderation (this commit)** |
-| 15 | Optional Docker, CI/CD, free-tier deployment, hardening |
+| 14 | Research analytics, collaboration network, audit-log UI, moderation |
+| **15** | **Optional Docker, CI/CD, free-tier deployment, hardening (this commit)** |
 
 Full details: [`docs/architecture.md`](docs/architecture.md).
 
+## Security
+
+- **Authentication**: Argon2id passwords, short-lived JWT access tokens, rotating httpOnly refresh cookies with family reuse detection. Role and active status are read from the database on every request, so a revoked role or a deactivated account takes effect immediately.
+- **Authorization**: a permission map (`app/core/permissions.py`), per-module resource policies for ownership and department scope, and a parametrised test that checks every role against every guarded endpoint.
+- **Headers**: `Content-Security-Policy: default-src 'none'` on API responses, plus `nosniff`, `DENY` framing, `no-referrer`, a minimal `Permissions-Policy`, and HSTS in production.
+- **CSRF**: every browser request carries `X-Requested-With`, which a cross-site form cannot set, alongside an explicit CORS allowlist.
+- **Rate limits**: 5 login attempts per minute per IP + registration number, 60 searches per minute per IP, 10 collaboration requests per hour per user.
+- **Error responses** use one envelope and never include stack traces, SQL or internal messages; interactive docs are disabled in production.
+- **Supply chain**: `pip-audit` and `npm audit` run in CI and weekly; gitleaks scans the full history.
+
+Reporting scope: this is a prototype. If you find something, open an issue describing the class of problem rather than a working exploit.
+
 ## Deployment
 
-Not yet. Deployment (Step 15) will stay provider-agnostic: static frontend hosting (e.g. Vercel or Netlify), a Python web service (e.g. Render) and any PostgreSQL host with pgvector. Everything is configured through environment variables; no provider SDKs in application code.
+Provider-agnostic: static frontend hosting (e.g. Vercel or Netlify), a Python web service (e.g. Render) and any PostgreSQL host with `pgvector`. Everything is configured through environment variables; no provider SDKs in application code. Step-by-step instructions, the cookie decision for split-domain hosting, free-tier caveats and a post-deploy checklist are in [`docs/deployment.md`](docs/deployment.md).
 
 ## License
 

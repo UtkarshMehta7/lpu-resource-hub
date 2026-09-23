@@ -24,6 +24,7 @@ from app.core.rate_limit import (
     create_collaboration_rate_limiter,
     create_search_rate_limiter,
 )
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.db.session import check_database_connection, create_db_engine, create_session_factory
 from app.jobs.scheduler import start_scheduler
 from app.ml import embeddings
@@ -127,6 +128,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.search_rate_limiter = create_search_rate_limiter()
     app.state.collaboration_rate_limiter = create_collaboration_rate_limiter()
 
+    # Outermost: every response, including errors, carries the headers.
+    app.add_middleware(SecurityHeadersMiddleware, production=settings.is_production)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
