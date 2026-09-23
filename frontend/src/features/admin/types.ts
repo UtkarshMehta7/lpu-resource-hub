@@ -5,6 +5,7 @@ export type CoordinatorScopeType = "department" | "school" | "university";
 /** Matches the backend's AdminUserRead schema (see app/modules/admin/schemas.py). */
 export interface AdminUserRead {
   id: string;
+  registration_number: string;
   email: string;
   full_name: string;
   role: Role;
@@ -13,6 +14,8 @@ export interface AdminUserRead {
   department_id: string | null;
   coordinator_scope_type: CoordinatorScopeType | null;
   coordinator_scope_id: string | null;
+  /** Who provisioned this account; null for the bootstrap admin. */
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }

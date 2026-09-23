@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-import type { LoginPayload, RegisterPayload, UserRead } from "./types";
+import type { LoginPayload, UserRead } from "./types";
 
 export interface AuthContextValue {
   user: UserRead | null;
@@ -8,7 +8,6 @@ export interface AuthContextValue {
   /** True until the initial silent-refresh attempt (on mount) settles. */
   isLoading: boolean;
   login: (payload: LoginPayload) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
 }
 

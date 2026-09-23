@@ -94,6 +94,16 @@ class User(Base):
         # department, so this is a lookup column, not just a reference.
         index=True,
     )
+    # Who provisioned this account. Nobody signs themselves up, so every
+    # account except the bootstrap admin has a creator, and the chain answers
+    # "who let this person in" without a second table. SET NULL rather than
+    # CASCADE: deleting a coordinator must never delete the people they added.
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     # Recomputed (not just read) whenever user_skills/user_research_areas
     # change; true once both have >= 3 rows. See app/modules/profiles/service.py.

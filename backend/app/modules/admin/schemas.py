@@ -20,14 +20,16 @@ from app.modules.users.models import CoordinatorScopeType, UserRole
 class AccountCreateRequest(BaseModel):
     """Create an account for someone else.
 
-    Admins may pass any role; faculty and coordinators may only create
-    students, and only in their own department (the API ignores a department
-    they don't own rather than trusting it).
+    There is deliberately no `role` field. The role of the new account is
+    derived from the creator's own role (admin -> coordinator -> faculty ->
+    student), so a request cannot ask for a role at all, let alone a higher
+    one. `department_id` is only read from an admin appointing a coordinator;
+    everyone else works in their own department and a value they don't own is
+    rejected rather than quietly ignored.
     """
 
     registration_number: str = Field(pattern=REGISTRATION_NUMBER_PATTERN)
     full_name: str = Field(min_length=1, max_length=200)
-    role: UserRole = UserRole.STUDENT
     department_id: uuid.UUID | None = None
     email: EmailStr | None = None
 
@@ -62,6 +64,8 @@ class AdminUserRead(BaseModel):
     is_active: bool
     must_change_password: bool
     department_id: uuid.UUID | None
+    # Who provisioned this account; null for the bootstrap admin.
+    created_by: uuid.UUID | None
     coordinator_scope_type: CoordinatorScopeType | None
     coordinator_scope_id: uuid.UUID | None
     created_at: datetime

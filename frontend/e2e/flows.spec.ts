@@ -297,7 +297,8 @@ test("faculty adds a student, who must set their own password first", async ({ b
   const registrationNumber = `E2E${RUN}`;
   await faculty.getByLabel("Registration number").fill(registrationNumber);
   await faculty.getByLabel("Full name").fill(`E2E Student ${RUN}`);
-  await faculty.getByRole("button", { name: "Create account" }).click();
+  // The button names the role being provisioned (ADR 0019).
+  await faculty.getByRole("button", { name: "Add student" }).click();
 
   await expect(faculty.getByText(/account created for/i)).toBeVisible();
   const temporaryPassword = (await faculty.locator("code").first().innerText()).trim();

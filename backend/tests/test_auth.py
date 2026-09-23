@@ -8,7 +8,7 @@ fixture) so tests do not see each other's rows.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,19 +18,17 @@ from sqlalchemy import create_engine, text
 from app.core.config import Settings
 from app.core.security import create_access_token
 from app.main import create_app
+from app.modules.users.models import UserRole
+from tests.conftest import SeededUser
 
 pytestmark = pytest.mark.db
 
-# Faculty self-register; students are created for them (ADR 0015). The
-# registration number is what you log in with, email is optional contact.
-REGISTER_PAYLOAD = {
-    "registration_number": "demo123456",
-    "email": "Faculty1@Example.com",
-    "password": "correcthorsebattery",
-    "full_name": "Faculty One",
-    "role": "faculty",
-}
-LOGIN_PAYLOAD = {"registration_number": "DEMO123456", "password": "correcthorsebattery"}
+# Nobody self-registers any more (ADR 0019): the account these tests sign in
+# with is provisioned for them, exactly as a coordinator would. The password
+# is the one tests/conftest.py seeds every account with.
+SEEDED_PASSWORD = "not-used-directly-seeded12"
+REGISTRATION_NUMBER = "DEMO123456"
+LOGIN_PAYLOAD = {"registration_number": REGISTRATION_NUMBER, "password": SEEDED_PASSWORD}
 
 
 @pytest.fixture
@@ -42,48 +40,55 @@ def client(db_settings: Settings, clean_db: None) -> Iterator[TestClient]:
         yield test_client
 
 
+@pytest.fixture(autouse=True)
+def provisioned_faculty(client: TestClient, seed_user: Callable[..., SeededUser]) -> SeededUser:
+    """The account under test, created the way the platform now creates
+    accounts: by somebody else.
+
+    Depends on `client` so it is seeded *after* clean_db truncates.
+    """
+    return seed_user(
+        UserRole.FACULTY,
+        registration_number=REGISTRATION_NUMBER,
+        email="faculty1@example.com",
+    )
+
+
 def _register(client: TestClient, **overrides: object) -> Response:
-    payload = {**REGISTER_PAYLOAD, **overrides}
-    return client.post("/api/v1/auth/register", json=payload)
+    """Sign in as the provisioned account.
+
+    Named for what it replaces: every test below used to create its subject
+    through POST /auth/register, which no longer exists. The response shape
+    is the same (access token + user + refresh cookie), so the assertions
+    that follow are unchanged.
+    """
+    payload = {**LOGIN_PAYLOAD, **overrides}
+    return client.post("/api/v1/auth/login", json=payload)
 
 
-def test_register_creates_user_and_sets_refresh_cookie(client: TestClient) -> None:
-    response = _register(client)
+@pytest.mark.parametrize(
+    "path", ["/api/v1/auth/register", "/api/v1/auth/signup", "/api/v1/users/register"]
+)
+def test_there_is_no_public_registration_endpoint(client: TestClient, path: str) -> None:
+    """The whole self-service door, closed. Not 403 with a role check behind
+    it -- the route does not exist."""
+    response = client.post(
+        path,
+        json={
+            "registration_number": "SNEAKY0001",
+            "password": "correcthorsebattery",
+            "full_name": "Sneaky Person",
+            "role": "faculty",
+        },
+    )
 
-    assert response.status_code == 201
-    body = response.json()
-    assert body["user"]["registration_number"] == "DEMO123456"  # normalised to upper case
-    assert body["user"]["email"] == "faculty1@example.com"  # normalised to lowercase
-    assert body["user"]["role"] == "faculty"
-    assert "password" not in body["user"]
-    assert "password_hash" not in body["user"]
-    assert body["token_type"] == "bearer"
-    assert response.cookies.get("refresh_token") is not None
-
-
-def test_register_rejects_duplicate_registration_number(client: TestClient) -> None:
-    _register(client)
-
-    response = _register(client, full_name="Someone Else")
-
-    assert response.status_code == 409
+    assert response.status_code == 404
 
 
-def test_register_rejects_a_registration_number_differing_only_by_case(
-    client: TestClient,
-) -> None:
-    _register(client)
+def test_the_openapi_schema_advertises_no_registration(client: TestClient) -> None:
+    paths = client.get("/openapi.json").json()["paths"]
 
-    response = _register(client, registration_number="DEMO123456", email="other@example.com")
-
-    assert response.status_code == 409
-
-
-@pytest.mark.parametrize("role", ["admin", "research_coordinator"])
-def test_register_rejects_non_self_registerable_roles(client: TestClient, role: str) -> None:
-    response = _register(client, role=role)
-
-    assert response.status_code == 422
+    assert not [path for path in paths if "register" in path or "signup" in path]
 
 
 def test_login_succeeds_with_correct_credentials(client: TestClient) -> None:
@@ -228,31 +233,6 @@ def test_logout_without_csrf_header_is_rejected(db_settings: Settings, clean_db:
     assert response.status_code == 403
 
 
-def test_register_rejects_password_shorter_than_minimum(client: TestClient) -> None:
-    response = _register(client, password="short1")
-
-    assert response.status_code == 422
-
-
-def test_register_rejects_a_common_password(client: TestClient) -> None:
-    response = _register(client, password="password123")
-
-    assert response.status_code == 422
-
-
-def test_register_ignores_mass_assigned_fields(client: TestClient) -> None:
-    response = _register(
-        client,
-        is_active=False,
-        id="11111111-1111-1111-1111-111111111111",
-    )
-
-    assert response.status_code == 201
-    body = response.json()["user"]
-    assert body["is_active"] is True
-    assert body["id"] != "11111111-1111-1111-1111-111111111111"
-
-
 def _deactivate(db_settings: Settings, registration_number: str) -> None:
     engine = create_engine(str(db_settings.database_url))
     try:
@@ -328,7 +308,7 @@ def test_change_password_succeeds_and_revokes_every_session(client: TestClient) 
     response = client.post(
         "/api/v1/auth/change-password",
         headers={"Authorization": f"Bearer {access_token}"},
-        json={"current_password": "correcthorsebattery", "new_password": "newcorrecthorsebattery"},
+        json={"current_password": SEEDED_PASSWORD, "new_password": "newcorrecthorsebattery"},
     )
     assert response.status_code == 204
 
@@ -364,7 +344,7 @@ def test_change_password_rejects_wrong_current_password(client: TestClient) -> N
 def test_change_password_requires_authentication(client: TestClient) -> None:
     response = client.post(
         "/api/v1/auth/change-password",
-        json={"current_password": "correcthorsebattery", "new_password": "newcorrecthorsebattery"},
+        json={"current_password": SEEDED_PASSWORD, "new_password": "newcorrecthorsebattery"},
     )
 
     assert response.status_code == 401

@@ -1,6 +1,6 @@
 import { Link, Navigate } from "react-router-dom";
 
-import { Monogram, UNIVERSITY_NAME, UNIVERSITY_SHORT } from "@/components/layout/Brand";
+import { Crest, UNIVERSITY_NAME, UNIVERSITY_SHORT } from "@/components/layout/Brand";
 import { useAuth } from "@/features/auth/authContext";
 
 const AUDIENCES = [
@@ -75,7 +75,7 @@ const CAPABILITIES = [
 const STEPS = [
   {
     title: "Get an account",
-    body: "Faculty register with their employee number. Students are added by their department and choose a password on first sign-in.",
+    body: "Nobody signs themselves up. A coordinator sets up the faculty of their department, and faculty enrol their students — each with a one-time password to replace at first sign-in.",
   },
   {
     title: "Say what you work on",
@@ -107,7 +107,7 @@ export function HomePage() {
         />
         <div className="relative mx-auto max-w-3xl">
           <div className="flex justify-center">
-            <Monogram className="size-14 text-lg" />
+            <Crest className="size-24 rounded-full bg-white p-2 shadow-sm ring-1 ring-brand-100" />
           </div>
           <p className="mt-5 text-sm font-semibold uppercase tracking-wide text-brand-700">
             {UNIVERSITY_NAME}
@@ -121,14 +121,8 @@ export function HomePage() {
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link
-              to="/register"
-              className="rounded-md bg-brand-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-800"
-            >
-              Create a faculty account
-            </Link>
-            <Link
               to="/login"
-              className="rounded-md border border-brand-200 bg-surface px-5 py-2.5 text-sm font-medium hover:bg-brand-50"
+              className="rounded-md bg-brand-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-800"
             >
               Sign in with your registration number
             </Link>
@@ -222,19 +216,13 @@ export function HomePage() {
       <section className="rounded-card border border-line bg-surface px-6 py-12 text-center sm:px-10">
         <h2 className="text-2xl font-semibold tracking-tight">Ready to look around?</h2>
         <p className="mx-auto mt-3 max-w-xl text-sm text-ink-muted">
-          Faculty can create an account now. Students sign in with the registration number and
-          temporary password their department gives them.
+          Sign in with the registration number and temporary password your department gave you.
+          Accounts are created for you — there is no sign-up.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link
-            to="/register"
-            className="rounded-md bg-brand-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-800"
-          >
-            Create a faculty account
-          </Link>
-          <Link
             to="/login"
-            className="rounded-md border border-line bg-surface px-5 py-2.5 text-sm font-medium hover:bg-canvas"
+            className="rounded-md bg-brand-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-800"
           >
             Sign in
           </Link>
