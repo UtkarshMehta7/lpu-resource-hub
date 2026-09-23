@@ -28,6 +28,9 @@ import { FacilitiesPage } from "@/features/facilities/FacilitiesPage";
 import { FacilityDetailPage } from "@/features/facilities/FacilityDetailPage";
 import { MyBookingsPage } from "@/features/facilities/MyBookingsPage";
 import { ChangePasswordRequiredPage } from "@/features/auth/ChangePasswordRequiredPage";
+import { AnalyticsPage } from "@/features/analytics/AnalyticsPage";
+import { AuditLogPage } from "@/features/admin/AuditLogPage";
+import { PlatformSettingsPage } from "@/features/admin/PlatformSettingsPage";
 import { CreateAccountPage } from "@/features/admin/CreateAccountPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ModerationQueuePage } from "@/features/reports/ModerationQueuePage";
@@ -96,6 +99,7 @@ export const router = createBrowserRouter([
               { path: "coordinator/verification-queue", element: <VerificationQueuePage /> },
               { path: "coordinator/review-queue", element: <ReviewQueuePage /> },
               { path: "admin/reports", element: <ModerationQueuePage /> },
+              { path: "analytics", element: <AnalyticsPage /> },
               { path: "coordinator/booking-queue", element: <BookingQueuePage /> },
               { path: "facilities/new", element: <FacilityFormPage /> },
               { path: "funding/new", element: <FundingFormPage /> },
@@ -122,7 +126,11 @@ export const router = createBrowserRouter([
           },
           {
             element: <RoleRoute allow={["admin"]} />,
-            children: [{ path: "admin/users", element: <AdminUsersPage /> }],
+            children: [
+              { path: "admin/users", element: <AdminUsersPage /> },
+              { path: "admin/audit-logs", element: <AuditLogPage /> },
+              { path: "admin/settings", element: <PlatformSettingsPage /> },
+            ],
           },
         ],
       },
