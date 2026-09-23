@@ -69,9 +69,12 @@ def test_required_values_fail_clearly_when_missing(missing: str) -> None:
     assert missing in str(excinfo.value)
 
 
-def test_rejects_non_psycopg_driver() -> None:
-    with pytest.raises(ValidationError, match="postgresql\\+psycopg"):
-        build(database_url="postgresql://user:secret@localhost:5432/example")
+def test_upgrades_a_bare_postgresql_url_rather_than_refusing_it() -> None:
+    """This used to raise. Demanding the driver prefix of whoever pastes a
+    connection string bought nothing and cost a failed deploy."""
+    settings = build(database_url="postgresql://user:secret@localhost:5432/example")
+
+    assert str(settings.database_url).startswith("postgresql+psycopg://")
 
 
 def test_rejects_short_jwt_secret_key() -> None:
@@ -105,3 +108,39 @@ def test_database_summary_never_contains_password() -> None:
     assert "secret" not in summary
     assert "example" in summary
     assert "localhost:5432" in summary
+
+
+# ---------------------------------------------- the connection string people paste
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "postgresql://u:p@host/db",  # what Neon and Supabase show
+        "postgres://u:p@host/db",  # what Heroku-style URLs look like
+        "postgresql+psycopg://u:p@host/db",  # already correct
+        '  "postgresql://u:p@host/db"  ',  # pasted with quotes and spaces
+    ],
+)
+def test_every_shape_of_postgres_url_is_accepted(raw: str) -> None:
+    """Which driver SQLAlchemy loads is our implementation detail. An operator
+    pasting a provider's connection string should not have to know it, and
+    getting it wrong used to mean a crash at startup after a deploy."""
+    settings = Settings(
+        app_env="development",
+        database_url=raw,
+        cors_origins="http://localhost:5173",
+        jwt_secret_key="x" * 40,
+    )
+
+    assert str(settings.database_url).startswith("postgresql+psycopg://")
+
+
+def test_something_that_is_not_postgres_is_still_refused() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            app_env="development",
+            database_url="mysql://u:p@host/db",
+            cors_origins="http://localhost:5173",
+            jwt_secret_key="x" * 40,
+        )
