@@ -19,4 +19,4 @@
 
 - `MAX_NODES` caps the network at 150 people per request. Beyond that the picture stops being readable anyway, and a paged or clustered view would be the honest next step rather than a bigger payload.
 - Trends are bucketed by calendar month over six months in Python from grouped SQL counts; a longer window or daily granularity would want a proper time-series query.
-- Analytics run against live tables with no materialised views. That is fine at this size; the queries are grouped counts over indexed columns, and caching can come when it is actually slow.
+- Analytics run against live tables with no materialised views. That is fine at this size; the queries are grouped counts over indexed columns, and caching can come when it is actually slow. A post-merge verification found two of those columns unindexed (`users.department_id`, `researcher_profiles.verification_status`) — migration 0015 adds them.
