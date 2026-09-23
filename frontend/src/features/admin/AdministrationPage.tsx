@@ -37,6 +37,16 @@ const PRIVILEGES: { group: string; items: { label: string; detail: string; to: s
         to: "/admin/coordinators",
       },
       {
+        label: "Administrators",
+        detail: "Promote a successor with their confirmation, or step down.",
+        to: "/admin/administrators",
+      },
+      {
+        label: "Create any account",
+        detail: "The override, for what the hierarchy can't serve. Audited as one.",
+        to: "/admin/accounts/new",
+      },
+      {
         label: "All accounts",
         detail:
           "Change a role, place someone in a department, rename, deactivate, reissue a password.",

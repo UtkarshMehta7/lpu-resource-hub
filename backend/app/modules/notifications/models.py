@@ -24,6 +24,8 @@ class NotificationType(StrEnum):
     PROFILE_VERIFIED = "profile_verified"
     RELEVANT_OPPORTUNITY = "relevant_opportunity"
     DEADLINE_REMINDER = "deadline_reminder"
+    # Carries a one-time code to someone being made an administrator.
+    ADMIN_PROMOTION_CODE = "admin_promotion_code"
 
 
 class Notification(Base):

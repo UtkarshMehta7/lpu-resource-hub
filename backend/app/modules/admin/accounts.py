@@ -109,17 +109,29 @@ def create_account(
     department_id: uuid.UUID | None,
     email: str | None,
     ip: str | None,
+    override_role: UserRole | None = None,
 ) -> CreatedAccount:
     """Create the one role this creator may create, in a department they may
-    reach. `role` is deliberately not a parameter: see the module docstring."""
-    role = creatable_role(creator.role)
+    reach.
+
+    `override_role` is the single exception, reachable only from the
+    admin-only override route: an admin naming a role directly. It is audited
+    under its own action so it never reads as an ordinary appointment.
+    """
+    if override_role is not None:
+        if creator.role is not UserRole.ADMIN:
+            raise NotAllowedRoleError
+        role: UserRole | None = override_role
+    else:
+        role = creatable_role(creator.role)
     if role is None:
         raise NotAllowedRoleError
 
     if creator.role is UserRole.ADMIN:
-        # An admin appoints coordinators anywhere, but a coordinator with no
-        # department oversees nothing, so the department is required here.
-        if department_id is None:
+        # A coordinator with no department oversees nothing, and a student or
+        # faculty member with none can't be reached by any scoped rule. Only
+        # another admin, who is scoped to everything, may have none.
+        if department_id is None and role is not UserRole.ADMIN:
             raise DepartmentRequiredError
     else:
         # Everyone else works inside their own department, and may not name
@@ -133,7 +145,7 @@ def create_account(
             raise OutOfScopeError
         department_id = scope
 
-    if db.get(Department, department_id) is None:
+    if department_id is not None and db.get(Department, department_id) is None:
         raise UnknownDepartmentError
 
     temporary_password = generate_temporary_password()
@@ -163,7 +175,7 @@ def create_account(
     audit_service.record(
         db,
         actor_id=creator.id,
-        action="user.created",
+        action="user.created_by_admin" if override_role is not None else "user.created",
         entity_type="user",
         entity_id=user.id,
         before=None,

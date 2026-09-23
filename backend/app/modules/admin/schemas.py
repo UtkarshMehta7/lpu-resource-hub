@@ -130,3 +130,33 @@ class DepartmentUpdate(BaseModel):
 
 
 CreatedAccountRead.model_rebuild()
+
+
+class AdminAccountCreateRequest(AccountCreateRequest):
+    """An admin creating an account outside the hierarchy.
+
+    The one endpoint where a role may be named, because the caller already
+    holds every power the role could grant. Its own route, its own audit
+    action: an override should look like one in the log, not like an ordinary
+    appointment.
+    """
+
+    role: UserRole
+
+
+class PromotionChallengeRead(BaseModel):
+    """What the requester gets back. Never the code."""
+
+    id: uuid.UUID
+    target_user_id: uuid.UUID
+    expires_at: datetime
+
+
+class PromotionConfirmRequest(BaseModel):
+    code: str = Field(min_length=4, max_length=12)
+
+
+class StepDownRequest(BaseModel):
+    """The role you keep after giving up the admin one."""
+
+    new_role: UserRole = UserRole.FACULTY
