@@ -1,0 +1,53 @@
+# Optional. The project runs perfectly well without Docker (see README);
+# this is for people who would rather not install PostgreSQL and Node.
+#
+#   docker compose up --build
+#   docker compose exec backend alembic upgrade head
+#   docker compose exec backend python -m scripts.seed_demo_data
+#
+services:
+  db:
+    # pgvector's image is plain PostgreSQL with the extension available, so
+    # migration 0013 can enable it.
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: lpu_hub
+      POSTGRES_PASSWORD: devpassword123
+      POSTGRES_DB: lpu_research_hub
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lpu_hub -d lpu_research_hub"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://lpu_hub:devpassword123@db:5432/lpu_research_hub
+      TEST_DATABASE_URL: postgresql+psycopg://lpu_hub:devpassword123@db:5432/lpu_research_hub_test
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+      # Compose is for local use only; a real deployment must supply its own.
+      JWT_SECRET_KEY: local-development-only-secret-key-change-me
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  db-data:

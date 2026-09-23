@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.core.config import Environment, Settings
 from app.main import create_app
 from tests.conftest import TEST_ORIGIN, make_settings
 
@@ -76,3 +77,32 @@ def test_cors_preflight_rejects_foreign_origin(client: TestClient) -> None:
 
     assert response.status_code == 400
     assert "access-control-allow-origin" not in response.headers
+
+
+def test_security_headers_are_sent_on_every_response(client: TestClient) -> None:
+    """Including on errors -- the middleware wraps the exception handlers."""
+    for response in (client.get("/health"), client.get("/api/v1/does-not-exist")):
+        assert response.headers["x-content-type-options"] == "nosniff"
+        assert response.headers["x-frame-options"] == "DENY"
+        assert response.headers["referrer-policy"] == "no-referrer"
+        assert "geolocation=()" in response.headers["permissions-policy"]
+
+
+def test_api_content_security_policy_denies_everything(client: TestClient) -> None:
+    """This service answers JSON: nothing should load, run or frame it."""
+    policy = client.get("/health").headers["content-security-policy"]
+
+    assert "default-src 'none'" in policy
+    assert "frame-ancestors 'none'" in policy
+
+
+def test_hsts_is_production_only(db_settings: Settings) -> None:
+    """Sending HSTS in development would pin localhost to HTTPS in the
+    developer's own browser."""
+    development = db_settings.model_copy(update={"app_env": Environment.DEVELOPMENT})
+    production = db_settings.model_copy(update={"app_env": Environment.PRODUCTION})
+
+    with TestClient(create_app(development)) as client:
+        assert "strict-transport-security" not in client.get("/health").headers
+    with TestClient(create_app(production)) as client:
+        assert client.get("/health").headers["strict-transport-security"].startswith("max-age=")

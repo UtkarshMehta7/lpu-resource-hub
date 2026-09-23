@@ -1,0 +1,57 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Advisories appear after code is merged, so re-check weekly.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: pip-audit (backend)
+        working-directory: backend
+        run: |
+          pip install pip-audit
+          pip install -e "."
+          # Audit the resolved dependencies, not the editable local package
+          # (pip-audit can't look that one up on PyPI). Fails on any advisory.
+          pip freeze --exclude-editable > /tmp/requirements.txt
+          pip-audit --requirement /tmp/requirements.txt --progress-spinner off
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: npm audit (frontend)
+        working-directory: frontend
+        run: |
+          npm ci
+          # Dev-only advisories shouldn't block a prototype; production deps must be clean.
+          npm audit --omit=dev --audit-level=high
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Scan the history, not just the tip: a secret committed and later
+          # removed is still a leaked secret.
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
