@@ -293,3 +293,99 @@ def test_provisioning_is_audited_and_records_the_creator(client: TestClient, wor
     ).json()["items"]
     created_row = next(row for row in listed if row["id"] == user["id"])
     assert created_row["created_by"] == str(world.faculty.id)
+
+
+# ------------------------------------------------ the admin override (ADR 0019)
+
+
+def test_an_admin_can_create_any_role_through_the_override(
+    client: TestClient, world: World
+) -> None:
+    """The ordinary path derives the role; this one names it, and only an
+    admin can reach it."""
+    response = client.post(
+        "/api/v1/admin/users",
+        headers=auth(world.admin),
+        json={
+            "registration_number": "OVERRIDE01",
+            "full_name": "Directly Made Faculty",
+            "role": "faculty",
+            "department_id": world.department_id,
+        },
+    )
+
+    assert response.status_code == 201, response.json()
+    assert response.json()["user"]["role"] == "faculty"
+
+
+def test_the_override_can_create_an_admin_without_a_department(
+    client: TestClient, world: World
+) -> None:
+    response = client.post(
+        "/api/v1/admin/users",
+        headers=auth(world.admin),
+        json={
+            "registration_number": "OVERRIDE02",
+            "full_name": "Second Admin",
+            "role": "admin",
+        },
+    )
+
+    assert response.status_code == 201, response.json()
+    assert response.json()["user"]["role"] == "admin"
+
+
+def test_the_override_still_needs_a_department_for_everyone_else(
+    client: TestClient, world: World
+) -> None:
+    response = client.post(
+        "/api/v1/admin/users",
+        headers=auth(world.admin),
+        json={
+            "registration_number": "OVERRIDE03",
+            "full_name": "Homeless Student",
+            "role": "student",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_the_override_is_audited_as_an_override(client: TestClient, world: World) -> None:
+    created = client.post(
+        "/api/v1/admin/users",
+        headers=auth(world.admin),
+        json={
+            "registration_number": "OVERRIDE04",
+            "full_name": "Logged Differently",
+            "role": "faculty",
+            "department_id": world.department_id,
+        },
+    ).json()
+
+    logs = client.get(
+        "/api/v1/admin/audit-logs",
+        headers=auth(world.admin),
+        params={"action": "user.created_by_admin", "entity_id": created["user"]["id"]},
+    ).json()["items"]
+    assert len(logs) == 1
+
+
+@pytest.mark.parametrize("actor_name", ["student", "faculty", "coordinator"])
+def test_nobody_below_an_admin_can_reach_the_override(
+    client: TestClient, world: World, actor_name: str
+) -> None:
+    actor: SeededUser = getattr(world, actor_name)
+
+    response = client.post(
+        "/api/v1/admin/users",
+        headers=auth(actor),
+        json={
+            "registration_number": "SNEAKY0001",
+            "full_name": "Would Be Admin",
+            "role": "admin",
+            "department_id": world.department_id,
+        },
+    )
+
+    assert response.status_code == 403

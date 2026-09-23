@@ -28,6 +28,7 @@ from app.core.security_headers import SecurityHeadersMiddleware
 from app.db.session import check_database_connection, create_db_engine, create_session_factory
 from app.jobs.scheduler import start_scheduler
 from app.ml import embeddings
+from app.modules.admin.accounts_router import admin_router as admin_accounts_router
 from app.modules.admin.accounts_router import router as accounts_router
 from app.modules.admin.router import org_router as admin_org_router
 from app.modules.admin.router import public_org_router
@@ -147,6 +148,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router, prefix=API_V1_PREFIX)
     app.include_router(users_router, prefix=API_V1_PREFIX)
     app.include_router(accounts_router, prefix=API_V1_PREFIX)
+    app.include_router(admin_accounts_router, prefix=API_V1_PREFIX)
     app.include_router(admin_router, prefix=f"{API_V1_PREFIX}/admin")
     app.include_router(admin_org_router, prefix=f"{API_V1_PREFIX}/admin")
     app.include_router(public_org_router, prefix=API_V1_PREFIX)

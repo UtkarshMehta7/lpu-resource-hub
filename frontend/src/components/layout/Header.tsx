@@ -56,6 +56,7 @@ const NAV: NavItem[] = [
   { to: "/admin/reports", label: "Reports", roles: ["research_coordinator", "admin"] },
   { to: "/admin", label: "Administration", roles: ["admin"] },
   { to: "/admin/coordinators", label: "Coordinators", roles: ["admin"] },
+  { to: "/admin/administrators", label: "Administrators", roles: ["admin"] },
   { to: "/admin/users", label: "Accounts", roles: ["admin"] },
   { to: "/admin/audit-logs", label: "Audit log", roles: ["admin"] },
   { to: "/admin/settings", label: "Settings", roles: ["admin"] },
