@@ -21,6 +21,9 @@ class ReportResolve(BaseModel):
     # OPEN isn't a resolution, so it can't be requested here.
     status: Literal[ReportStatus.DISMISSED, ReportStatus.ACTIONED]
     note: str | None = Field(default=None, max_length=2000)
+    # Also take the content down: archives a project, closes an opening.
+    # Ignored for targets that can't be hidden (publications, profiles).
+    hide_target: bool = False
 
 
 class ReportRead(BaseModel):

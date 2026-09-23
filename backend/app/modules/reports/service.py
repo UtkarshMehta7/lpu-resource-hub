@@ -16,10 +16,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.audit import service as audit_service
-from app.modules.opportunities.models import Opportunity
+from app.modules.opportunities.models import Opportunity, OpportunityStatus
 from app.modules.opportunities.policies import visibility_filter as opportunity_visibility
 from app.modules.profiles.models import ResearcherProfile
-from app.modules.projects.models import Project
+from app.modules.projects.models import Project, ProjectStatus
 from app.modules.projects.policies import visibility_filter as project_visibility
 from app.modules.publications.models import Publication
 from app.modules.reports.models import ContentReport, ReportStatus, ReportTargetType
@@ -132,6 +132,29 @@ def list_reports(
     return _to_reads(db, moderator, list(rows))
 
 
+def _hide_target(db: Session, report: ContentReport) -> bool:
+    """Takes the reported content out of circulation, where that's meaningful.
+
+    A project is archived and an opening is closed -- both existing states, so
+    nothing is destroyed and the owner can still see their own item. Reported
+    publications and profiles have no equivalent, so this is a no-op for them
+    and the audit row records that nothing was hidden.
+    """
+    if report.target_type is ReportTargetType.PROJECT:
+        project = db.get(Project, report.target_id)
+        if project is None or project.status is ProjectStatus.ARCHIVED:
+            return False
+        project.status = ProjectStatus.ARCHIVED
+        return True
+    if report.target_type is ReportTargetType.OPPORTUNITY:
+        opportunity = db.get(Opportunity, report.target_id)
+        if opportunity is None or opportunity.status is OpportunityStatus.CLOSED:
+            return False
+        opportunity.status = OpportunityStatus.CLOSED
+        return True
+    return False
+
+
 def resolve_report(
     db: Session, moderator: User, report_id: uuid.UUID, data: ReportResolve, *, ip: str | None
 ) -> ReportRead:
@@ -140,6 +163,7 @@ def resolve_report(
         raise ReportNotFoundError
     if report.status is not ReportStatus.OPEN:
         raise AlreadyResolvedError
+    hidden = _hide_target(db, report) if data.hide_target else False
     report.status = data.status
     report.reviewed_by = moderator.id
     report.reviewed_at = datetime.now(UTC)
@@ -151,7 +175,7 @@ def resolve_report(
         entity_type="content_report",
         entity_id=report.id,
         before={"status": ReportStatus.OPEN.value},
-        after={"status": data.status.value, "note": data.note},
+        after={"status": data.status.value, "note": data.note, "hidden": hidden},
         ip=ip,
     )
     db.commit()
