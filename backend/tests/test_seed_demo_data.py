@@ -10,7 +10,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
 from app.modules.admin.models import Department, School
-from app.modules.profiles.models import ResearcherProfile, StudentProfile
+from app.modules.profiles.models import (
+    ResearcherProfile,
+    StudentProfile,
+    VerificationStatus,
+)
 from app.modules.taxonomy.models import ResearchArea, Skill, TagAlias
 from app.modules.users.models import User, UserRole
 from scripts.seed_demo_data import (
@@ -100,3 +104,33 @@ def test_seed_leaves_some_researchers_pending_for_the_queue(db: Session) -> None
     )
 
     assert len(pending) > 0
+
+
+def test_the_documented_demo_faculty_account_is_verified(db: Session) -> None:
+    """DEMOFACULTY01 is the faculty login in the README and the browser flows.
+
+    An unverified researcher can't submit a project or post an opening, so if
+    this account seeds as PENDING the whole faculty journey is closed on a
+    fresh install -- which is exactly how the end-to-end suite failed.
+    """
+    seed(db, PLACEHOLDER_HASH)
+
+    profile = db.execute(
+        select(ResearcherProfile)
+        .join(User, User.id == ResearcherProfile.user_id)
+        .where(User.registration_number == "DEMOFACULTY01")
+    ).scalar_one()
+
+    assert profile.verification_status is VerificationStatus.VERIFIED
+
+
+def test_some_profiles_stay_pending_for_the_verification_queue(db: Session) -> None:
+    seed(db, PLACEHOLDER_HASH)
+
+    pending = db.execute(
+        select(func.count())
+        .select_from(ResearcherProfile)
+        .where(ResearcherProfile.verification_status == VerificationStatus.PENDING)
+    ).scalar_one()
+
+    assert pending > 0
