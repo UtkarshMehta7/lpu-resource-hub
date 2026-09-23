@@ -6,7 +6,8 @@ export type CoordinatorScopeType = "department" | "school" | "university";
 export interface AdminUserRead {
   id: string;
   registration_number: string;
-  email: string;
+  /** Optional contact address; the registration number is the credential. */
+  email: string | null;
   full_name: string;
   role: Role;
   is_active: boolean;
@@ -51,4 +52,25 @@ export interface AuditLogRead {
   after: Record<string, unknown> | null;
   ip: string | null;
   created_at: string;
+}
+
+/**
+ * What deleting an account would take with it, counted before anyone
+ * confirms. `accounts_provisioned` is the exception in the list: those
+ * accounts survive, they simply stop recording who created them.
+ */
+export interface DeletionImpact {
+  registration_number: string;
+  full_name: string;
+  role: Role;
+  projects_owned: number;
+  project_memberships: number;
+  opportunities_created: number;
+  publications_created: number;
+  applications_submitted: number;
+  collaboration_requests: number;
+  bookings: number;
+  reports_filed: number;
+  accounts_provisioned: number;
+  destroys_content: boolean;
 }

@@ -29,6 +29,9 @@ const NAV: NavItem[] = [
   { to: "/students", label: "Students", roles: ["faculty", "research_coordinator", "admin"] },
   // One route, but the label names who you actually provision, so nobody has
   // to guess. Mirrors CREATABLE_ROLE on the backend.
+  // Admins manage accounts from the console at /admin/users; for a
+  // coordinator or faculty member, /people is the whole of that authority.
+  { to: "/people", label: "My people", roles: ["research_coordinator", "faculty"] },
   { to: "/people/new", label: "Add coordinator", roles: ["admin"] },
   { to: "/people/new", label: "Add faculty", roles: ["research_coordinator"] },
   { to: "/people/new", label: "Add student", roles: ["faculty"] },

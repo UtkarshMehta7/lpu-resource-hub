@@ -6,19 +6,30 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminUsersPage } from "./AdminUsersPage";
 import type { AdminUserRead } from "./types";
 
-const { fetchUsers, updateUser, resetTemporaryPassword, fetchDepartments, useAuthMock } =
-  vi.hoisted(() => ({
-    fetchUsers: vi.fn(),
-    updateUser: vi.fn(),
-    resetTemporaryPassword: vi.fn(),
-    fetchDepartments: vi.fn(),
-    useAuthMock: vi.fn(),
-  }));
+const {
+  fetchUsers,
+  updateUser,
+  resetTemporaryPassword,
+  fetchDepartments,
+  useAuthMock,
+  deleteUser,
+  fetchDeletionImpact,
+} = vi.hoisted(() => ({
+  fetchUsers: vi.fn(),
+  updateUser: vi.fn(),
+  resetTemporaryPassword: vi.fn(),
+  fetchDepartments: vi.fn(),
+  useAuthMock: vi.fn(),
+  deleteUser: vi.fn(),
+  fetchDeletionImpact: vi.fn(),
+}));
 
 vi.mock("./api", () => ({
   fetchUsers,
   updateUser,
   resetTemporaryPassword,
+  deleteUser,
+  fetchDeletionImpact,
   changeUserRole: vi.fn(),
   setUserActive: vi.fn(),
 }));
@@ -57,6 +68,22 @@ beforeEach(() => {
   fetchUsers.mockResolvedValue({ items: [STRANDED], page: 1, page_size: 100, total: 1 });
   fetchDepartments.mockResolvedValue([{ id: "dept-1", name: "Agriculture", school_id: "s-1" }]);
   updateUser.mockResolvedValue({ ...STRANDED, department_id: "dept-1" });
+  deleteUser.mockResolvedValue(undefined);
+  fetchDeletionImpact.mockResolvedValue({
+    registration_number: "DEMOFACULTY01",
+    full_name: "Demo Faculty 01",
+    role: "faculty",
+    projects_owned: 0,
+    project_memberships: 0,
+    opportunities_created: 0,
+    publications_created: 0,
+    applications_submitted: 0,
+    collaboration_requests: 0,
+    bookings: 0,
+    reports_filed: 0,
+    accounts_provisioned: 0,
+    destroys_content: false,
+  });
 });
 
 describe("AdminUsersPage", () => {
@@ -192,6 +219,54 @@ describe("AdminUsersPage", () => {
     renderPage();
 
     expect(await screen.findByText(/give them a department first/i)).toBeInTheDocument();
+  });
+
+  it("deletes an account only after showing what else would go", async () => {
+    const user = userEvent.setup();
+    fetchDeletionImpact.mockResolvedValue({
+      registration_number: "DEMOFACULTY01",
+      full_name: "Demo Faculty 01",
+      role: "faculty",
+      projects_owned: 2,
+      project_memberships: 1,
+      opportunities_created: 3,
+      publications_created: 0,
+      applications_submitted: 0,
+      collaboration_requests: 0,
+      bookings: 0,
+      reports_filed: 0,
+      accounts_provisioned: 4,
+      destroys_content: true,
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /delete demo faculty 01/i }));
+
+    expect(deleteUser).not.toHaveBeenCalled();
+    expect(await screen.findByText("2 projects they lead")).toBeInTheDocument();
+    expect(screen.getByText("3 opportunities they posted")).toBeInTheDocument();
+    expect(screen.getByText(/4 accounts they created will keep working/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /delete permanently/i }));
+
+    await waitFor(() => expect(deleteUser).toHaveBeenCalledWith("user-1"));
+  });
+
+  it("says plainly when an account has no work attached", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /delete demo faculty 01/i }));
+
+    expect(await screen.findByText(/nothing else is deleted with it/i)).toBeInTheDocument();
+  });
+
+  it("offers no delete button for your own account", async () => {
+    useAuthMock.mockReturnValue({ user: { id: "user-1", role: "admin" } });
+    renderPage();
+
+    await screen.findByRole("button", { name: /rename/i });
+    expect(screen.queryByRole("button", { name: /^delete/i })).toBeNull();
   });
 
   it("surfaces the reason the API refused", async () => {

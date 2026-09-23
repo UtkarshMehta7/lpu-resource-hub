@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration. CI is green on main.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: ~119 API operations, 37 tables, 17 migrations, 19 ADRs,
-~680 backend tests, ~116 frontend tests, 14 Playwright flows.
+Current shape: ~122 API operations, 37 tables, 18 migrations, 21 ADRs,
+~740 backend tests, ~135 frontend tests, 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
 - Nobody self-registers. `POST /auth/register` does not exist and must not
@@ -67,6 +67,15 @@ Current shape: ~119 API operations, 37 tables, 17 migrations, 19 ADRs,
   person-bearing response schema carries `registration_number`; search matches
   it as a case-insensitive prefix, not through the language analyser -- an
   identifier is not prose.
+- **Deleting is not deactivating, and both are needed.** `DELETABLE_ROLES`
+  in `app/core/permissions.py` says who may remove whom: admin anyone but
+  themselves, coordinator their department's faculty and students, faculty
+  their students, student nobody. Nobody deletes their own account, which is
+  also why no "last administrator" check exists -- it would be unreachable.
+  21 of the 31 FKs to `users.id` CASCADE, so a deletion is always costed
+  first (`GET /users/{id}/deletion-impact`) and shown before it is confirmed.
+  Deactivate for someone who has left; delete for an account that should
+  never have existed (it frees the registration number).
 - A fix to the service layer does not fix the rows already in the deployed
   database. The coordinators appointed before `_sync_coordinator_scope` needed
   migration 0018 as well, and the users page now shows each coordinator's

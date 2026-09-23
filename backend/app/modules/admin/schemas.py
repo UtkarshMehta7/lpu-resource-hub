@@ -163,3 +163,28 @@ class StepDownRequest(BaseModel):
     """The role you keep after giving up the admin one."""
 
     new_role: UserRole = UserRole.FACULTY
+
+
+class DeletionImpactRead(BaseModel):
+    """What deleting an account would take with it.
+
+    Shown before the deletion is confirmed, because the cascade is wide and
+    invisible: a faculty member's projects, and every application to them,
+    go at the same time.
+    """
+
+    registration_number: str
+    full_name: str
+    role: UserRole
+    projects_owned: int
+    project_memberships: int
+    opportunities_created: int
+    publications_created: int
+    applications_submitted: int
+    collaboration_requests: int
+    bookings: int
+    reports_filed: int
+    #: Accounts this person provisioned. These are NOT deleted -- they simply
+    #: stop recording who created them.
+    accounts_provisioned: int
+    destroys_content: bool

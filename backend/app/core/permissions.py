@@ -26,6 +26,7 @@ class Permission(StrEnum):
     USER_UPDATE_ROLE = "user:update_role"
     USER_ACTIVATE = "user:activate"
     USER_DEACTIVATE = "user:deactivate"
+    USER_DELETE = "user:delete"
     AUDIT_READ = "audit:read"
     SCHOOL_MANAGE = "school:manage"
     DEPARTMENT_MANAGE = "department:manage"
@@ -63,6 +64,9 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             # Faculty create student accounts for their own department; the
             # department limit is a resource policy, not a permission.
             Permission.USER_CREATE,
+            # ...and may remove the same accounts again. Which roles, and
+            # whose, is DELETABLE_ROLES plus a scope check, not a permission.
+            Permission.USER_DELETE,
             Permission.PROJECT_CREATE,
             Permission.PUBLICATION_CREATE,
             Permission.OPPORTUNITY_CREATE,
@@ -91,6 +95,7 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.USER_UPDATE_ROLE,
             Permission.USER_ACTIVATE,
             Permission.USER_DEACTIVATE,
+            Permission.USER_DELETE,
             Permission.AUDIT_READ,
             Permission.SCHOOL_MANAGE,
             Permission.DEPARTMENT_MANAGE,
@@ -140,6 +145,33 @@ CREATABLE_ROLE: dict[UserRole, UserRole | None] = {
 def creatable_role(creator_role: UserRole) -> UserRole | None:
     """The one role this role may bring into the platform, or None."""
     return CREATABLE_ROLE[creator_role]
+
+
+# Removal runs down the same hierarchy, but unlike creation it is not limited
+# to a single rung: an administrator answers for the whole platform, so they
+# may remove anyone, while everybody else may only remove people below them.
+# Students remove nobody.
+#
+# This decides the *role*. Whose account, in which department, is a separate
+# scope check (see app/modules/admin/deletion.py) -- a coordinator may delete
+# faculty, but not another department's faculty.
+DELETABLE_ROLES: dict[UserRole, frozenset[UserRole]] = {
+    UserRole.ADMIN: frozenset(
+        {UserRole.STUDENT, UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR, UserRole.ADMIN}
+    ),
+    UserRole.RESEARCH_COORDINATOR: frozenset({UserRole.STUDENT, UserRole.FACULTY}),
+    UserRole.FACULTY: frozenset({UserRole.STUDENT}),
+    UserRole.STUDENT: frozenset(),
+}
+
+
+def deletable_roles(actor_role: UserRole) -> frozenset[UserRole]:
+    """The roles this role may remove from the platform."""
+    return DELETABLE_ROLES[actor_role]
+
+
+def may_delete_role(actor_role: UserRole, target_role: UserRole) -> bool:
+    return target_role in DELETABLE_ROLES[actor_role]
 
 
 def require_permission(permission: Permission) -> Callable[..., User]:

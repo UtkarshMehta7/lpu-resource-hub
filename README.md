@@ -52,6 +52,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Department membership: self-declared until verification locks it, admin can place anyone, replacement temporary passwords, rename from the admin list ([ADR 0018](docs/adr/0018-department-membership.md)) | Done |
 | Provisioning hierarchy with no self-registration, separate administration sign-in, two-person admin promotion ([ADR 0019](docs/adr/0019-account-provisioning-hierarchy.md)) | Done |
 | Registration number shown wherever a person is named and searchable by it; a coordinator's scope follows their department, with the scope visible on the users page ([ADR 0020](docs/adr/0020-identity-on-screen-and-derived-coordinator-scope.md)) | Done |
+| Account deletion down the hierarchy — admin anyone, coordinator their department's faculty and students, faculty their students — with the cascade counted and shown before it happens ([ADR 0021](docs/adr/0021-account-deletion.md)) | Done |
 
 ## Technology stack
 
