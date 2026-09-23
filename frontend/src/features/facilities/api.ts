@@ -176,3 +176,46 @@ export async function cancelBooking(id: string): Promise<Booking> {
   const response = await apiClient.post<Booking>(`/api/v1/bookings/${id}/cancel`);
   return response.data;
 }
+
+/**
+ * Renaming and removing. The endpoints have existed since Step 11; only the
+ * UI was missing, which left a typo in a lab's name permanent.
+ *
+ * Scope is the API's business: a coordinator may only touch facilities in
+ * the department they oversee, and gets 403 outside it.
+ */
+export async function updateFacility(
+  id: string,
+  changes: Partial<Pick<Facility, "name" | "description" | "location" | "contact">>,
+): Promise<Facility> {
+  const response = await apiClient.patch<Facility>(`/api/v1/facilities/${id}`, changes);
+  return response.data;
+}
+
+export async function deleteFacility(id: string): Promise<void> {
+  await apiClient.delete(`/api/v1/facilities/${id}`);
+}
+
+export async function updateEquipment(
+  id: string,
+  changes: Partial<
+    Pick<
+      Equipment,
+      | "name"
+      | "description"
+      | "category"
+      | "maintenance_status"
+      | "students_allowed"
+      | "requires_approval"
+      | "max_hours"
+      | "min_lead_hours"
+    >
+  >,
+): Promise<Equipment> {
+  const response = await apiClient.patch<Equipment>(`/api/v1/equipment/${id}`, changes);
+  return response.data;
+}
+
+export async function deleteEquipment(id: string): Promise<void> {
+  await apiClient.delete(`/api/v1/equipment/${id}`);
+}
