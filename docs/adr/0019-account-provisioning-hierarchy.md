@@ -85,6 +85,35 @@ step also added the pages that were missing:
   appointed *to* a department — left a fresh install unable to create anyone
   without curl.
 
+## Administering the administrators
+
+Two later additions, driven by the same question — who is allowed to hand out
+power, and what stops one stolen session from doing it:
+
+- **`/admin/login`.** A separate entrance for administrators, landing on
+  `/admin` rather than a dashboard. It is a distinct door, not a stronger
+  lock: same credentials, same endpoint, same rate limit. The page says so,
+  so nobody mistakes the URL for a boundary.
+- **`/admin/accounts/new` — the override.** `POST /api/v1/admin/users` is the
+  one endpoint where a role may be named, admin-only, for what the hierarchy
+  cannot serve: a department with no coordinator yet, a correction, a second
+  administrator. It is audited as `user.created_by_admin`, so an override
+  never reads as an ordinary appointment.
+- **`/admin/administrators` — promotion takes two people.** An admin opens a
+  challenge; a six-digit code goes to the *target's* notification inbox, never
+  the requester's; the promotion completes only when the admin enters what the
+  target reads back. The code is stored as a SHA-256 hash, expires in ten
+  minutes, works once, and dies after five wrong guesses. An admin may also
+  **step down**, refused while they are the last active one — so a handover is
+  promote-then-stand-down, and the platform is never left without an
+  administrator.
+
+The code rides the existing notification system, so there is no email or SMS
+provider and no cost. That also means its security rests on the target's
+account, not on a second device: it proves *the target participated*, not that
+a phone was in someone's hand. That is the property worth having here — it is
+what stops one compromised admin session from quietly minting another admin.
+
 ## Consequences
 
 **Good**

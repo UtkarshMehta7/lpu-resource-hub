@@ -9,7 +9,8 @@ export type NotificationType =
   | "project_reviewed"
   | "profile_verified"
   | "relevant_opportunity"
-  | "deadline_reminder";
+  | "deadline_reminder"
+  | "admin_promotion_code";
 
 export interface AppNotification {
   id: string;
