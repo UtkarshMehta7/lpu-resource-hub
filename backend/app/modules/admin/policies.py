@@ -21,9 +21,20 @@ class LastActiveAdminError(Exception):
     """Raised when a change would leave the platform with zero active admins."""
 
 
+class SelfPasswordResetError(Exception):
+    """Raised when an admin tries to reset their own password this way."""
+
+
 def assert_not_self_role_change(actor: User, target: User) -> None:
     if actor.id == target.id:
         raise SelfRoleChangeError
+
+
+def assert_not_self_password_reset(actor: User, target: User) -> None:
+    """An admin resetting their own password here would lock themselves behind
+    the password-change gate for no reason: /auth/change-password is the way."""
+    if actor.id == target.id:
+        raise SelfPasswordResetError
 
 
 def assert_preserves_last_active_admin(

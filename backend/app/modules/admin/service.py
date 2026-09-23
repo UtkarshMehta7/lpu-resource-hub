@@ -13,8 +13,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.pagination import Page, PageParams
+from app.core.security import hash_password
+from app.modules.admin.accounts import generate_temporary_password
 from app.modules.admin.models import Department, School
 from app.modules.admin.policies import (
+    assert_not_self_password_reset,
     assert_not_self_role_change,
     assert_preserves_last_active_admin,
 )
@@ -38,6 +41,10 @@ class UserNotFoundError(Exception):
 
 class InvalidCoordinatorScopeError(Exception):
     """Raised when coordinator_scope_id doesn't name a real department for the scope type."""
+
+
+class InvalidDepartmentError(Exception):
+    """Raised when department_id doesn't name a real department."""
 
 
 class SchoolNotFoundError(Exception):
@@ -92,10 +99,23 @@ def get_user_or_raise(db: Session, user_id: uuid.UUID) -> User:
     return user
 
 
-def update_user(db: Session, target: User, data: AdminUserUpdate) -> User:
+def update_user(
+    db: Session, actor: User, target: User, data: AdminUserUpdate, *, ip: str | None
+) -> User:
     fields_set = data.model_fields_set
     if data.full_name is not None:
         target.full_name = data.full_name
+
+    # A department decides what its members may reach, so a change to one is
+    # audited like the other scope changes.
+    department_changed = (
+        "department_id" in fields_set and data.department_id != target.department_id
+    )
+    if department_changed:
+        if data.department_id is not None and db.get(Department, data.department_id) is None:
+            raise InvalidDepartmentError
+        before_department = target.department_id
+        target.department_id = data.department_id
 
     resulting_type = (
         data.coordinator_scope_type
@@ -120,9 +140,53 @@ def update_user(db: Session, target: User, data: AdminUserUpdate) -> User:
         target.coordinator_scope_type = data.coordinator_scope_type
     if "coordinator_scope_id" in fields_set:
         target.coordinator_scope_id = data.coordinator_scope_id
+
+    if department_changed:
+        db.flush()
+        audit_service.record(
+            db,
+            actor_id=actor.id,
+            action="user.department_changed",
+            entity_type="user",
+            entity_id=target.id,
+            before={"department_id": str(before_department) if before_department else None},
+            after={"department_id": str(target.department_id) if target.department_id else None},
+            ip=ip,
+        )
     db.commit()
     db.refresh(target)
     return target
+
+
+def reset_temporary_password(
+    db: Session, actor: User, target: User, *, ip: str | None
+) -> tuple[User, str]:
+    """Issue a fresh temporary password for someone who lost theirs.
+
+    The password is returned once and never stored in readable form. Every
+    existing session is revoked, and the account is walled off behind the
+    password-change gate again, exactly as a newly created one is.
+    """
+    assert_not_self_password_reset(actor, target)
+
+    temporary_password = generate_temporary_password()
+    target.password_hash = hash_password(temporary_password)
+    target.must_change_password = True
+    db.flush()
+    revoke_all_sessions(db, target.id)
+    audit_service.record(
+        db,
+        actor_id=actor.id,
+        action="user.password_reset",
+        entity_type="user",
+        entity_id=target.id,
+        before=None,
+        after={"must_change_password": True},
+        ip=ip,
+    )
+    db.commit()
+    db.refresh(target)
+    return target, temporary_password
 
 
 def change_role(

@@ -70,6 +70,12 @@ ENDPOINTS = (
         frozenset({UserRole.ADMIN}),
         needs_target=True,
     ),
+    Endpoint(
+        "POST",
+        "/api/v1/admin/users/{id}/temporary-password",
+        frozenset({UserRole.ADMIN}),
+        needs_target=True,
+    ),
     # Step 3: organisation
     Endpoint("GET", "/api/v1/admin/schools", frozenset({UserRole.ADMIN})),
     Endpoint(
