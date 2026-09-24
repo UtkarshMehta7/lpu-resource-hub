@@ -532,8 +532,9 @@ beside it carry the same six diagrams drawn for print.
 
 [docs/presentation-script.md](docs/presentation-script.md) — the spoken script
 for all 35 slides, cut-down running orders for a 20-minute and a 4-minute
-version, a live demonstration run sheet and the questions to expect with their
-answers. The slide notes and this file are generated from one source, so they
+version, a live demonstration run sheet, a three-minute walkthrough of the
+stack that follows one request end to end, and the questions to expect with
+their answers. The slide notes and this file are generated from one source, so they
 cannot drift apart.
 
 ## End-to-end tests
