@@ -268,7 +268,11 @@ test("a collaboration request shows up in the recipient's notifications", async 
     .first()
     .click();
   await student.getByRole("button", { name: "Request collaboration" }).click();
-  await student.getByLabel("Message").fill(`Could we collaborate on the ${RUN} field trials?`);
+  // exact: true, because the header's Messages link is labelled "Messages"
+  // and getByLabel substring-matches by default.
+  await student
+    .getByLabel("Message", { exact: true })
+    .fill(`Could we collaborate on the ${RUN} field trials?`);
   await student.getByRole("button", { name: "Send request", exact: true }).click();
 
   // These flows run against the shared dev database, so a request to this
