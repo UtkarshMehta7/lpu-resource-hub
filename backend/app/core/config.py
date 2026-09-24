@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     rec_semantic_weight: float = Field(default=0.0, ge=0.0, le=0.9)
     # Deadline-reminder scheduler (Step 12). Off in tests; on in a real run.
     enable_scheduler: bool = False
+    #: Apply outstanding migrations at startup, under an advisory lock.
+    #: Off locally and in tests, on for deployments (render.yaml): twice now,
+    #: code has reached production ahead of its migration and answered 500.
+    run_migrations_on_start: bool = False
     reminder_interval_minutes: int = Field(default=60, ge=5, le=1440)
 
     @field_validator("database_url", "test_database_url", mode="before")
