@@ -34,6 +34,7 @@ function conversation(overrides: Partial<Conversation> = {}): Conversation {
         role: "faculty",
       },
     ],
+    open: true,
     unread_count: 0,
     last_message_at: "2026-09-24T10:00:00Z",
     preview: "Welcome aboard",

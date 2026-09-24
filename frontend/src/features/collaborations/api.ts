@@ -1,7 +1,7 @@
 import type { Role } from "@/features/auth/types";
 import { apiClient } from "@/lib/api/client";
 
-export type CollaborationStatus = "pending" | "accepted" | "declined" | "cancelled";
+export type CollaborationStatus = "pending" | "accepted" | "declined" | "cancelled" | "ended";
 export type Box = "inbox" | "sent";
 
 export const COLLABORATION_STATUS_LABEL: Record<CollaborationStatus, string> = {
@@ -9,6 +9,7 @@ export const COLLABORATION_STATUS_LABEL: Record<CollaborationStatus, string> = {
   accepted: "Accepted",
   declined: "Declined",
   cancelled: "Cancelled",
+  ended: "Ended",
 };
 
 interface Party {
@@ -52,7 +53,7 @@ export async function fetchMyCollaborations(
 
 export async function respondToCollaboration(
   id: string,
-  action: "accept" | "decline" | "cancel",
+  action: "accept" | "decline" | "cancel" | "end",
 ): Promise<CollaborationRequest> {
   const response = await apiClient.post<CollaborationRequest>(
     `/api/v1/collaborations/${id}/${action}`,

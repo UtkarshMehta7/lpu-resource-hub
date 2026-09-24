@@ -1,7 +1,10 @@
 """Collaboration request workflow and who may contact whom.
 
 TRANSITIONS is the one place the workflow is defined: the recipient answers,
-the sender can take the request back, and only while it's PENDING.
+the sender can take the request back while it is still PENDING, and once it is
+ACCEPTED *either* of them may end it. Ending is the only transition both
+parties share -- a collaboration takes two to start and one to stop, because
+requiring agreement to stop would mean nobody could ever leave.
 """
 
 from __future__ import annotations
@@ -17,13 +20,14 @@ TRANSITIONS: dict[tuple[S, S], frozenset[Actor]] = {
     (S.PENDING, S.ACCEPTED): frozenset({"recipient"}),
     (S.PENDING, S.DECLINED): frozenset({"recipient"}),
     (S.PENDING, S.CANCELLED): frozenset({"sender"}),
+    (S.ACCEPTED, S.ENDED): frozenset({"sender", "recipient"}),
 }
 
 RESEARCHER_ROLES = frozenset({UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR})
 
 
 class InvalidTransitionError(Exception):
-    """The request isn't PENDING any more."""
+    """This request is not in a state that allows the change asked for."""
 
 
 class WrongPartyError(Exception):

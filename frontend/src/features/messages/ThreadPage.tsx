@@ -194,41 +194,50 @@ export function ThreadPage() {
         <div ref={bottomRef} />
       </div>
 
-      <form
-        className="sticky bottom-0 mt-4 flex items-end gap-2 border-t border-line bg-canvas pt-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit();
-        }}
-      >
-        <label htmlFor="message-body" className="sr-only">
-          Message
-        </label>
-        <textarea
-          id="message-body"
-          value={draft}
-          rows={1}
-          maxLength={4000}
-          placeholder="Write a message…"
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            // Enter sends, Shift+Enter starts a line: what people expect of a
-            // chat box, and the reason this is a textarea and not an input.
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              submit();
-            }
+      {conversation && !conversation.open ? (
+        // Said here rather than discovered by pressing Send: the server
+        // refuses with 409, and finding that out the hard way is worse.
+        <p className="mt-4 rounded-card border border-dashed border-line bg-surface px-4 py-3 text-center text-sm text-ink-muted">
+          This collaboration has ended, so the conversation is read-only. Everything said here
+          stays.
+        </p>
+      ) : (
+        <form
+          className="sticky bottom-0 mt-4 flex items-end gap-2 border-t border-line bg-canvas pt-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
           }}
-          className="max-h-40 min-h-10 flex-1 resize-y rounded-md border border-line bg-surface px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={!draft.trim() || send.isPending}
-          className="rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {send.isPending ? "Sending…" : "Send"}
-        </button>
-      </form>
+          <label htmlFor="message-body" className="sr-only">
+            Message
+          </label>
+          <textarea
+            id="message-body"
+            value={draft}
+            rows={1}
+            maxLength={4000}
+            placeholder="Write a message…"
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              // Enter sends, Shift+Enter starts a line: what people expect of a
+              // chat box, and the reason this is a textarea and not an input.
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                submit();
+              }
+            }}
+            className="max-h-40 min-h-10 flex-1 resize-y rounded-md border border-line bg-surface px-3 py-2 text-sm"
+          />
+          <button
+            type="submit"
+            disabled={!draft.trim() || send.isPending}
+            className="rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {send.isPending ? "Sending…" : "Send"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

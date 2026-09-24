@@ -46,6 +46,7 @@ const CONVERSATION: Conversation = {
       role: "faculty",
     },
   ],
+  open: true,
   unread_count: 0,
   last_message_at: "2026-09-24T10:00:00Z",
   preview: "Hello",
@@ -167,6 +168,15 @@ describe("ThreadPage", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
+  });
+
+  it("says a finished collaboration is read-only instead of offering a composer", async () => {
+    fetchConversation.mockResolvedValue({ ...CONVERSATION, open: false });
+    renderThread();
+
+    expect(await screen.findByText(/read-only/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Message")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
   });
 
   it("explains a thread it cannot load rather than showing an empty page", async () => {

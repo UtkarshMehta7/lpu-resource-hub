@@ -6,12 +6,13 @@ recipient answers, the sender cancels. Services never import FastAPI.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.events import EVENT_BUS, Event, EventName
@@ -50,6 +51,9 @@ def _load(db: Session, viewer: User, request_id: uuid.UUID) -> CollaborationRequ
     if request is None or viewer.id not in (request.sender_id, request.recipient_id):
         raise CollaborationNotFoundError
     return request
+
+
+logger = logging.getLogger(__name__)
 
 
 def _to_reads(
@@ -166,6 +170,27 @@ def list_requests(
     return _to_reads(db, viewer, rows)
 
 
+def _open_thread_if_possible(db: Session, request: CollaborationRequest) -> None:
+    """Give the accepted request a thread, but never at the cost of the answer.
+
+    Chat is additive. Accepting a collaboration is the older, more important
+    act, and it must not fail because the messages layer cannot -- which is
+    exactly what happened on the deployed instance, where the code shipped
+    before its migration and every acceptance answered 500. The savepoint
+    keeps the failure from poisoning the surrounding transaction, so the
+    acceptance still commits and the thread can be opened later.
+    """
+    try:
+        with db.begin_nested():
+            messages_service.open_for_collaboration(db, request)
+    except SQLAlchemyError:
+        logger.exception(
+            "Could not open a conversation for collaboration %s; the request is "
+            "still accepted. Has migration 0019 run on this database?",
+            request.id,
+        )
+
+
 def respond(
     db: Session, actor: User, request_id: uuid.UUID, target: CollaborationStatus
 ) -> CollaborationRead:
@@ -179,7 +204,7 @@ def respond(
         # can open a thread, so there is no channel to anyone who hasn't
         # agreed to one (ADR 0022).
         db.flush()
-        messages_service.open_for_collaboration(db, request)
+        _open_thread_if_possible(db, request)
     # Tell the other party what happened.
     other_party = request.sender_id if party == "recipient" else request.recipient_id
     EVENT_BUS.publish(

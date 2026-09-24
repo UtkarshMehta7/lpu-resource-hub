@@ -18,6 +18,10 @@ class CollaborationStatus(StrEnum):
     ACCEPTED = "accepted"
     DECLINED = "declined"
     CANCELLED = "cancelled"
+    #: The work finished, or the two decided to stop. Either party may end an
+    #: accepted collaboration; the thread stays readable but takes no new
+    #: messages.
+    ENDED = "ended"
 
 
 class CollaborationRequest(Base):

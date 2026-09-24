@@ -28,7 +28,7 @@ from app.modules.messages.schemas import (
     MessagePage,
     MessageRead,
 )
-from app.modules.messages.service import PAGE_SIZE
+from app.modules.messages.service import PAGE_SIZE, ThreadClosedError
 from app.modules.users.models import User
 
 router = APIRouter(tags=["messages"])
@@ -98,6 +98,11 @@ def post_message(
         return service.send_message(db, sender, conversation_id, data.body)
     except ThreadNotFoundError as exc:
         raise _NOT_FOUND from exc
+    except ThreadClosedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This collaboration has ended, so the conversation is read-only.",
+        ) from exc
 
 
 @router.post("/conversations/{conversation_id}/read", status_code=status.HTTP_204_NO_CONTENT)

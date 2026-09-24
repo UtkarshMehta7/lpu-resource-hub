@@ -76,6 +76,12 @@ Current shape: ~128 API operations, 40 tables, 19 migrations, 22 ADRs,
   first (`GET /users/{id}/deletion-impact`) and shown before it is confirmed.
   Deactivate for someone who has left; delete for an account that should
   never have existed (it frees the registration number).
+- **Chat must never break collaboration.** Opening a thread on acceptance
+  runs in a savepoint and swallows SQLAlchemyError: the acceptance is the
+  older, more important act. Shipping the code before its migration made
+  every acceptance answer 500 -- an additive feature took down an
+  existing one. A new dependency from old code to new code gets the same
+  treatment.
 - **Threads are scoped, and there is no endpoint that creates one.** A
   conversation belongs to an accepted collaboration request or a project
   team; it appears when that happens. Never add a create-conversation

@@ -42,7 +42,7 @@ export function CollaborationsPage() {
   });
 
   const respond = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: "accept" | "decline" | "cancel" }) =>
+    mutationFn: ({ id, action }: { id: string; action: "accept" | "decline" | "cancel" | "end" }) =>
       respondToCollaboration(id, action),
     onSuccess: async () => {
       setError(null);
@@ -136,7 +136,7 @@ function RequestItem({
   request: CollaborationRequest;
   box: Box;
   busy: boolean;
-  onAction: (action: "accept" | "decline" | "cancel") => void;
+  onAction: (action: "accept" | "decline" | "cancel" | "end") => void;
 }) {
   const other = box === "inbox" ? request.sender : request.recipient;
   const profileLink = other.role === "student" ? null : `/researchers/${other.id}`;
@@ -173,6 +173,31 @@ function RequestItem({
       </div>
       <p className="mt-2 whitespace-pre-line text-sm">{request.message}</p>
       <p className="mt-1 text-xs text-ink-muted">{new Date(request.created_at).toLocaleString()}</p>
+      {request.status === "accepted" ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Link
+            to="/messages"
+            className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium hover:bg-canvas"
+          >
+            Open conversation
+          </Link>
+          {/* Either party may end it: needing both to agree would mean
+              nobody could ever leave. */}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onAction("end")}
+            className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+          >
+            End collaboration
+          </button>
+        </div>
+      ) : null}
+      {request.status === "ended" ? (
+        <p className="mt-3 text-xs text-ink-muted">
+          This collaboration has ended. The conversation stays readable.
+        </p>
+      ) : null}
       {request.status === "pending" ? (
         <div className="mt-3 flex gap-2">
           {box === "inbox" ? (
