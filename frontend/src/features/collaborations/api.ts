@@ -60,3 +60,21 @@ export async function respondToCollaboration(
   );
   return response.data;
 }
+
+/** Where two people stand, for the control that offers to change it. */
+export type CollaborationState = "none" | "requested" | "active" | "ended";
+
+export interface CollaborationSummary {
+  state: CollaborationState;
+  request_id: string | null;
+  /** True when the viewer is waiting for an answer, false when they owe one. */
+  i_sent_it: boolean | null;
+  conversation_id: string | null;
+}
+
+export async function fetchCollaborationState(userId: string): Promise<CollaborationSummary> {
+  const response = await apiClient.get<CollaborationSummary>(
+    `/api/v1/collaborations/with/${userId}`,
+  );
+  return response.data;
+}

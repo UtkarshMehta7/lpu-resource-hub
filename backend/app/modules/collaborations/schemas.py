@@ -9,7 +9,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-from app.modules.collaborations.models import CollaborationStatus
+from app.modules.collaborations.models import CollaborationState, CollaborationStatus
 from app.modules.users.models import UserRole
 
 
@@ -41,3 +41,20 @@ class CollaborationRead(BaseModel):
 class Box(StrEnum):
     INBOX = "inbox"
     SENT = "sent"
+
+
+class CollaborationSummary(BaseModel):
+    """Where two people stand, for the control that offers to change it.
+
+    The interface asks this once and renders the right thing, instead of
+    offering to start a collaboration that is already running (ADR 0023).
+    """
+
+    state: CollaborationState
+    #: The request awaiting an answer, when the state is REQUESTED.
+    request_id: uuid.UUID | None = None
+    #: Whether the viewer is the one waiting for an answer, or the one who
+    #: owes it. None when nothing is pending.
+    i_sent_it: bool | None = None
+    #: Where to talk, once there is somewhere.
+    conversation_id: uuid.UUID | None = None

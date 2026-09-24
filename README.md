@@ -53,6 +53,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Provisioning hierarchy with no self-registration, separate administration sign-in, two-person admin promotion ([ADR 0019](docs/adr/0019-account-provisioning-hierarchy.md)) | Done |
 | Registration number shown wherever a person is named and searchable by it; a coordinator's scope follows their department, with the scope visible on the users page ([ADR 0020](docs/adr/0020-identity-on-screen-and-derived-coordinator-scope.md)) | Done |
 | Account deletion down the hierarchy — admin anyone, coordinator their department's faculty and students, faculty their students — with the cascade counted and shown before it happens ([ADR 0021](docs/adr/0021-account-deletion.md)) | Done |
+| Collaboration is one relationship per pair of people, so it cannot be started twice or split a conversation in two; either party may end it ([ADR 0023](docs/adr/0023-collaboration-belongs-to-a-pair.md)) | Done |
 | Conversation threads scoped to an accepted collaboration request or a project team: polled not socketed, one notification per thread, moderation hides rather than deletes ([ADR 0022](docs/adr/0022-scoped-conversation-threads.md)) | Done |
 
 ## Technology stack
