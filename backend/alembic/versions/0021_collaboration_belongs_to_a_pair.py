@@ -10,7 +10,11 @@ The data work is the risky half, and it is deliberately conservative:
 
 * every existing request is mapped to a pair, ordered so {a,b} and {b,a} are
   one row, and the pair's state is taken from the strongest request it has --
-  accepted beats ended beats pending beats nothing;
+  accepted beats ended beats pending beats nothing. The comparison casts the
+  status to text on purpose: 'ended' is added to the enum by migration 0020,
+  and PostgreSQL refuses to *use* a new enum value until the transaction that
+  added it has committed. Comparing as text needs no such thing, so this
+  migration is correct whatever transaction boundaries it is run under;
 * where a pair ended up with more than one conversation, the oldest is kept
   and every message is repointed to it. **No message is deleted.**
 * merging read marks takes the EARLIEST of the two, and NULL (never opened)
@@ -95,9 +99,9 @@ def upgrade() -> None:
             SELECT least(sender_id, recipient_id),
                    greatest(sender_id, recipient_id),
                    (CASE
-                      WHEN bool_or(status = 'accepted') THEN 'active'
-                      WHEN bool_or(status = 'ended')    THEN 'ended'
-                      WHEN bool_or(status = 'pending')  THEN 'requested'
+                      WHEN bool_or(status::text = 'accepted') THEN 'active'
+                      WHEN bool_or(status::text = 'ended')    THEN 'ended'
+                      WHEN bool_or(status::text = 'pending')  THEN 'requested'
                       ELSE 'none'
                     END)::collaboration_state
               FROM collaboration_requests
