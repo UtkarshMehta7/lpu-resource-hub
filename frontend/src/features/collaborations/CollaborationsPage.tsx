@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { toApiError } from "@/lib/api/errors";
 import { Uid } from "@/components/ui/Uid";
+import { SkeletonList } from "@/components/ui/Skeleton";
 
 import {
   COLLABORATION_STATUS_LABEL,
@@ -95,7 +96,11 @@ export function CollaborationsPage() {
           {error}
         </p>
       ) : null}
-      {isPending ? <p className="mt-6 text-sm text-ink-muted">Loading…</p> : null}
+      {isPending ? (
+        <div className="mt-6">
+          <SkeletonList rows={3} />
+        </div>
+      ) : null}
       {isError ? (
         <p role="alert" className="mt-6 text-sm text-red-700">
           Could not load requests.

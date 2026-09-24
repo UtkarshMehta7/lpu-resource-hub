@@ -6,6 +6,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
 
 import { TagPicker, type TagOption } from "@/components/ui/TagPicker";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { useAuth } from "@/features/auth/authContext";
 import { fetchProjects } from "@/features/projects/api";
 import { searchSkills } from "@/features/taxonomy/api";
@@ -53,7 +54,7 @@ export function OpportunityFormPage() {
     enabled: Boolean(opportunityId),
   });
 
-  if (opportunityId && isPending) return <p className="text-sm text-ink-muted">Loading…</p>;
+  if (opportunityId && isPending) return <SkeletonList rows={3} />;
   return <OpportunityForm key={existing?.id ?? "new"} existing={existing ?? null} />;
 }
 

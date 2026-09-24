@@ -19,6 +19,7 @@ import {
 import { PUB_TYPE_LABEL, type PublicationType } from "./labels";
 import { AuthorListEditor } from "./AuthorListEditor";
 import { newAuthorRow, toAuthorInputs, type AuthorRow } from "./authors";
+import { SkeletonList } from "@/components/ui/Skeleton";
 
 const schema = z.object({
   title: z.string().trim().min(1, "Title is required").max(500, "Title is too long"),
@@ -51,7 +52,7 @@ export function PublicationFormPage() {
     enabled: Boolean(publicationId),
   });
 
-  if (publicationId && isPending) return <p className="text-sm text-ink-muted">Loading…</p>;
+  if (publicationId && isPending) return <SkeletonList rows={3} />;
   return <PublicationForm key={existing?.id ?? "new"} existing={existing ?? null} />;
 }
 

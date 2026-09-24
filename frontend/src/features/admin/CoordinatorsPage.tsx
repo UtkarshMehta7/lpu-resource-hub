@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { fetchDepartments } from "@/features/directory/api-org";
 
 import { fetchUsers } from "./api";
@@ -44,7 +45,11 @@ export function CoordinatorsPage() {
         </Link>
       </div>
 
-      {isPending ? <p className="mt-6 text-sm text-ink-muted">Loading…</p> : null}
+      {isPending ? (
+        <div className="mt-6">
+          <SkeletonList rows={3} />
+        </div>
+      ) : null}
       {isError ? (
         <p role="alert" className="mt-6 text-sm text-red-700">
           Could not load coordinators.

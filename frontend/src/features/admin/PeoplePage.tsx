@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Uid } from "@/components/ui/Uid";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { useAuth } from "@/features/auth/authContext";
 import type { Role } from "@/features/auth/types";
 import { fetchDepartments } from "@/features/directory/api-org";
@@ -99,7 +100,11 @@ export function PeoplePage() {
         </p>
       ) : null}
 
-      {isPending ? <p className="mt-6 text-sm text-ink-muted">Loading…</p> : null}
+      {isPending ? (
+        <div className="mt-6">
+          <SkeletonList rows={3} />
+        </div>
+      ) : null}
       {isError ? (
         <p role="alert" className="mt-6 text-sm text-red-700">
           Could not load the list.
