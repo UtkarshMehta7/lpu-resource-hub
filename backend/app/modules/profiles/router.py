@@ -17,10 +17,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
 from app.db.session import get_db
+from app.modules.admin.models import Department
 from app.modules.profiles.models import ResearcherProfile, StudentProfile
 from app.modules.profiles.saved import (
     AlreadySavedError,
@@ -32,6 +34,7 @@ from app.modules.profiles.saved import (
 )
 from app.modules.profiles.saved_schemas import SavedCreate, SavedEntry, SavedType
 from app.modules.profiles.schemas import (
+    DepartmentCoordinatorRead,
     ResearchAreaEntry,
     ResearcherProfileRead,
     ResearcherProfileUpdate,
@@ -212,3 +215,51 @@ def delete_saved(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Saved item not found."
         ) from exc
+
+
+@router.get("/department", response_model=DepartmentCoordinatorRead | None)
+def read_my_department_coordinator(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> DepartmentCoordinatorRead | None:
+    """The viewer's department and whoever oversees it.
+
+    Returns null when the viewer has no department. Returns the department
+    with an empty coordinator when nobody oversees it yet: "there is no
+    coordinator" is useful information, and silence is not.
+    """
+    if current_user.department_id is None:
+        return None
+
+    department = db.get(Department, current_user.department_id)
+    if department is None:
+        return None
+
+    coordinator = (
+        db.execute(
+            select(User)
+            .where(
+                User.role == UserRole.RESEARCH_COORDINATOR,
+                User.coordinator_scope_id == department.id,
+                User.is_active.is_(True),
+            )
+            .order_by(User.full_name)
+        )
+        .scalars()
+        .first()
+    )
+    if coordinator is None:
+        return DepartmentCoordinatorRead(
+            department_id=department.id, department_name=department.name
+        )
+
+    profile = db.get(ResearcherProfile, coordinator.id)
+    return DepartmentCoordinatorRead(
+        department_id=department.id,
+        department_name=department.name,
+        user_id=coordinator.id,
+        full_name=coordinator.full_name,
+        registration_number=coordinator.registration_number,
+        designation=profile.designation if profile is not None else None,
+        email=coordinator.email,
+    )

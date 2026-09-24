@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Uid } from "@/components/ui/Uid";
@@ -86,7 +87,15 @@ export function VerificationQueuePage() {
               {data.map((item) => (
                 <tr key={item.user_id}>
                   <td className="px-4 py-3">
-                    {item.full_name}
+                    {/* Deciding on somebody without being able to read their
+                        profile first is guesswork. The detail page shows an
+                        unverified researcher, which is exactly who is here. */}
+                    <Link
+                      to={`/researchers/${item.user_id}`}
+                      className="font-medium text-brand-700 hover:underline"
+                    >
+                      {item.full_name}
+                    </Link>
                     <Uid value={item.registration_number} className="ml-2" />
                   </td>
                   <td className="px-4 py-3 text-ink-muted">{item.email}</td>

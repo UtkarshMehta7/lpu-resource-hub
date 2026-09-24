@@ -89,3 +89,22 @@ class SkillEntry(BaseModel):
 class ResearchAreaEntry(BaseModel):
     research_area_id: uuid.UUID
     is_expertise: bool = False
+
+
+class DepartmentCoordinatorRead(BaseModel):
+    """Who oversees the viewer's department, and where to read about them.
+
+    A faculty member needs to know who verifies their profile, reviews their
+    projects and approves their bookings. Before this, the only way to find
+    out was to ask someone.
+    """
+
+    department_id: uuid.UUID
+    department_name: str
+    #: None when the department has no coordinator yet -- which is worth
+    #: saying out loud, because it explains why nothing is being verified.
+    user_id: uuid.UUID | None = None
+    full_name: str | None = None
+    registration_number: str | None = None
+    designation: str | None = None
+    email: str | None = None

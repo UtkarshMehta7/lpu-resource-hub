@@ -38,3 +38,20 @@ export async function saveResearchAreas(
   const response = await apiClient.put<ResearchAreaEntry[]>("/api/v1/me/research-areas", entries);
   return response.data;
 }
+
+/** Who oversees the viewer's department. Null when they have no department. */
+export interface DepartmentCoordinator {
+  department_id: string;
+  department_name: string;
+  /** Null when the department has no coordinator yet. */
+  user_id: string | null;
+  full_name: string | null;
+  registration_number: string | null;
+  designation: string | null;
+  email: string | null;
+}
+
+export async function fetchMyDepartment(): Promise<DepartmentCoordinator | null> {
+  const response = await apiClient.get<DepartmentCoordinator | null>("/api/v1/me/department");
+  return response.data;
+}
