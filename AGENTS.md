@@ -39,7 +39,7 @@ Tooling: ruff, mypy --strict, pytest | eslint, prettier, tsc
 ## Where this actually is (read before planning anything)
 All 16 roadmap steps are done (v1.0.0), plus the corrections after them:
 department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
-admin console, and the deployment configuration. CI is green on main.
+admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: ~128 API operations, 40 tables, 19 migrations, 22 ADRs,
@@ -103,7 +103,17 @@ Current shape: ~128 API operations, 40 tables, 19 migrations, 22 ADRs,
 - **The frontend TS types are hand-written mirrors of the Pydantic schemas**
   and have drifted twice. When adding a backend field, update
   `frontend/src/features/*/types.ts` in the same change.
-- E2E runs against the *development* database, so its state matters.
+- E2E runs against the *development* database, so its state matters. A
+  local run needs `scripts/seed_demo_data.py` first, or every flow fails
+  at sign-in for want of DEMOADMIN -- CI seeds it, a dev box may not.
+- **The E2E sign-in helper has to use the right entrance.** Administrators
+  are refused at /login (ADR 0020), so `sessionFor` sends DEMOADMIN to
+  /admin/login. This is what turned CI red for six commits, unnoticed
+  because the other five jobs stayed green. Anchor the URL assertion
+  (`/\/admin$/`): an unanchored `/\/admin/` also matches /admin/login, so
+  a failed sign-in passes and the test dies later, somewhere confusing.
+- **Check `gh run list` after pushing.** Backend and frontend passing is
+  not the suite passing.
 
 ## Deployment (configured, never yet performed)
 Free path: Neon (Postgres + pgvector) -> Render (API from source, reads

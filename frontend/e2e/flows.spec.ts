@@ -30,12 +30,22 @@ async function sessionFor(browser: Browser, registrationNumber: string): Promise
   const existing = sessions.get(registrationNumber);
   if (existing) return existing;
 
+  // The two entrances are separate and the server enforces it (ADR 0020):
+  // an administrator is refused at /login, everyone else at /admin/login.
+  // Signing every role in at /login is what broke this suite when the
+  // portals landed.
+  const isAdmin = registrationNumber === ADMIN;
   const page = await (await browser.newContext()).newPage();
-  await page.goto("/login");
+  await page.goto(isAdmin ? "/admin/login" : "/login");
   await page.getByLabel("Registration number").fill(registrationNumber);
   await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page).toHaveURL(/\/(dashboard|account|onboarding)/);
+  await page
+    .getByRole("button", { name: isAdmin ? "Sign in to administration" : "Log in" })
+    .click();
+  // Anchored: /\/admin/ alone also matches /admin/login, so a *failed*
+  // sign-in would satisfy it and the test would fail later, somewhere
+  // confusing.
+  await expect(page).toHaveURL(isAdmin ? /\/admin$/ : /\/(dashboard|account|onboarding)/);
   sessions.set(registrationNumber, page);
   return page;
 }
