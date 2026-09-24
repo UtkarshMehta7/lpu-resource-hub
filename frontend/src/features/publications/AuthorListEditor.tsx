@@ -3,6 +3,7 @@ import { useState } from "react";
 import { fetchResearchers, type ResearcherCard } from "@/features/directory/api";
 
 import { newAuthorRow, type AuthorRow } from "./authors";
+import { CloseIcon } from "@/components/ui/icons";
 
 const FIELD = "w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm";
 
@@ -99,7 +100,7 @@ export function AuthorListEditor({
                 onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
                 className="px-1 text-sm text-red-700"
               >
-                ✕
+                <CloseIcon className="size-3.5" />
               </button>
             </div>
           </li>

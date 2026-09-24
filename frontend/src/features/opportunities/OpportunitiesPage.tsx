@@ -5,6 +5,7 @@ import { useAuth } from "@/features/auth/authContext";
 import { fetchDepartments } from "@/features/directory/api-org";
 import { searchSkills } from "@/features/taxonomy/api";
 import { Uid } from "@/components/ui/Uid";
+import { SkeletonList } from "@/components/ui/Skeleton";
 
 import { fetchOpportunities } from "./api";
 import {
@@ -201,7 +202,11 @@ export function OpportunitiesPage({ mine = false }: { mine?: boolean }) {
         </div>
       </div>
 
-      {isPending ? <p className="mt-6 text-sm text-ink-muted">Loading opportunities…</p> : null}
+      {isPending ? (
+        <div className="mt-6">
+          <SkeletonList rows={3} />
+        </div>
+      ) : null}
       {isError ? (
         <p role="alert" className="mt-6 text-sm text-red-700">
           Could not load opportunities.

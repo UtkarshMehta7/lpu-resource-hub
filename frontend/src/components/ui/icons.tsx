@@ -61,3 +61,32 @@ export function MenuIcon({ className }: { className?: string }) {
     </Svg>
   );
 }
+
+export function StarIcon({ className, filled = false }: { className?: string; filled?: boolean }) {
+  // The only icon that carries state, so it takes a fill rather than a second
+  // glyph: ★ and ☆ are different characters at different widths, and the row
+  // shifted as you saved.
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+      className={className ?? "size-4"}
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.7l5.8-.8Z" />
+    </svg>
+  );
+}
+
+export function CloseIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </Svg>
+  );
+}

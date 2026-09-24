@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { StatusIndicator } from "@/components/ui/StatusIndicator";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { RequestCollaborationButton } from "@/features/collaborations/RequestCollaborationButton";
 import { ReportButton } from "@/features/reports/ReportButton";
 import { SaveButton } from "@/features/saved/SaveButton";
@@ -29,7 +30,7 @@ export function ResearcherDetailPage() {
     enabled: Boolean(userId),
   });
 
-  if (isPending) return <p className="text-sm text-ink-muted">Loading profile…</p>;
+  if (isPending) return <SkeletonList rows={3} />;
 
   if (isError || !data) {
     return (

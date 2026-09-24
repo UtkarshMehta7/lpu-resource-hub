@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { useAuth } from "@/features/auth/authContext";
 import type { Role } from "@/features/auth/types";
 import { fetchDepartments } from "@/features/directory/api-org";
@@ -165,7 +166,7 @@ export function AdminUsersPage() {
   };
 
   if (isPending) {
-    return <p className="text-sm text-ink-muted">Loading users…</p>;
+    return <SkeletonList rows={3} />;
   }
 
   if (isError) {
