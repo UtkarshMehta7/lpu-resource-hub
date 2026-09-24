@@ -148,8 +148,15 @@ so the refresh cookie stays first-party).
 - `netlify.toml` MUST be at the repo root; Netlify never finds it elsewhere.
 - Render's Docker runtime looks for `./Dockerfile` at the configured root
   directory -- set that to `backend`, or use the Blueprint for a source build.
-- Migrations are a release step: `backend/scripts/release.sh`, run from a
-  workstation. Never on container start.
+- **The deployed instance migrates itself at boot**, under a Postgres
+  advisory lock, and refuses to start if that fails (ADR 0024,
+  `RUN_MIGRATIONS_ON_START`, set in render.yaml). This replaced the old
+  "never on container start" rule, which failed twice: code reached
+  production ahead of its migration and answered 500 until somebody with the
+  connection string was free.
+- Still run **destructive or data-rewriting** migrations deliberately with
+  `backend/scripts/release.sh` before merging the code that needs them.
+  Unattended is fine for adding a table; it is not fine for merging rows.
 - Do not install the `ml` extra in production; it exceeds a free instance.
 - **Deployed 24 Sep 2026.** API live on Render (Docker service, root
   directory `backend`) against Neon; health, readiness, login and the

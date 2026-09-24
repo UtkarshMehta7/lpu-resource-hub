@@ -26,6 +26,7 @@ from app.core.rate_limit import (
     create_search_rate_limiter,
 )
 from app.core.security_headers import SecurityHeadersMiddleware
+from app.db.migrations import upgrade_to_head
 from app.db.session import check_database_connection, create_db_engine, create_session_factory
 from app.jobs.scheduler import start_scheduler
 from app.ml import embeddings
@@ -87,6 +88,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
     else:
         logger.info("Database connection OK (%s)", settings.database_summary())
+
+    if settings.run_migrations_on_start:
+        try:
+            upgrade_to_head(engine, settings)
+        except Exception:
+            # Serving with a schema the code does not match is worse than not
+            # serving: every request against the missing table answers 500,
+            # which is exactly the failure this setting exists to prevent.
+            logger.critical("Database migration FAILED; refusing to start.")
+            engine.dispose()
+            raise
 
     # Handlers turn domain events into notifications (Step 12). Registered
     # here, once per app, rather than at import time.

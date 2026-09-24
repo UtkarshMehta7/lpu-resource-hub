@@ -27,6 +27,11 @@ services:
         value: "3.12.7"
       - key: APP_ENV
         value: production
+      # The instance brings its own schema up to date at boot, under an
+      # advisory lock. Without this, a deploy that needs a migration serves
+      # 500s until somebody runs alembic by hand (ADR 0024).
+      - key: RUN_MIGRATIONS_ON_START
+        value: "true"
       # Settings validation refuses to start in production without these, so
       # a misconfiguration fails at deploy rather than at the first request.
       - key: DATABASE_URL
