@@ -525,6 +525,16 @@ scan.
 
 [docs/diagrams.md](docs/diagrams.md) — a system diagram and an entity
 relationship diagram, both Mermaid so they render on GitHub.
+[docs/project-documentation.html](docs/project-documentation.html) and the PDF
+beside it carry the same six diagrams drawn for print.
+
+## Presenting the project
+
+[docs/presentation-script.md](docs/presentation-script.md) — the spoken script
+for all 35 slides, cut-down running orders for a 20-minute and a 4-minute
+version, a live demonstration run sheet and the questions to expect with their
+answers. The slide notes and this file are generated from one source, so they
+cannot drift apart.
 
 ## End-to-end tests
 
