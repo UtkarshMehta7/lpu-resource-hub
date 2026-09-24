@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>LPU Research Intelligence &amp; Collaboration Hub — Project Documentation</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  :root {
+    --orange: #b74a09; --orange-mid: #f47216; --orange-light: #fff5ed;
+    --ink: #1c2430; --muted: #5b6573; --line: #d9dde3; --teal: #1f5b65;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font: 10.5pt/1.55 "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink); margin: 0;
+  }
+  h1, h2, h3, h4 { color: var(--ink); line-height: 1.25; margin: 0 0 .4em; }
+  h1 { font-size: 26pt; letter-spacing: -.02em; }
+  h2 {
+    font-size: 15pt; margin-top: 1.6em; padding-bottom: .25em;
+    border-bottom: 2px solid var(--orange); page-break-after: avoid;
+  }
+  h3 { font-size: 11.5pt; margin-top: 1.2em; color: var(--orange); page-break-after: avoid; }
+  h4 { font-size: 10.5pt; margin-top: 1em; }
+  p, li { margin: 0 0 .5em; }
+  ul, ol { margin: 0 0 .7em; padding-left: 1.2em; }
+  code { font: 9pt ui-monospace, "SF Mono", Menlo, monospace; background: #f3f4f6; padding: 1px 4px; border-radius: 3px; }
+  table { width: 100%; border-collapse: collapse; margin: .6em 0 1em; font-size: 9.5pt; page-break-inside: avoid; }
+  th, td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
+  th { background: var(--orange-light); font-weight: 600; }
+  .cover { page-break-after: always; padding-top: 22mm; }
+  .cover h1 { font-size: 30pt; margin-bottom: .1em; }
+  .cover .sub { font-size: 13pt; color: var(--orange); font-weight: 600; margin-bottom: 1.6em; }
+  .badge {
+    display: inline-block; border: 1px solid var(--orange); color: var(--orange);
+    border-radius: 999px; padding: 2px 10px; font-size: 8.5pt; font-weight: 600;
+    letter-spacing: .06em; text-transform: uppercase;
+  }
+  .disclaimer {
+    border-left: 3px solid var(--orange); background: var(--orange-light);
+    padding: 10px 14px; margin: 1.2em 0; font-size: 9.5pt;
+  }
+  .note { border-left: 3px solid var(--teal); background: #f1f7f8; padding: 8px 12px; margin: .8em 0; font-size: 9.5pt; }
+  .metrics { display: flex; flex-wrap: wrap; gap: 8px; margin: 1em 0; }
+  .metric {
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; min-width: 88px;
+  }
+  .metric b { display: block; font-size: 17pt; color: var(--orange); line-height: 1.1; }
+  .metric span { font-size: 8pt; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  figure { margin: 1em 0; page-break-inside: avoid; }
+  figcaption { font-size: 8.5pt; color: var(--muted); margin-top: .3em; }
+  .page-break { page-break-before: always; }
+  .toc a { color: var(--ink); text-decoration: none; }
+  .toc li { margin-bottom: .25em; }
+  svg { max-width: 100%; height: auto; }
+  .small { font-size: 9pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ============================================ COVER -->
+<section class="cover">
+  <span class="badge">Prototype · Not an official LPU system</span>
+  <h1>Research Intelligence &amp;<br />Collaboration Hub</h1>
+  <p class="sub">Lovely Professional University (LPU) — Project Documentation</p>
+
+  <div class="metrics">
+    <div class="metric"><b>135</b><span>API operations</span></div>
+    <div class="metric"><b>39</b><span>Tables</span></div>
+    <div class="metric"><b>21</b><span>Migrations</span></div>
+    <div class="metric"><b>24</b><span>ADRs</span></div>
+    <div class="metric"><b>639</b><span>Tests</span></div>
+    <div class="metric"><b>23</b><span>Modules</span></div>
+  </div>
+
+  <div class="disclaimer">
+    <strong>Disclaimer.</strong> This is a proposed prototype research platform and is
+    <strong>not an official LPU system</strong> unless formally adopted or authorized. It is not
+    connected to any real LPU system or data. Every person, project, publication, facility and
+    funding record it displays is <strong>fictional demo data</strong>.
+  </div>
+
+  <table>
+    <tr><th style="width:32%">Repository</th><td>github.com/UtkarshMehta7/lpu-resource-hub</td></tr>
+    <tr><th>Live application</th><td>lpu-research-hub.netlify.app</td></tr>
+    <tr><th>API</th><td>lpu-resource-hub.onrender.com</td></tr>
+    <tr><th>Database</th><td>Neon (PostgreSQL 18, serverless)</td></tr>
+    <tr><th>Licence</th><td>MIT</td></tr>
+    <tr><th>Cost to run</th><td>₹0 — free tiers and locally-run open-source ML only</td></tr>
+  </table>
+
+  <h3>Contents</h3>
+  <ol class="toc">
+    <li>Problem, goal and scope</li>
+    <li>System architecture</li>
+    <li>Technology stack</li>
+    <li>Data model and entity relationships</li>
+    <li>Roles, permissions and account provisioning</li>
+    <li>Feature catalogue — what the platform does</li>
+    <li>Workflows and state machines</li>
+    <li>Security model</li>
+    <li>AI and recommendation engine</li>
+    <li>Testing strategy and quality gates</li>
+    <li>Deployment architecture</li>
+    <li>Design decisions (ADR index)</li>
+    <li>Known limitations and future work</li>
+  </ol>
+</section>
+
+<!-- ============================================ 1 -->
+<h2>1. Problem, goal and scope</h2>
+
+<h3>1.1 The problem</h3>
+<p>
+  Inside a large university, research capability is invisible across departmental boundaries.
+  Faculty expertise, ongoing projects and available laboratory equipment are known locally and
+  almost nowhere else. Three costs follow directly:
+</p>
+<ul>
+  <li><strong>Collaborators never meet.</strong> Two researchers working on adjacent problems in
+    different schools have no mechanism to discover one another.</li>
+  <li><strong>Students cannot find research.</strong> Opportunities circulate by word of mouth, so
+    access depends on who a student already knows.</li>
+  <li><strong>Resources idle and deadlines pass.</strong> Equipment goes under-used because nobody
+    outside the owning department knows it exists; funding calls are missed for want of a reminder.</li>
+</ul>
+
+<h3>1.2 The goal</h3>
+<p>
+  One platform where research capability is discoverable, collaboration is initiated and continued
+  in the open, shared facilities are bookable, and funding deadlines announce themselves — with
+  every action governed by university hierarchy rather than by a free-for-all.
+</p>
+
+<h3>1.3 Scope and constraints</h3>
+<table>
+  <tr><th style="width:30%">Constraint</th><th>Consequence for the design</th></tr>
+  <tr><td>Zero cost</td><td>No paid APIs, no mandatory cloud services. Machine learning runs locally (scikit-learn, sentence-transformers). Docker is optional.</td></tr>
+  <tr><td>PostgreSQL only</td><td>Full-text search, trigram fuzzy matching, exclusion constraints and vector similarity are all done in the database; no Elasticsearch, no vector service.</td></tr>
+  <tr><td>No message broker</td><td>In-memory rate limiting, an in-process scheduler and synchronous domain events — each behind an interface so it can be replaced.</td></tr>
+  <tr><td>Fictional data only</td><td>The platform is a prototype. It must never present fabricated records as real university data, and says so on every page.</td></tr>
+</table>
+
+<!-- ============================================ 2 -->
+<h2>2. System architecture</h2>
+
+<figure>
+<svg viewBox="0 0 760 430" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial" font-size="11">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6573"/>
+    </marker>
+  </defs>
+  <!-- browser -->
+  <rect x="20" y="20" width="200" height="90" rx="8" fill="#fff5ed" stroke="#b74a09"/>
+  <text x="120" y="42" text-anchor="middle" font-weight="bold" fill="#b74a09">Browser (SPA)</text>
+  <text x="120" y="60" text-anchor="middle" font-size="9.5">React 19 · TypeScript strict</text>
+  <text x="120" y="75" text-anchor="middle" font-size="9.5">Vite · Tailwind 4</text>
+  <text x="120" y="90" text-anchor="middle" font-size="9.5">TanStack Query · RHF + Zod</text>
+  <text x="120" y="104" text-anchor="middle" font-size="9.5">Served by Netlify (CDN)</text>
+
+  <path d="M220 65 H300" stroke="#5b6573" marker-end="url(#a)"/>
+  <text x="260" y="58" text-anchor="middle" font-size="8.5" fill="#5b6573">HTTPS / JSON</text>
+  <text x="260" y="80" text-anchor="middle" font-size="8" fill="#5b6573">/api proxied → same-origin cookie</text>
+
+  <!-- api -->
+  <rect x="300" y="20" width="250" height="250" rx="8" fill="#fff" stroke="#b74a09"/>
+  <text x="425" y="42" text-anchor="middle" font-weight="bold" fill="#b74a09">FastAPI modular monolith</text>
+  <text x="425" y="58" text-anchor="middle" font-size="9" fill="#5b6573">(Render · Docker · 1 instance)</text>
+  <rect x="316" y="70" width="218" height="26" rx="4" fill="#f6f7f9" stroke="#d9dde3"/>
+  <text x="425" y="87" text-anchor="middle" font-size="9.5">Routers — HTTP only</text>
+  <rect x="316" y="102" width="218" height="26" rx="4" fill="#f6f7f9" stroke="#d9dde3"/>
+  <text x="425" y="119" text-anchor="middle" font-size="9.5">Dependencies — auth, permissions</text>
+  <rect x="316" y="134" width="218" height="26" rx="4" fill="#f6f7f9" stroke="#d9dde3"/>
+  <text x="425" y="151" text-anchor="middle" font-size="9.5">Services — business rules</text>
+  <rect x="316" y="166" width="218" height="26" rx="4" fill="#f6f7f9" stroke="#d9dde3"/>
+  <text x="425" y="183" text-anchor="middle" font-size="9.5">Policies — ownership &amp; scope</text>
+  <rect x="316" y="198" width="218" height="26" rx="4" fill="#f6f7f9" stroke="#d9dde3"/>
+  <text x="425" y="215" text-anchor="middle" font-size="9.5">SQLAlchemy 2.0 (sync) · psycopg 3</text>
+  <rect x="316" y="230" width="218" height="26" rx="4" fill="#fff5ed" stroke="#f47216"/>
+  <text x="425" y="247" text-anchor="middle" font-size="9.5">Events → notifications · audit</text>
+
+  <path d="M550 145 H620" stroke="#5b6573" marker-end="url(#a)"/>
+  <!-- db -->
+  <rect x="620" y="95" width="125" height="105" rx="8" fill="#f1f7f8" stroke="#1f5b65"/>
+  <text x="682" y="118" text-anchor="middle" font-weight="bold" fill="#1f5b65">PostgreSQL 18</text>
+  <text x="682" y="136" text-anchor="middle" font-size="9">Neon serverless</text>
+  <text x="682" y="152" text-anchor="middle" font-size="9">FTS · pg_trgm</text>
+  <text x="682" y="167" text-anchor="middle" font-size="9">btree_gist · pgvector</text>
+  <text x="682" y="186" text-anchor="middle" font-size="9">39 tables</text>
+
+  <!-- side processes -->
+  <rect x="300" y="290" width="118" height="60" rx="6" fill="#fff" stroke="#d9dde3"/>
+  <text x="359" y="312" text-anchor="middle" font-size="9.5" font-weight="bold">Scheduler</text>
+  <text x="359" y="328" text-anchor="middle" font-size="8.5">APScheduler, in-process</text>
+  <text x="359" y="342" text-anchor="middle" font-size="8.5">deadline reminders</text>
+
+  <rect x="432" y="290" width="118" height="60" rx="6" fill="#fff" stroke="#d9dde3"/>
+  <text x="491" y="312" text-anchor="middle" font-size="9.5" font-weight="bold">ML layer</text>
+  <text x="491" y="328" text-anchor="middle" font-size="8.5">TF-IDF (always)</text>
+  <text x="491" y="342" text-anchor="middle" font-size="8.5">embeddings (optional)</text>
+
+  <path d="M359 290 V270 H425" stroke="#d9dde3"/>
+  <path d="M491 290 V270 H425" stroke="#d9dde3"/>
+
+  <rect x="20" y="290" width="200" height="60" rx="6" fill="#fff" stroke="#d9dde3"/>
+  <text x="120" y="312" text-anchor="middle" font-size="9.5" font-weight="bold">Rate limiting</text>
+  <text x="120" y="328" text-anchor="middle" font-size="8.5">In-memory, per user / IP</text>
+  <text x="120" y="342" text-anchor="middle" font-size="8.5">auth · search · messages</text>
+
+  <text x="20" y="390" font-size="9" fill="#5b6573">Boundaries are enforced in code: routers contain no business logic; services never import FastAPI;</text>
+  <text x="20" y="405" font-size="9" fill="#5b6573">each workflow's state transitions live in exactly one table. The ML layer can be extracted later.</text>
+</svg>
+<figcaption>Figure 1 — System architecture. A modular monolith with clear internal seams, chosen so a single free instance can run the whole platform.</figcaption>
+</figure>
+
+<h3>2.1 Why a modular monolith</h3>
+<p>
+  Microservices would multiply deployment cost and operational surface for a project that must run
+  at zero cost on one instance. The seams that matter — router / service / policy / repository, and
+  a pluggable recommendation strategy — are enforced inside one deployable, so the ML layer or any
+  module can be extracted later without re-architecting.
+</p>
+
+<h3>2.2 Backend module map</h3>
+<p class="small">23 modules under <code>backend/app/modules/</code>, each with router, schemas, models, service and (where ownership matters) policies.</p>
+<table>
+  <tr><th style="width:22%">Group</th><th>Modules</th></tr>
+  <tr><td>Identity</td><td><code>auth</code>, <code>users</code>, <code>profiles</code>, <code>admin</code></td></tr>
+  <tr><td>Discovery</td><td><code>researchers</code>, <code>taxonomy</code>, <code>search</code>, <code>recommendations</code></td></tr>
+  <tr><td>Research work</td><td><code>projects</code>, <code>publications</code>, <code>opportunities</code>, <code>applications</code></td></tr>
+  <tr><td>Connection</td><td><code>collaborations</code>, <code>messages</code>, <code>notifications</code></td></tr>
+  <tr><td>Resources</td><td><code>facilities</code>, <code>bookings</code>, <code>funding</code></td></tr>
+  <tr><td>Governance</td><td><code>audit</code>, <code>reports</code>, <code>analytics</code>, <code>health</code></td></tr>
+</table>
+
+<!-- ============================================ 3 -->
+<h2 class="page-break">3. Technology stack</h2>
+<table>
+  <tr><th style="width:20%">Layer</th><th style="width:42%">Technology</th><th>Why this choice</th></tr>
+  <tr><td>Frontend</td><td>React 19, TypeScript (strict), Vite, Tailwind CSS 4, React Router 7, Axios, TanStack Query, React Hook Form + Zod, Recharts</td><td>Strict typing catches schema drift at compile time; TanStack Query removes hand-written cache and polling code.</td></tr>
+  <tr><td>Backend</td><td>Python 3.12, FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2.0 (sync), psycopg 3, Alembic</td><td>Pydantic gives request/response validation and OpenAPI for free. Sync SQLAlchemy is simpler to reason about and test; FastAPI runs it in a threadpool.</td></tr>
+  <tr><td>Database</td><td>PostgreSQL 18 with <code>pg_trgm</code>, <code>btree_gist</code>, <code>pgvector</code></td><td>One engine provides relational integrity, full-text search, fuzzy matching, double-booking prevention and vector similarity.</td></tr>
+  <tr><td>Security</td><td>Argon2id, PyJWT, rotating refresh tokens, CSP and security headers</td><td>Argon2id is the current password-hashing recommendation; token rotation with reuse detection limits the value of a stolen token.</td></tr>
+  <tr><td>AI / ML</td><td>scikit-learn (TF-IDF), sentence-transformers (optional), pgvector</td><td>Runs locally at no cost. The semantic layer is optional and degrades to lexical matching if absent.</td></tr>
+  <tr><td>Quality</td><td>ruff, mypy --strict, pytest · ESLint, Prettier, tsc, Vitest, Playwright</td><td>Static analysis at maximum strictness; tests at unit, API and browser level.</td></tr>
+  <tr><td>Operations</td><td>GitHub Actions, Docker (optional), Neon, Render, Netlify</td><td>Five CI jobs gate every push; all three hosts have free tiers sufficient for a prototype.</td></tr>
+</table>
+
+<!-- ============================================ 4 -->
+<h2>4. Data model and entity relationships</h2>
+
+<figure>
+<svg viewBox="0 0 760 470" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial" font-size="9.5">
+  <defs>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8a93a0"/>
+    </marker>
+  </defs>
+  <style>
+    .e { fill:#fff; stroke:#b74a09; }
+    .e2 { fill:#f6f7f9; stroke:#8a93a0; }
+    .t { font-weight:bold; font-size:10px; }
+    .f { font-size:8.2px; fill:#5b6573; }
+    .l { stroke:#8a93a0; fill:none; }
+  </style>
+
+  <!-- users -->
+  <rect class="e" x="300" y="10" width="160" height="72" rx="5"/>
+  <text class="t" x="380" y="26" text-anchor="middle">users</text>
+  <text class="f" x="308" y="40">registration_number ᵁᴷ</text>
+  <text class="f" x="308" y="52">role · is_active · department_id</text>
+  <text class="f" x="308" y="64">coordinator_scope_id · created_by</text>
+  <text class="f" x="308" y="76">must_change_password</text>
+
+  <!-- org -->
+  <rect class="e2" x="20" y="10" width="130" height="46" rx="5"/>
+  <text class="t" x="85" y="26" text-anchor="middle">schools</text>
+  <text class="f" x="28" y="40">name ᵁᴷ</text>
+  <rect class="e2" x="20" y="76" width="130" height="46" rx="5"/>
+  <text class="t" x="85" y="92" text-anchor="middle">departments</text>
+  <text class="f" x="28" y="106">school_id · name</text>
+  <path class="l" d="M85 56 V76" marker-end="url(#b)"/>
+  <path class="l" d="M150 99 H300 V82" marker-end="url(#b)"/>
+
+  <!-- profiles -->
+  <rect class="e2" x="600" y="10" width="145" height="46" rx="5"/>
+  <text class="t" x="672" y="26" text-anchor="middle">researcher_profiles</text>
+  <text class="f" x="608" y="40">verification_status</text>
+  <rect class="e2" x="600" y="66" width="145" height="40" rx="5"/>
+  <text class="t" x="672" y="82" text-anchor="middle">student_profiles</text>
+  <text class="f" x="608" y="96">is_discoverable</text>
+  <path class="l" d="M460 34 H600" marker-end="url(#b)"/>
+  <path class="l" d="M460 46 H560 V86 H600" marker-end="url(#b)"/>
+
+  <!-- collaborations -->
+  <rect class="e" x="290" y="130" width="180" height="58" rx="5"/>
+  <text class="t" x="380" y="146" text-anchor="middle">collaborations</text>
+  <text class="f" x="298" y="160">user_a_id &lt; user_b_id ᶜᴴᴷ</text>
+  <text class="f" x="298" y="172">UNIQUE(user_a_id, user_b_id)</text>
+  <text class="f" x="298" y="184">state: none→requested→active→ended</text>
+  <path class="l" d="M380 82 V130" marker-end="url(#b)"/>
+
+  <rect class="e2" x="80" y="140" width="160" height="46" rx="5"/>
+  <text class="t" x="160" y="156" text-anchor="middle">collaboration_requests</text>
+  <text class="f" x="88" y="170">status · message · project_id</text>
+  <path class="l" d="M290 160 H240" marker-end="url(#b)"/>
+
+  <!-- conversations -->
+  <rect class="e" x="290" y="210" width="180" height="58" rx="5"/>
+  <text class="t" x="380" y="226" text-anchor="middle">conversations</text>
+  <text class="f" x="298" y="240">collaboration_id XOR project_id</text>
+  <text class="f" x="298" y="252">one thread per pair, for its life</text>
+  <text class="f" x="298" y="264">last_message_at</text>
+  <path class="l" d="M380 188 V210" marker-end="url(#b)"/>
+
+  <rect class="e2" x="80" y="215" width="160" height="46" rx="5"/>
+  <text class="t" x="160" y="231" text-anchor="middle">conversation_participants</text>
+  <text class="f" x="88" y="245">last_read_at · muted</text>
+  <path class="l" d="M290 238 H240" marker-end="url(#b)"/>
+
+  <rect class="e2" x="520" y="215" width="150" height="46" rx="5"/>
+  <text class="t" x="595" y="231" text-anchor="middle">messages</text>
+  <text class="f" x="528" y="245">body · hidden_at · hidden_by</text>
+  <path class="l" d="M470 238 H520" marker-end="url(#b)"/>
+
+  <!-- projects -->
+  <rect class="e" x="290" y="295" width="180" height="58" rx="5"/>
+  <text class="t" x="380" y="311" text-anchor="middle">projects</text>
+  <text class="f" x="298" y="325">owner_id · status · visibility</text>
+  <text class="f" x="298" y="337">draft→review→active→…</text>
+  <text class="f" x="298" y="349">reviewed_by · deleted_at</text>
+  <path class="l" d="M300 82 H270 V324 H290" marker-end="url(#b)"/>
+
+  <rect class="e2" x="80" y="300" width="160" height="40" rx="5"/>
+  <text class="t" x="160" y="316" text-anchor="middle">project_members</text>
+  <text class="f" x="88" y="330">member_role</text>
+  <path class="l" d="M290 320 H240" marker-end="url(#b)"/>
+
+  <rect class="e2" x="520" y="295" width="150" height="40" rx="5"/>
+  <text class="t" x="595" y="311" text-anchor="middle">publications</text>
+  <text class="f" x="528" y="325">doi ᵁᴷ · authors (ordered)</text>
+  <path class="l" d="M470 315 H520" marker-end="url(#b)"/>
+
+  <!-- opportunities -->
+  <rect class="e" x="290" y="375" width="180" height="46" rx="5"/>
+  <text class="t" x="380" y="391" text-anchor="middle">opportunities</text>
+  <text class="f" x="298" y="405">type · positions · deadline</text>
+  <path class="l" d="M380 353 V375" marker-end="url(#b)"/>
+
+  <rect class="e2" x="520" y="375" width="150" height="46" rx="5"/>
+  <text class="t" x="595" y="391" text-anchor="middle">applications</text>
+  <text class="f" x="528" y="405">status · decided_by</text>
+  <path class="l" d="M470 398 H520" marker-end="url(#b)"/>
+
+  <rect class="e2" x="80" y="375" width="160" height="46" rx="5"/>
+  <text class="t" x="160" y="391" text-anchor="middle">bookings</text>
+  <text class="f" x="88" y="405">EXCLUDE overlapping slots</text>
+
+  <text class="f" x="20" y="445">Core entities shown. 39 tables in total — taxonomy (skills, research_areas, aliases,</text>
+  <text class="f" x="20" y="457">suggestions), facilities/equipment, funding, notifications, saved_items, audit_logs and embeddings omitted for clarity.</text>
+</svg>
+<figcaption>Figure 2 — Entity relationships, core domain. Orange entities are the spine of the platform.</figcaption>
+</figure>
+
+<h3>4.1 Database conventions</h3>
+<ul>
+  <li>UUID primary keys via <code>gen_random_uuid()</code>; <code>created_at</code> / <code>updated_at</code> as <code>timestamptz</code>.</li>
+  <li>PostgreSQL enums for workflow statuses; CHECK constraints for invariants that must never be violated.</li>
+  <li>Every schema change is a reviewed Alembic migration with a sequential id. <code>create_all()</code> is never used.</li>
+  <li>Deterministic constraint naming, so migrations are readable and reversible.</li>
+</ul>
+
+<h3>4.2 Constraints that carry real rules</h3>
+<table>
+  <tr><th style="width:34%">Constraint</th><th>What it makes impossible</th></tr>
+  <tr><td><code>UNIQUE(user_a_id, user_b_id)</code> with <code>CHECK (user_a_id &lt; user_b_id)</code></td><td>Two people having more than one collaboration relationship, in either direction. Duplicates are impossible in the database rather than guarded in code.</td></tr>
+  <tr><td><code>EXCLUDE USING gist</code> on bookings</td><td>Two approved bookings overlapping on the same equipment. The database refuses; no application race can produce a double-booking.</td></tr>
+  <tr><td>Partial <code>UNIQUE</code> on notifications <code>dedupe_key</code></td><td>The same reminder being sent twice, however often the scheduler runs.</td></tr>
+  <tr><td><code>CHECK</code> exactly-one-of on conversations and tag aliases</td><td>A thread belonging to both a collaboration and a project, or to neither.</td></tr>
+  <tr><td><code>UNIQUE</code> on <code>registration_number</code>, case-normalised</td><td>Two accounts sharing a university identity.</td></tr>
+</table>
+
+<!-- ============================================ 5 -->
+<h2 class="page-break">5. Roles, permissions and account provisioning</h2>
+
+<figure>
+<svg viewBox="0 0 740 300" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial" font-size="10">
+  <defs>
+    <marker id="c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#b74a09"/>
+    </marker>
+  </defs>
+  <rect x="40" y="20" width="150" height="54" rx="6" fill="#b74a09"/>
+  <text x="115" y="42" text-anchor="middle" fill="#fff" font-weight="bold">ADMIN</text>
+  <text x="115" y="60" text-anchor="middle" fill="#ffe6d2" font-size="8.5">platform-wide authority</text>
+
+  <rect x="230" y="20" width="170" height="54" rx="6" fill="#f47216"/>
+  <text x="315" y="42" text-anchor="middle" fill="#fff" font-weight="bold">RESEARCH COORDINATOR</text>
+  <text x="315" y="60" text-anchor="middle" fill="#fff5ed" font-size="8.5">scope = one department</text>
+
+  <rect x="440" y="20" width="140" height="54" rx="6" fill="#ffc79c"/>
+  <text x="510" y="42" text-anchor="middle" font-weight="bold">FACULTY</text>
+  <text x="510" y="60" text-anchor="middle" font-size="8.5">once verified</text>
+
+  <rect x="620" y="20" width="100" height="54" rx="6" fill="#ffe6d2"/>
+  <text x="670" y="42" text-anchor="middle" font-weight="bold">STUDENT</text>
+  <text x="670" y="60" text-anchor="middle" font-size="8.5">creates nobody</text>
+
+  <path d="M190 47 H230" stroke="#b74a09" marker-end="url(#c)"/>
+  <path d="M400 47 H440" stroke="#b74a09" marker-end="url(#c)"/>
+  <path d="M580 47 H620" stroke="#b74a09" marker-end="url(#c)"/>
+  <text x="380" y="95" text-anchor="middle" font-size="9" fill="#5b6573">“creates” — each role provisions exactly the one below it. Nobody self-registers.</text>
+
+  <rect x="40" y="125" width="680" height="120" rx="6" fill="#f6f7f9" stroke="#d9dde3"/>
+  <text x="56" y="146" font-weight="bold" font-size="10.5">Three enforcement layers, all on the server</text>
+  <text x="56" y="168" font-size="9.5">1 · Permission — a route dependency checks a code-defined role → permission map (401 / 403).</text>
+  <text x="56" y="188" font-size="9.5">2 · Resource policy — ownership and department scope, checked after the row is loaded.</text>
+  <text x="56" y="208" font-size="9.5">3 · Query scoping — rows a user may not see never leave the database.</text>
+  <text x="56" y="232" font-size="9" fill="#b74a09">Frontend route guards only hide the interface. They are convenience, never security.</text>
+
+  <text x="40" y="272" font-size="9" fill="#5b6573">401 = not authenticated · 403 = authenticated but not allowed · 404 = must not learn it exists</text>
+  <text x="40" y="288" font-size="9" fill="#5b6573">Role and active status are re-read from the database on every request — never trusted from the token.</text>
+</svg>
+<figcaption>Figure 3 — Role hierarchy and the three layers of authorization.</figcaption>
+</figure>
+
+<h3>5.1 Account provisioning</h3>
+<p>
+  There is <strong>no public registration</strong>. <code>POST /auth/register</code> does not exist, and a
+  test asserts the OpenAPI document contains no such path. Accounts descend the institutional
+  hierarchy: an administrator appoints research coordinators, a coordinator provisions the faculty
+  of the department they oversee, and a faculty member enrols their own students.
+</p>
+<p>
+  The new account's role is <strong>derived from the creator</strong> and never read from the request
+  body — there is no client-supplied role to forge. Each new user receives a temporary password
+  they must replace before they can use anything else.
+</p>
+
+<h3>5.2 Administrator handover</h3>
+<p>
+  Promoting somebody to administrator requires two people. A six-digit code is generated, hashed
+  with SHA-256, and delivered to the <em>target's</em> notification inbox — not the requester's. It
+  expires in ten minutes, is single-use, and allows five attempts. Administration also has its own
+  sign-in page, and the server refuses the wrong entrance for each role. That check runs
+  <em>after</em> the password is verified, so the administration page can never become an oracle
+  telling an attacker which registration numbers belong to administrators.
+</p>
+
+<h3>5.3 Permission matrix (abridged)</h3>
+<table>
+  <tr><th>Capability</th><th>Student</th><th>Faculty</th><th>Coordinator</th><th>Admin</th></tr>
+  <tr><td>Browse directory, search, recommendations</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+  <tr><td>Apply to opportunities</td><td>✓</td><td>collaboration openings only</td><td>—</td><td>—</td></tr>
+  <tr><td>Create projects, publications, openings</td><td>—</td><td>✓ (verified)</td><td>✓</td><td>—</td></tr>
+  <tr><td>Create accounts</td><td>—</td><td>students, own dept</td><td>faculty, own scope</td><td>coordinators / any (audited override)</td></tr>
+  <tr><td>Delete accounts</td><td>—</td><td>students, own dept</td><td>faculty + students, own scope</td><td>anyone but themselves</td></tr>
+  <tr><td>Verify researchers, review projects, approve bookings</td><td>—</td><td>—</td><td>✓ own department</td><td>✓ platform-wide</td></tr>
+  <tr><td>Moderate reports, read analytics</td><td>—</td><td>—</td><td>✓ scoped</td><td>✓ platform</td></tr>
+  <tr><td>Read audit log, manage settings</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
+</table>
+
+<!-- ============================================ 6 -->
+<h2 class="page-break">6. Feature catalogue</h2>
+
+<h3>6.1 Identity and onboarding</h3>
+<ul>
+  <li><strong>Sign in with the LPU registration number</strong> (UMS-style); email is optional contact information, never a credential.</li>
+  <li><strong>Two separate entrances</strong> — administration and the main platform — enforced server-side.</li>
+  <li><strong>Forced password replacement</strong> on first sign-in; the application is locked until it is done.</li>
+  <li><strong>Onboarding wizard</strong> — profile basics, skills, research areas — with a stored completeness flag.</li>
+  <li><strong>Role-aware profiles</strong>: students declare programme, year and discoverability; researchers declare designation, availability and links.</li>
+</ul>
+
+<h3>6.2 Discovery</h3>
+<ul>
+  <li><strong>Researcher directory</strong> with full-text and typo-tolerant (trigram) search, filtered by department, research area, skill and availability.</li>
+  <li><strong>Search by registration number</strong> — matched as a case-insensitive prefix, not through the language analyser, because an identifier is not prose.</li>
+  <li><strong>Opt-in student discovery.</strong> Students are invisible to search unless they choose otherwise; only public profile fields are ever exposed.</li>
+  <li><strong>Unified search</strong> across researchers, projects, publications and opportunities.</li>
+  <li><strong>Natural-language search</strong> — sentence embeddings in pgvector fused with full-text ranking; degrades cleanly to lexical search when the optional model is not installed.</li>
+  <li><strong>Command palette</strong> (⌘K / Ctrl+K) reaching all 28 destinations, offering only pages the signed-in role may open.</li>
+</ul>
+
+<h3>6.3 Research work</h3>
+<ul>
+  <li><strong>Projects</strong> with a reviewed lifecycle, team members, research areas, skills and visibility rules.</li>
+  <li><strong>Publications</strong> with ordered internal and external author lists, DOI de-duplication and project links.</li>
+  <li><strong>Opportunity board</strong> — research assistant, thesis, internship and collaboration openings, with positions and deadlines.</li>
+  <li><strong>Applications</strong> with a status timeline, applicant review and automatic addition to the project team on acceptance.</li>
+</ul>
+
+<h3>6.4 Connection</h3>
+<ul>
+  <li><strong>Collaboration relationships</strong> — one per pair of people, in either direction, with a request/accept/decline/cancel/end lifecycle.</li>
+  <li><strong>Conversation threads</strong> scoped to an accepted collaboration or a project team. There is no open inbox and no endpoint that creates a thread: threads appear as a consequence of agreement.</li>
+  <li><strong>One thread per pair for its life</strong> — collaborating again reopens the same conversation instead of splitting two people's history.</li>
+  <li><strong>Notifications</strong> from domain events, with deduplication: twenty messages produce one notice until it is read.</li>
+  <li><strong>Deadline reminders</strong> at seven days and one day, from an in-process scheduler.</li>
+</ul>
+
+<h3>6.5 Resources</h3>
+<ul>
+  <li><strong>Facility and equipment catalogue</strong> with a week calendar.</li>
+  <li><strong>Booking requests and approvals</strong>, with double-booking prevented by a database exclusion constraint rather than by application logic.</li>
+  <li><strong>Funding calls</strong> (fictional) that can be saved, with deadline reminders.</li>
+</ul>
+
+<h3>6.6 Governance</h3>
+<ul>
+  <li><strong>Faculty verification queue</strong> — department-scoped for coordinators, platform-wide for administrators; nobody may verify their own profile.</li>
+  <li><strong>Project review queue</strong>; a reviewer may never approve their own project.</li>
+  <li><strong>Content reports and moderation</strong>, able to hide content without destroying it.</li>
+  <li><strong>Append-only audit log</strong> for every sensitive action, readable by administrators.</li>
+  <li><strong>Scoped analytics</strong> — coordinators see their department, administrators the platform — plus a collaboration network graph.</li>
+  <li><strong>Account deletion</strong> down the hierarchy, with the cascade counted and shown before anything is destroyed.</li>
+</ul>
+
+<!-- ============================================ 7 -->
+<h2 class="page-break">7. Workflows and state machines</h2>
+
+<figure>
+<svg viewBox="0 0 740 200" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial" font-size="9.5">
+  <defs>
+    <marker id="d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6573"/>
+    </marker>
+  </defs>
+  <rect x="20" y="70" width="90" height="38" rx="19" fill="#f6f7f9" stroke="#8a93a0"/>
+  <text x="65" y="94" text-anchor="middle">none</text>
+
+  <rect x="180" y="70" width="110" height="38" rx="19" fill="#fff5ed" stroke="#f47216"/>
+  <text x="235" y="94" text-anchor="middle">requested</text>
+
+  <rect x="370" y="70" width="100" height="38" rx="19" fill="#b74a09"/>
+  <text x="420" y="94" text-anchor="middle" fill="#fff">active</text>
+
+  <rect x="560" y="70" width="100" height="38" rx="19" fill="#f6f7f9" stroke="#8a93a0"/>
+  <text x="610" y="94" text-anchor="middle">ended</text>
+
+  <path d="M110 89 H180" stroke="#5b6573" marker-end="url(#d)"/>
+  <text x="145" y="82" text-anchor="middle" font-size="8">request</text>
+
+  <path d="M290 89 H370" stroke="#5b6573" marker-end="url(#d)"/>
+  <text x="330" y="82" text-anchor="middle" font-size="8">accept</text>
+  <text x="330" y="103" text-anchor="middle" font-size="7.5" fill="#5b6573">(recipient)</text>
+
+  <path d="M470 89 H560" stroke="#5b6573" marker-end="url(#d)"/>
+  <text x="515" y="82" text-anchor="middle" font-size="8">end</text>
+  <text x="515" y="103" text-anchor="middle" font-size="7.5" fill="#5b6573">(either party)</text>
+
+  <path d="M235 70 V40 H65 V70" stroke="#5b6573" fill="none" marker-end="url(#d)"/>
+  <text x="150" y="34" text-anchor="middle" font-size="8">decline (recipient) · cancel (sender)</text>
+
+  <path d="M610 108 V140 H235 V108" stroke="#5b6573" fill="none" marker-end="url(#d)"/>
+  <text x="420" y="153" text-anchor="middle" font-size="8">collaborate again — reopens the same conversation</text>
+
+  <text x="20" y="180" font-size="8.5" fill="#5b6573">A thread is writable only while the relationship is active, and readable always: what was said still happened.</text>
+  <text x="20" y="193" font-size="8.5" fill="#5b6573">It takes two people to start a collaboration and one to end it — requiring agreement to stop would mean nobody could leave.</text>
+</svg>
+<figcaption>Figure 4 — Collaboration state machine. Defined once, in a single transition table, and enforced in the service layer.</figcaption>
+</figure>
+
+<figure>
+<svg viewBox="0 0 740 150" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial" font-size="9.5">
+  <rect x="20" y="45" width="90" height="36" rx="5" fill="#f6f7f9" stroke="#8a93a0"/>
+  <text x="65" y="68" text-anchor="middle">draft</text>
+  <rect x="160" y="45" width="120" height="36" rx="5" fill="#fff5ed" stroke="#f47216"/>
+  <text x="220" y="68" text-anchor="middle">pending review</text>
+  <rect x="330" y="45" width="90" height="36" rx="5" fill="#b74a09"/>
+  <text x="375" y="68" text-anchor="middle" fill="#fff">active</text>
+  <rect x="470" y="10" width="100" height="36" rx="5" fill="#f6f7f9" stroke="#8a93a0"/>
+  <text x="520" y="33" text-anchor="middle">completed</text>
+  <rect x="470" y="80" width="100" height="36" rx="5" fill="#f6f7f9" stroke="#8a93a0"/>
+  <text x="520" y="103" text-anchor="middle">archived</text>
+
+  <path d="M110 63 H160" stroke="#5b6573" marker-end="url(#d)"/>
+  <text x="135" y="56" text-anchor="middle" font-size="8">submit</text>
+  <path d="M280 63 H330" stroke="#5b6573" marker-end="url(#d)"/>
+  <text x="305" y="56" text-anchor="middle" font-size="8">approve</text>
+  <path d="M420 58 H470 V46" stroke="#5b6573" fill="none" marker-end="url(#d)"/>
+  <path d="M420 70 H470 V80" stroke="#5b6573" fill="none" marker-end="url(#d)"/>
+  <path d="M220 45 V20 H65 V45" stroke="#5b6573" fill="none" marker-end="url(#d)"/>
+  <text x="140" y="14" text-anchor="middle" font-size="8">request changes</text>
+  <text x="20" y="138" font-size="8.5" fill="#5b6573">Only an ACTIVE project accepts applications. A coordinator may never review their own project.</text>
+</svg>
+<figcaption>Figure 5 — Project review lifecycle.</figcaption>
+</figure>
+
+<h3>7.1 Other workflows</h3>
+<table>
+  <tr><th style="width:22%">Workflow</th><th>States</th><th style="width:26%">Who may transition</th></tr>
+  <tr><td>Researcher verification</td><td>unverified → pending → verified / rejected</td><td>Coordinator (own department) or administrator; never oneself</td></tr>
+  <tr><td>Opportunity</td><td>draft → open → closed / filled</td><td>Creator; auto-fills when positions are taken</td></tr>
+  <tr><td>Application</td><td>submitted → under review → accepted / rejected / withdrawn</td><td>Owner decides; applicant may withdraw</td></tr>
+  <tr><td>Booking</td><td>requested → approved / rejected / cancelled</td><td>Coordinator approves; database prevents overlap</td></tr>
+  <tr><td>Content report</td><td>open → dismissed / actioned</td><td>Coordinator or administrator; may hide the target</td></tr>
+</table>
+
+<!-- ============================================ 8 -->
+<h2 class="page-break">8. Security model</h2>
+<table>
+  <tr><th style="width:26%">Control</th><th>Implementation</th></tr>
+  <tr><td>Password storage</td><td>Argon2id with per-password salt. Passwords are never logged, returned or comparable in plaintext.</td></tr>
+  <tr><td>Session</td><td>15-minute JWT access token held in memory only — never in localStorage, so an XSS cannot read it at rest.</td></tr>
+  <tr><td>Refresh</td><td>Opaque 7-day token in an <code>httpOnly; Secure; SameSite</code> cookie scoped to <code>/api/v1/auth</code>, stored as a SHA-256 hash, rotated on every use. Reuse of a retired token revokes the entire family.</td></tr>
+  <tr><td>CSRF</td><td>Every browser request carries <code>X-Requested-With</code>; the cookie is same-origin via the Netlify proxy.</td></tr>
+  <tr><td>Authorization</td><td>Three server-side layers (§5). Role and active status re-read from the database on every request.</td></tr>
+  <tr><td>Information disclosure</td><td>404 — not 403 — wherever a user must not learn a resource exists: another department's queue, a conversation they are not in, an administrator's registration number.</td></tr>
+  <tr><td>Rate limiting</td><td>Per-user and per-IP budgets on sign-in, search, collaboration requests and messages.</td></tr>
+  <tr><td>Transport and headers</td><td>HSTS, CSP, <code>X-Content-Type-Options</code>, frame denial. API docs disabled in production.</td></tr>
+  <tr><td>Secrets</td><td>Never committed. All configuration via environment variables; <code>.env.example</code> holds placeholders only. CI runs a secret scan and dependency audit on every push.</td></tr>
+  <tr><td>Audit</td><td>Append-only log of every sensitive action — role changes, approvals, deletions, administrative overrides — recording actor, entity, before/after and IP.</td></tr>
+</table>
+
+<!-- ============================================ 9 -->
+<h2>9. AI and recommendation engine</h2>
+<p>
+  Recommendations are <strong>explainable by design</strong>. Every suggestion carries the reasons it
+  was made, because a black box that cannot justify itself will not be trusted by the researchers
+  it is advising.
+</p>
+<table>
+  <tr><th style="width:26%">Signal</th><th>Method</th><th>Weight</th></tr>
+  <tr><td>Skill overlap</td><td>Set intersection against the viewer's declared skills</td><td>Highest</td></tr>
+  <tr><td>Research-area overlap</td><td>Taxonomy match, including two-level parent relationships</td><td>High</td></tr>
+  <tr><td>Textual similarity</td><td>TF-IDF vectors with cosine similarity (scikit-learn), computed locally</td><td>Medium</td></tr>
+  <tr><td>Semantic similarity</td><td>Sentence-transformer embeddings in pgvector, fused with full-text rank</td><td>Optional</td></tr>
+  <tr><td>Recency and availability</td><td>Open positions, deadlines, stated availability</td><td>Tie-break</td></tr>
+</table>
+<p>
+  A user with a sparse profile receives a <strong>cold-start</strong> response that says so plainly
+  and offers the newest relevant items rather than pretending to a confidence it does not have. The
+  engine is a pluggable strategy, and an offline evaluation script measures ranking quality.
+</p>
+
+<!-- ============================================ 10 -->
+<h2>10. Testing strategy and quality gates</h2>
+<div class="metrics">
+  <div class="metric"><b>454</b><span>Backend tests</span></div>
+  <div class="metric"><b>185</b><span>Frontend tests</span></div>
+  <div class="metric"><b>14</b><span>E2E flows</span></div>
+  <div class="metric"><b>5</b><span>CI jobs</span></div>
+</div>
+<table>
+  <tr><th style="width:24%">Level</th><th>Tooling and approach</th></tr>
+  <tr><td>Static analysis</td><td><code>ruff</code> (lint + format), <code>mypy --strict</code> across 159 files. No <code>any</code>, no blanket <code>type: ignore</code>, no disabled rules to make a check pass.</td></tr>
+  <tr><td>Backend</td><td><code>pytest</code> against a <strong>real PostgreSQL</strong> database — never SQLite — with each test rolled back. Behaviour is tested through the API, not through mocks.</td></tr>
+  <tr><td>Authorization</td><td>A generated matrix asserts the exact status code for every endpoint × role combination, so a new endpoint cannot quietly be left unguarded.</td></tr>
+  <tr><td>Frontend</td><td>Vitest with Testing Library, queried by role and label as a user would find them.</td></tr>
+  <tr><td>Browser</td><td>Playwright drives 14 flows end to end against a seeded database — project submission through review, application, booking, collaboration, account provisioning and deletion.</td></tr>
+  <tr><td>CI</td><td>Five jobs per push: backend, backend with the ML extra, frontend, end-to-end, and security (dependency audit + secret scan).</td></tr>
+</table>
+<div class="note">
+  <strong>A principle learned the hard way:</strong> passing tests are not a working screen. A
+  one-time administrator code was delivered correctly and rendered invisibly, with every test
+  green, because a display function had no case for it. New interface work is therefore driven in a
+  real browser before it is called done.
+</div>
+
+<!-- ============================================ 11 -->
+<h2 class="page-break">11. Deployment architecture</h2>
+
+<figure>
+<svg viewBox="0 0 740 260" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial" font-size="9.5">
+  <rect x="20" y="30" width="150" height="80" rx="6" fill="#fff5ed" stroke="#b74a09"/>
+  <text x="95" y="52" text-anchor="middle" font-weight="bold" fill="#b74a09">Netlify</text>
+  <text x="95" y="70" text-anchor="middle" font-size="8.5">Static SPA on a CDN</text>
+  <text x="95" y="85" text-anchor="middle" font-size="8.5">netlify.toml at repo root</text>
+  <text x="95" y="100" text-anchor="middle" font-size="8.5">/api/* → proxied</text>
+
+  <rect x="280" y="30" width="170" height="80" rx="6" fill="#fff" stroke="#b74a09"/>
+  <text x="365" y="52" text-anchor="middle" font-weight="bold" fill="#b74a09">Render</text>
+  <text x="365" y="70" text-anchor="middle" font-size="8.5">Docker · root dir “backend”</text>
+  <text x="365" y="85" text-anchor="middle" font-size="8.5">binds injected $PORT</text>
+  <text x="365" y="100" text-anchor="middle" font-size="8.5">migrates itself at boot</text>
+
+  <rect x="560" y="30" width="160" height="80" rx="6" fill="#f1f7f8" stroke="#1f5b65"/>
+  <text x="640" y="52" text-anchor="middle" font-weight="bold" fill="#1f5b65">Neon</text>
+  <text x="640" y="70" text-anchor="middle" font-size="8.5">PostgreSQL 18 serverless</text>
+  <text x="640" y="85" text-anchor="middle" font-size="8.5">pgvector enabled</text>
+  <text x="640" y="100" text-anchor="middle" font-size="8.5">pooled connection</text>
+
+  <path d="M170 70 H280" stroke="#5b6573" marker-end="url(#d)"/>
+  <path d="M450 70 H560" stroke="#5b6573" marker-end="url(#d)"/>
+  <text x="225" y="63" text-anchor="middle" font-size="8">same-origin</text>
+  <text x="505" y="63" text-anchor="middle" font-size="8">psycopg 3</text>
+
+  <rect x="20" y="150" width="700" height="80" rx="6" fill="#f6f7f9" stroke="#d9dde3"/>
+  <text x="36" y="171" font-weight="bold" font-size="10">Why the API is proxied rather than called cross-origin</text>
+  <text x="36" y="191" font-size="9">The refresh token lives in an httpOnly cookie. Proxying /api through Netlify keeps it first-party, so</text>
+  <text x="36" y="207" font-size="9">SameSite=lax applies and the session survives a page refresh without relaxing cookie policy for</text>
+  <text x="36" y="223" font-size="9">third-party contexts — which would weaken CSRF protection for every user.</text>
+</svg>
+<figcaption>Figure 6 — Deployment topology. Every component sits on a free tier.</figcaption>
+</figure>
+
+<h3>11.1 Release process</h3>
+<p>
+  A push to <code>main</code> deploys. The API applies outstanding Alembic migrations at startup and,
+  if that fails, starts <em>degraded</em> and reports the reason on <code>/health/ready</code> rather
+  than refusing to serve — a failed deploy leaves the previous image running and the fault
+  invisible. Data-rewriting migrations are still run deliberately from a workstation before the
+  code that needs them merges.
+</p>
+
+<!-- ============================================ 12 -->
+<h2>12. Design decisions (ADR index)</h2>
+<p class="small">Twenty-four architecture decision records in <code>docs/adr/</code>. The most consequential:</p>
+<table>
+  <tr><th style="width:8%">ADR</th><th style="width:34%">Decision</th><th>Why it mattered</th></tr>
+  <tr><td>0015</td><td>Sign in with the registration number</td><td>Matches how the university already identifies people; email becomes optional contact data.</td></tr>
+  <tr><td>0017</td><td>Deployment and hardening</td><td>Free-tier topology, security headers, cookie strategy.</td></tr>
+  <tr><td>0018</td><td>Department membership</td><td>Self-declared until verification locks it; an administrator can always correct it.</td></tr>
+  <tr><td>0019</td><td>Provisioning hierarchy</td><td>Removed public registration; the role is derived from the creator, never sent by a client.</td></tr>
+  <tr><td>0020</td><td>Identity on screen, derived coordinator scope</td><td>The UID appears wherever a person is named; a coordinator's scope follows their department automatically, because one with no scope silently oversaw nothing.</td></tr>
+  <tr><td>0021</td><td>Account deletion</td><td>Deletion down the hierarchy, with the cascade counted and shown first — 21 of 31 foreign keys cascade.</td></tr>
+  <tr><td>0022</td><td>Scoped conversation threads</td><td>Chat exists only where a relationship already does; polling rather than WebSockets, with the reasoning recorded.</td></tr>
+  <tr><td>0023</td><td>Collaboration belongs to a pair</td><td>Keying the relationship to a request allowed duplicates and split two people's history; the pair is now unique in the database.</td></tr>
+  <tr><td>0024</td><td>Migrate at startup</td><td>Code repeatedly reached production ahead of its migration. The instance now heals itself and reports failure honestly.</td></tr>
+</table>
+
+<!-- ============================================ 13 -->
+<h2>13. Known limitations and future work</h2>
+<table>
+  <tr><th style="width:30%">Limitation</th><th>Reasoning and the path forward</th></tr>
+  <tr><td>Messaging polls rather than pushes</td><td>Deliberate: synchronous SQLAlchemy, no Redis, and a free instance that sleeps. A 10-second poll that pauses when the tab is hidden is indistinguishable from real time at this scale. Server-Sent Events are the upgrade path — one endpoint, no schema change.</td></tr>
+  <tr><td>Semantic search optional in production</td><td>The sentence-transformer model exceeds a free instance's memory. Embeddings can be precomputed offline, or the paid tier used.</td></tr>
+  <tr><td>Single application instance</td><td>Rate limiting and the scheduler are in-process. Horizontal scaling needs shared state — both already sit behind interfaces.</td></tr>
+  <tr><td>Notifications are in-app only</td><td>Email or push would need a provider and therefore a cost.</td></tr>
+  <tr><td>All data is fictional</td><td>Integration with real university systems is deliberately out of scope for a prototype.</td></tr>
+</table>
+
+<h3>13.1 Natural next steps</h3>
+<ol>
+  <li>Institutional single sign-on in place of local passwords.</li>
+  <li>Email notifications and calendar export for bookings and deadlines.</li>
+  <li>Co-authorship and citation graphs from the publication data already stored.</li>
+  <li>Generated OpenAPI TypeScript types, removing the hand-written frontend mirror of each schema.</li>
+  <li>An expertise heat-map across schools, using the taxonomy already in place.</li>
+</ol>
+
+<div class="disclaimer" style="margin-top:2em">
+  <strong>Prototype notice.</strong> Not an official Lovely Professional University system unless
+  formally adopted or authorized. Not connected to any real LPU system or data. All people,
+  projects, publications, facilities and funding records shown are fictional demo data.
+</div>
+
+</body>
+</html>
