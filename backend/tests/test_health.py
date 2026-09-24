@@ -40,7 +40,7 @@ def test_readiness_ok_when_database_reachable(app: FastAPI, client: TestClient) 
     response = client.get("/health/ready")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "database": "ok"}
+    assert response.json() == {"status": "ok", "database": "ok", "migrations": "ok"}
 
 
 def test_readiness_503_when_database_unreachable(app: FastAPI, client: TestClient) -> None:
@@ -49,4 +49,8 @@ def test_readiness_503_when_database_unreachable(app: FastAPI, client: TestClien
     response = client.get("/health/ready")
 
     assert response.status_code == 503
-    assert response.json() == {"status": "degraded", "database": "unavailable"}
+    assert response.json() == {
+        "status": "degraded",
+        "database": "unavailable",
+        "migrations": "ok",
+    }

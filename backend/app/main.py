@@ -89,16 +89,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         logger.info("Database connection OK (%s)", settings.database_summary())
 
+    app.state.migration_error = None
     if settings.run_migrations_at_boot:
         try:
             upgrade_to_head(engine, settings)
-        except Exception:
-            # Serving with a schema the code does not match is worse than not
-            # serving: every request against the missing table answers 500,
-            # which is exactly the failure this setting exists to prevent.
-            logger.critical("Database migration FAILED; refusing to start.")
-            engine.dispose()
-            raise
+        except Exception as exc:  # noqa: BLE001 -- recorded and reported, not swallowed
+            # Refusing to start was the wrong call. It turned a migration
+            # problem into a failed deploy, which left the *previous* image
+            # serving and the site broken in exactly the way the migration
+            # was meant to fix -- with no way to see why from outside.
+            # Starting degraded keeps everything that does not need the new
+            # schema working, and /health/ready says what went wrong.
+            app.state.migration_error = f"{type(exc).__name__}: {exc}"
+            logger.critical("Database migration FAILED: %s", exc, exc_info=True)
 
     # Handlers turn domain events into notifications (Step 12). Registered
     # here, once per app, rather than at import time.
