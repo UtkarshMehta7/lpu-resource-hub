@@ -148,12 +148,13 @@ so the refresh cookie stays first-party).
 - `netlify.toml` MUST be at the repo root; Netlify never finds it elsewhere.
 - Render's Docker runtime looks for `./Dockerfile` at the configured root
   directory -- set that to `backend`, or use the Blueprint for a source build.
-- **The deployed instance migrates itself at boot**, under a Postgres
-  advisory lock, and refuses to start if that fails (ADR 0024,
-  `RUN_MIGRATIONS_ON_START`, set in render.yaml). This replaced the old
-  "never on container start" rule, which failed twice: code reached
-  production ahead of its migration and answered 500 until somebody with the
-  connection string was free.
+- **The deployed instance migrates itself at boot** and starts degraded if
+  that fails, reporting why on /health/ready (ADR 0024,
+  on by default in production). No advisory lock: DATABASE_URL is Neon's
+  *pooler*, PgBouncer in transaction mode, where a session-level
+  pg_advisory_lock is never released -- the container hung before binding its
+  port and the deploy was cancelled. Nothing that runs before the port is
+  bound may be able to block.
 - Still run **destructive or data-rewriting** migrations deliberately with
   `backend/scripts/release.sh` before merging the code that needs them.
   Unattended is fine for adding a table; it is not fine for merging rows.

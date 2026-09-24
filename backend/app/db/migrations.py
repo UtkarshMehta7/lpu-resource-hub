@@ -1,21 +1,27 @@
-"""Bring the schema up to date at startup, safely.
+"""Bring the schema up to date at startup.
 
 The rule used to be that migrations are a release step and never run on
 container start, because two instances booting at once would race. That rule
-protected a problem the platform does not have -- and it cost more than it
-saved. Twice now, code that needed a migration reached production before the
+protected against a problem this deployment does not have, and cost more than
+it saved: twice, code that needed a migration reached production before the
 migration did, and the feature answered 500 until somebody with the connection
-string ran alembic by hand. The second time, sending a collaboration request
-broke for real users.
+string ran alembic by hand.
 
-The race is a real concern, and a PostgreSQL advisory lock settles it: whoever
-boots first holds the lock and migrates; everyone else waits and then finds
-nothing to do. That is how this is done in production systems that deploy
-from a container, and it is strictly safer than a human remembering.
+There is no lock here, and that is deliberate. The usual answer to the race is
+a session-level `pg_advisory_lock`, and it is wrong against this database: the
+connection string points at Neon's *pooler*, which is PgBouncer in transaction
+mode. A session-level lock is taken on a backend connection that is handed
+straight back to the pool, so it is never released and every later boot waits
+on it forever. The container hung before binding its port and the deploy was
+cancelled -- the schema stayed behind, which is the failure this whole thing
+exists to prevent.
 
-Off by default. Local development and the test suite migrate explicitly, and
-should keep doing so -- surprise schema changes while you are working are
-their own kind of unpleasant. Deployments turn it on (`render.yaml`).
+This service runs one instance with WEB_CONCURRENCY=1, so there is no second
+migrator to race with. If that ever changes, the lock must be taken on a
+*direct* (non-pooled) Neon endpoint, or be a transaction-level lock around a
+single-transaction migration. Not this.
+
+Off by default; production turns it on (see Settings.run_migrations_at_boot).
 """
 
 from __future__ import annotations
@@ -24,17 +30,11 @@ import logging
 from pathlib import Path
 
 from alembic.config import Config
-from sqlalchemy import Engine, text
 
 from alembic import command
 from app.core.config import Settings
 
 logger = logging.getLogger(__name__)
-
-#: Any constant will do; it only has to be the same in every instance. Chosen
-#: once and never changed, or two versions of the app would not see each
-#: other's lock.
-MIGRATION_LOCK_ID = 8_274_119_055
 
 
 def _alembic_config(settings: Settings) -> Config:
@@ -45,21 +45,8 @@ def _alembic_config(settings: Settings) -> Config:
     return config
 
 
-def upgrade_to_head(engine: Engine, settings: Settings) -> None:
-    """Run any outstanding migrations, once, across every booting instance.
-
-    Holds a session-level advisory lock for the duration. A second instance
-    booting at the same moment blocks here rather than running the same
-    migration concurrently, and proceeds as soon as the first is finished.
-    """
-    with engine.connect() as connection:
-        logger.info("Waiting for the migration lock…")
-        connection.execute(text("SELECT pg_advisory_lock(:key)"), {"key": MIGRATION_LOCK_ID})
-        connection.commit()
-        try:
-            logger.info("Applying database migrations…")
-            command.upgrade(_alembic_config(settings), "head")
-            logger.info("Database schema is up to date.")
-        finally:
-            connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": MIGRATION_LOCK_ID})
-            connection.commit()
+def upgrade_to_head(settings: Settings) -> None:
+    """Apply outstanding migrations. Must return, or the app never serves."""
+    logger.info("Applying database migrations…")
+    command.upgrade(_alembic_config(settings), "head")
+    logger.info("Database schema is up to date.")

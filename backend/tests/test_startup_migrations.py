@@ -8,13 +8,13 @@ reached the deployed instance ahead of its migration, and the feature answered
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
+import time
 
 import pytest
 from sqlalchemy import create_engine, text
 
 from app.core.config import Environment, Settings
-from app.db.migrations import MIGRATION_LOCK_ID, upgrade_to_head
+from app.db.migrations import upgrade_to_head
 
 pytestmark = pytest.mark.db
 
@@ -22,7 +22,7 @@ pytestmark = pytest.mark.db
 def test_it_brings_the_schema_to_head(db_settings: Settings) -> None:
     engine = create_engine(str(db_settings.database_url))
     try:
-        upgrade_to_head(engine, db_settings)
+        upgrade_to_head(db_settings)
         with engine.connect() as connection:
             revision = connection.execute(
                 text("SELECT version_num FROM alembic_version")
@@ -32,32 +32,16 @@ def test_it_brings_the_schema_to_head(db_settings: Settings) -> None:
         engine.dispose()
 
 
-def test_two_instances_booting_at_once_do_not_race(db_settings: Settings) -> None:
-    """The reason the old rule existed. An advisory lock settles it: one
-    migrates, the other waits and then finds nothing to do."""
-    engine = create_engine(str(db_settings.database_url), pool_size=5)
-    try:
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            results = [pool.submit(upgrade_to_head, engine, db_settings) for _ in range(3)]
-            for result in results:
-                result.result()  # raises if any of them failed
-    finally:
-        engine.dispose()
+def test_it_returns_rather_than_blocking(db_settings: Settings) -> None:
+    """It must finish, and quickly. An earlier version took a session-level
+    advisory lock against Neon's transaction-mode pooler, which never released
+    it: the container hung before binding its port and the deploy was
+    cancelled, leaving the schema behind."""
+    started = time.monotonic()
 
+    upgrade_to_head(db_settings)
 
-def test_the_lock_is_released_afterwards(db_settings: Settings) -> None:
-    """A held lock would block every later boot forever."""
-    engine = create_engine(str(db_settings.database_url))
-    try:
-        upgrade_to_head(engine, db_settings)
-        with engine.connect() as connection:
-            held = connection.execute(
-                text("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND objid = :key"),
-                {"key": MIGRATION_LOCK_ID % (2**31)},
-            ).scalar_one()
-            assert held == 0
-    finally:
-        engine.dispose()
+    assert time.monotonic() - started < 60, "startup must not hang on migrations"
 
 
 def test_production_migrates_itself_without_being_told(db_settings: Settings) -> None:

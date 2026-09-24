@@ -1,4 +1,4 @@
-# ADR 0024: The deployed instance migrates itself, under an advisory lock
+# ADR 0024: The deployed instance migrates itself at boot
 
 - **Status:** Accepted
 - **Date:** 2026-09-24
@@ -31,9 +31,21 @@ lock the database already provides.
 
 ## Decision
 
-The application applies outstanding migrations at startup, holding
-`pg_advisory_lock` for the duration. The first instance to boot migrates;
-any other blocks on the lock and finds nothing to do when it acquires it.
+The application applies outstanding migrations at startup.
+
+**Without a lock**, and that was learned the hard way. The first version held
+`pg_advisory_lock` for the duration, which is the standard answer and is wrong
+against this database: `DATABASE_URL` points at Neon's *pooler*, PgBouncer in
+transaction mode. A session-level advisory lock is taken on a backend
+connection that is returned to the pool immediately, so it is never released.
+The container logged "Waiting for the migration lock…", never bound its port,
+and Render cancelled the deploy — leaving the previous image serving and the
+schema exactly as far behind as before.
+
+The race the lock guarded against needs two migrators. This service runs one
+instance with `WEB_CONCURRENCY=1`. If that changes, the lock must be taken on
+a **direct, non-pooled** Neon endpoint, or be a transaction-level lock around
+a single-transaction migration.
 
 **If the migration fails, the app refuses to start.** Serving with a schema
 the code does not match is worse than not serving: every request against the
@@ -64,9 +76,12 @@ watching.
 - The lock id is a constant. It must never change: two versions of the app
   with different ids would not see each other's lock, which is the race back
   again.
-- Tested with three concurrent boots against one database, plus an assertion
-  that the lock is released afterwards — a held advisory lock would block
-  every later boot forever.
+- A test asserts startup returns rather than blocking. "It hangs" and "it is
+  slow" look identical to a platform health check, and the difference is a
+  cancelled deploy.
+- Anything that runs before the port is bound can stop the service from
+  existing. Migrations are now the only such thing, and they are bounded by
+  the migrations themselves.
 
 ## Alternatives considered
 
