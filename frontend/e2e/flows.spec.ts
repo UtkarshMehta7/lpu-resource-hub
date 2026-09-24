@@ -250,8 +250,11 @@ test("coordinator lists a funding call and a student saves it", async ({ browser
   await student.goto("/funding");
   await student.getByRole("searchbox", { name: "Search" }).fill(FUNDING);
   await student.getByRole("link", { name: FUNDING }).click();
-  await student.getByRole("button", { name: /☆ Save/ }).click();
-  await expect(student.getByRole("button", { name: /★ Saved/ })).toBeVisible();
+  // exact: true because "Save" is a prefix of "Saved". The star is an SVG
+  // now, not a ☆/★ character, so it contributes nothing to the accessible
+  // name -- which is the point of the icon, and what broke this assertion.
+  await student.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(student.getByRole("button", { name: "Saved", exact: true })).toBeVisible();
 
   // It shows up in Saved and as an upcoming deadline on the dashboard.
   await student.goto("/me/saved?type=funding");
