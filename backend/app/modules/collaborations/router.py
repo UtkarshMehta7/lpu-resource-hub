@@ -117,3 +117,16 @@ def cancel_collaboration(
     request_id: uuid.UUID, db: DbSession, actor: CurrentUser
 ) -> CollaborationRead:
     return _respond(db, actor, request_id, CollaborationStatus.CANCELLED)
+
+
+@router.post("/collaborations/{request_id}/end", response_model=CollaborationRead)
+def end_collaboration(
+    request_id: uuid.UUID, db: DbSession, actor: CurrentUser
+) -> CollaborationRead:
+    """End an accepted collaboration. Either party may; neither needs consent.
+
+    Requiring both to agree would mean nobody could ever leave. The thread
+    stays readable -- what was said still happened -- but takes no new
+    messages.
+    """
+    return _respond(db, actor, request_id, CollaborationStatus.ENDED)

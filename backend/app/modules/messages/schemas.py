@@ -70,6 +70,9 @@ class ConversationRead(BaseModel):
     #: "Soil sensors" for a project; the other person's name for a request.
     title: str
     participants: list[Participant]
+    #: False once the collaboration behind it has ended: readable, not
+    #: writable. Project threads are always open.
+    open: bool
     unread_count: int
     last_message_at: datetime | None
     #: First line of the newest message, for the list. None on a fresh thread,

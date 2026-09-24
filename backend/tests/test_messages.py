@@ -500,3 +500,140 @@ def test_deleting_the_subject_takes_the_thread_with_it(client: TestClient, world
     )
 
     assert client.get("/api/v1/me/conversations", headers=auth(world.faculty)).json() == []
+
+
+# ------------------------------------------- ending what was started
+
+
+def _end(client: TestClient, actor: SeededUser, request_id: str) -> int:
+    return client.post(f"/api/v1/collaborations/{request_id}/end", headers=auth(actor)).status_code
+
+
+def _accepted_request_id(client: TestClient, world: World) -> str:
+    request_id: str = client.post(
+        "/api/v1/collaborations",
+        headers=auth(world.student),
+        json={"recipient_id": str(world.faculty.id), "message": "May I join the sensor work?"},
+    ).json()["id"]
+    client.post(f"/api/v1/collaborations/{request_id}/accept", headers=auth(world.faculty))
+    return request_id
+
+
+def test_either_party_may_end_a_collaboration(client: TestClient, world: World) -> None:
+    """It takes two to start one and one to stop it: requiring both to agree
+    would mean nobody could ever leave."""
+    request_id = _accepted_request_id(client, world)
+
+    assert _end(client, world.student, request_id) == 200
+
+
+def test_the_other_party_may_end_it_too(client: TestClient, world: World) -> None:
+    request_id = _accepted_request_id(client, world)
+
+    assert _end(client, world.faculty, request_id) == 200
+
+
+def test_an_outsider_cannot_end_someone_elses_collaboration(
+    client: TestClient, world: World
+) -> None:
+    request_id = _accepted_request_id(client, world)
+
+    assert _end(client, world.other_student, request_id) == 404
+
+
+def test_a_pending_request_cannot_be_ended(client: TestClient, world: World) -> None:
+    """Declining and cancelling are the answers while it is still a question."""
+    request_id = client.post(
+        "/api/v1/collaborations",
+        headers=auth(world.student),
+        json={"recipient_id": str(world.faculty.id), "message": "Hello?"},
+    ).json()["id"]
+
+    assert _end(client, world.faculty, request_id) == 409
+
+
+def test_ending_it_twice_is_refused(client: TestClient, world: World) -> None:
+    request_id = _accepted_request_id(client, world)
+    assert _end(client, world.student, request_id) == 200
+
+    assert _end(client, world.student, request_id) == 409
+
+
+def test_an_ended_collaboration_keeps_its_thread_readable(client: TestClient, world: World) -> None:
+    """What was said still happened. The record survives the relationship."""
+    request_id = _accepted_request_id(client, world)
+    thread_id = client.get("/api/v1/me/conversations", headers=auth(world.student)).json()[0]["id"]
+    _send(client, world.student, thread_id, "Thanks for having me")
+
+    assert _end(client, world.faculty, request_id) == 200
+
+    page = client.get(
+        f"/api/v1/conversations/{thread_id}/messages", headers=auth(world.student)
+    ).json()
+    assert [item["body"] for item in page["items"]] == ["Thanks for having me"]
+
+
+def test_an_ended_collaboration_takes_no_new_messages(client: TestClient, world: World) -> None:
+    request_id = _accepted_request_id(client, world)
+    thread_id = client.get("/api/v1/me/conversations", headers=auth(world.student)).json()[0]["id"]
+    _end(client, world.faculty, request_id)
+
+    response = client.post(
+        f"/api/v1/conversations/{thread_id}/messages",
+        headers=auth(world.student),
+        json={"body": "one more thing"},
+    )
+
+    assert response.status_code == 409
+    assert "read-only" in response.json()["error"]["message"]
+
+
+def test_the_thread_says_it_is_closed(client: TestClient, world: World) -> None:
+    """So the composer can be hidden rather than failing on submit."""
+    request_id = _accepted_request_id(client, world)
+    before = client.get("/api/v1/me/conversations", headers=auth(world.student)).json()[0]
+    assert before["open"] is True
+
+    _end(client, world.faculty, request_id)
+
+    after = client.get("/api/v1/me/conversations", headers=auth(world.student)).json()[0]
+    assert after["open"] is False
+
+
+def test_a_project_thread_never_closes_this_way(client: TestClient, world: World) -> None:
+    """A project has its own lifecycle, and an archived project's team can
+    still need to talk about what happened."""
+    thread = client.post(
+        f"/api/v1/projects/{world.project_id}/conversation", headers=auth(world.faculty)
+    ).json()
+
+    assert thread["open"] is True
+
+
+def test_accepting_still_works_when_the_thread_cannot_be_opened(
+    client: TestClient, world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The bug this guards: chat shipped before its migration, so every
+    acceptance answered 500 and the collaboration was never accepted at all.
+    Chat is additive; it must never take the older feature down with it."""
+    from sqlalchemy.exc import OperationalError
+
+    from app.modules.collaborations import service as collaboration_service
+
+    def explode(*args: object, **kwargs: object) -> None:
+        raise OperationalError("SELECT 1", {}, Exception('relation "conversations" does not exist'))
+
+    monkeypatch.setattr(collaboration_service.messages_service, "open_for_collaboration", explode)
+
+    request_id = client.post(
+        "/api/v1/collaborations",
+        headers=auth(world.student),
+        json={"recipient_id": str(world.faculty.id), "message": "May I join?"},
+    ).json()["id"]
+
+    accepted = client.post(
+        f"/api/v1/collaborations/{request_id}/accept", headers=auth(world.faculty)
+    )
+
+    assert accepted.status_code == 200, accepted.json()
+    assert accepted.json()["status"] == "accepted", "the acceptance survives"

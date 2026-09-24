@@ -40,6 +40,11 @@ class MessageTooLongError(Exception):
     """Guarded by the schema as well; kept so the service stands alone."""
 
 
+class ThreadClosedError(Exception):
+    """The collaboration behind this thread has ended, so it takes no new
+    messages. Reading it is still allowed: what was said still happened."""
+
+
 # --------------------------------------------------------------- opening threads
 
 
@@ -275,6 +280,24 @@ def _previews(db: Session, conversation_ids: list[uuid.UUID]) -> dict[uuid.UUID,
     }
 
 
+def _closed_threads(db: Session, conversation_ids: list[uuid.UUID]) -> dict[uuid.UUID, bool]:
+    """Which of these threads no longer take messages, in one query."""
+    if not conversation_ids:
+        return {}
+    rows = db.execute(
+        select(Conversation.id, CollaborationRequest.status)
+        .join(
+            CollaborationRequest,
+            CollaborationRequest.id == Conversation.collaboration_request_id,
+        )
+        .where(Conversation.id.in_(conversation_ids))
+    ).all()
+    return {
+        conversation_id: status is not CollaborationStatus.ACCEPTED
+        for conversation_id, status in rows
+    }
+
+
 def list_conversations(db: Session, viewer: User) -> list[ConversationRead]:
     """Every thread this person takes part in, most recent activity first.
 
@@ -298,6 +321,7 @@ def list_conversations(db: Session, viewer: User) -> list[ConversationRead]:
     participants = _participant_rows(db, ids)
     unread = _unread_counts(db, viewer, ids)
     previews = _previews(db, ids)
+    closed = _closed_threads(db, ids)
 
     reads: list[ConversationRead] = []
     for conversation in conversations:
@@ -318,6 +342,7 @@ def list_conversations(db: Session, viewer: User) -> list[ConversationRead]:
                     )
                     for person in people
                 ],
+                open=not closed.get(conversation.id, False),
                 unread_count=unread.get(conversation.id, 0),
                 last_message_at=conversation.last_message_at,
                 preview=previews.get(conversation.id),
@@ -379,8 +404,24 @@ def read_messages(
 # ------------------------------------------------------------------- writing
 
 
+def is_closed(db: Session, conversation_id: uuid.UUID) -> bool:
+    """True once the collaboration behind the thread has ended.
+
+    Project threads never close this way: a project has its own lifecycle, and
+    an archived project's team can still need to talk about what happened.
+    """
+    status = db.execute(
+        select(CollaborationRequest.status)
+        .join(Conversation, Conversation.collaboration_request_id == CollaborationRequest.id)
+        .where(Conversation.id == conversation_id)
+    ).scalar_one_or_none()
+    return status is not None and status is not CollaborationStatus.ACCEPTED
+
+
 def send_message(db: Session, sender: User, conversation_id: uuid.UUID, body: str) -> MessageRead:
     assert_participant(db, conversation_id, sender)
+    if is_closed(db, conversation_id):
+        raise ThreadClosedError
 
     message = Message(conversation_id=conversation_id, sender_id=sender.id, body=body.strip())
     db.add(message)

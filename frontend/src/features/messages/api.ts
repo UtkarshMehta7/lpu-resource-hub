@@ -17,6 +17,8 @@ export interface Conversation {
   subject_id: string;
   title: string;
   participants: Participant[];
+  /** False once the collaboration behind it has ended: readable, not writable. */
+  open: boolean;
   unread_count: number;
   last_message_at: string | null;
   preview: string | null;

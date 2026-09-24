@@ -110,6 +110,30 @@ real.
 - A whitespace-only message was accepted and stored blank before the schema
   trimmed first; `min_length` counts spaces. Fixed with a validator, tested.
 
+## Amendment, same day: ending a collaboration, and not taking it down with us
+
+Two things the first pass got wrong, both found by using it rather than by
+testing it.
+
+**Chat took collaboration down with it.** Opening a thread on acceptance was a
+plain call inside the accepting transaction, so on the deployed instance --
+where the code shipped before its migration -- every acceptance answered 500
+and the collaboration was never accepted at all. An additive feature broke an
+older, more important one. It now runs in a savepoint and swallows
+`SQLAlchemyError`: the acceptance commits, the thread is simply missing, and
+the log says why. Tested by making thread creation raise and asserting the
+acceptance still succeeds.
+
+**A collaboration could be started but never ended.** `ACCEPTED -> ENDED` is
+now in the transition table, open to *either* party: it takes two to start one
+and one to stop it, because requiring both to agree would mean nobody could
+ever leave. The thread stays readable and takes no new messages -- what was
+said still happened, and the record outlives the relationship. `open` on the
+conversation says so, so the composer is hidden rather than the person
+discovering it by pressing Send and getting a 409. Project threads never close
+this way: a project has its own lifecycle, and an archived project's team can
+still need to talk about what happened.
+
 ## Alternatives considered
 
 - **Generic user-to-user DMs.** The obvious reading of "add chat", and the
@@ -122,6 +146,11 @@ real.
   bell under a live conversation.
 - **Deleting a moderated message.** Leaves a hole mid-exchange that the other
   party cannot interpret; hiding says what happened.
+- **Requiring both parties to agree before a collaboration ends.** Symmetrical
+  and unworkable: somebody who wants out would need permission from the person
+  they want out from.
+- **Deleting the thread when a collaboration ends.** Destroys the other
+  party's record of an exchange they were half of, to tidy a list.
 - **Deriving thread membership from the project on every read.** Saves a table
   and loses the ability to revoke access without rewriting history — and makes
   every message read a join against project membership.
