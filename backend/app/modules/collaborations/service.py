@@ -18,6 +18,7 @@ from app.core.events import EVENT_BUS, Event, EventName
 from app.modules.collaborations.models import CollaborationRequest, CollaborationStatus
 from app.modules.collaborations.policies import Actor, assert_transition, can_contact
 from app.modules.collaborations.schemas import Box, CollaborationCreate, CollaborationRead, Party
+from app.modules.messages import service as messages_service
 from app.modules.profiles.models import StudentProfile
 from app.modules.projects.models import Project
 from app.modules.projects.policies import visibility_filter as project_visibility
@@ -173,6 +174,12 @@ def respond(
     assert_transition(request.status, target, party)
     request.status = target
     request.responded_at = datetime.now(UTC)
+    if target is CollaborationStatus.ACCEPTED:
+        # Saying yes is what creates somewhere to talk. Nothing a client sends
+        # can open a thread, so there is no channel to anyone who hasn't
+        # agreed to one (ADR 0022).
+        db.flush()
+        messages_service.open_for_collaboration(db, request)
     # Tell the other party what happened.
     other_party = request.sender_id if party == "recipient" else request.recipient_id
     EVENT_BUS.publish(

@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/authContext";
 
+import { MessagesLink } from "@/features/messages/MessagesLink";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 
 import { Brand } from "./Brand";
@@ -35,6 +36,8 @@ const NAV: NavItem[] = [
   { to: "/people/new", label: "Add coordinator", roles: ["admin"] },
   { to: "/people/new", label: "Add faculty", roles: ["research_coordinator"] },
   { to: "/people/new", label: "Add student", roles: ["faculty"] },
+  // Sits next to Requests on purpose: a request accepted becomes a thread.
+  { to: "/messages", label: "Messages" },
   {
     to: "/collaborations",
     label: "Requests",
@@ -105,6 +108,7 @@ export function Header() {
                 More
               </button>
             </nav>
+            <MessagesLink />
             <NotificationBell />
             <button
               type="button"
