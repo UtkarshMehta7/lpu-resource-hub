@@ -43,6 +43,17 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
+            # One transaction per migration, not one for the whole upgrade.
+            #
+            # PostgreSQL will not let a newly added enum value be *used* in
+            # the transaction that added it, unless the type itself was
+            # created there too. Migration 0020 adds 'ended' to
+            # collaboration_status and 0021 selects on it: fine on a database
+            # built from scratch, where the type is created in the same run,
+            # and fatal on a database that already had the type -- which is
+            # every deployed one. It broke production and passed locally,
+            # which is precisely the shape of bug this setting prevents.
+            transaction_per_migration=True,
         )
         with context.begin_transaction():
             context.run_migrations()
