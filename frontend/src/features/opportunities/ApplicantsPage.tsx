@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/authContext";
 import { toApiError } from "@/lib/api/errors";
 import { Uid } from "@/components/ui/Uid";
+import { SkeletonList } from "@/components/ui/Skeleton";
 
 import {
   changeApplicationStatus,
@@ -52,7 +53,11 @@ export function ApplicantsPage() {
         <p className="mt-1 text-sm text-ink-muted">Read-only: only the poster decides.</p>
       ) : null}
 
-      {isPending ? <p className="mt-6 text-sm text-ink-muted">Loading…</p> : null}
+      {isPending ? (
+        <div className="mt-6">
+          <SkeletonList rows={3} />
+        </div>
+      ) : null}
       {isError ? (
         <p role="alert" className="mt-6 text-sm text-red-700">
           You can&apos;t view applications for this opportunity.

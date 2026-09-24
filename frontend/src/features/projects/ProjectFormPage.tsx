@@ -6,6 +6,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
 
 import { TagPicker, type TagOption } from "@/components/ui/TagPicker";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { searchResearchAreas, searchSkills } from "@/features/taxonomy/api";
 import { toApiError } from "@/lib/api/errors";
 
@@ -38,7 +39,7 @@ export function ProjectFormPage() {
     enabled: Boolean(projectId),
   });
 
-  if (projectId && isPending) return <p className="text-sm text-ink-muted">Loading…</p>;
+  if (projectId && isPending) return <SkeletonList rows={3} />;
   return <ProjectForm key={existing?.id ?? "new"} existing={existing ?? null} />;
 }
 

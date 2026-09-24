@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { useAuth } from "@/features/auth/authContext";
 import { ReportButton } from "@/features/reports/ReportButton";
 import { toApiError } from "@/lib/api/errors";
@@ -38,7 +39,7 @@ export function PublicationDetailPage() {
     },
   });
 
-  if (isPending) return <p className="text-sm text-ink-muted">Loading…</p>;
+  if (isPending) return <SkeletonList rows={3} />;
   if (isError) {
     return (
       <p role="alert" className="text-sm text-red-700">

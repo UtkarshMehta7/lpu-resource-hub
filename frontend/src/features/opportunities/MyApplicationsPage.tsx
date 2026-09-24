@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { toApiError } from "@/lib/api/errors";
 
 import { fetchMyApplications, withdrawApplication } from "./api";
@@ -39,7 +40,11 @@ export function MyApplicationsPage() {
           {error}
         </p>
       ) : null}
-      {isPending ? <p className="mt-6 text-sm text-ink-muted">Loading…</p> : null}
+      {isPending ? (
+        <div className="mt-6">
+          <SkeletonList rows={3} />
+        </div>
+      ) : null}
       {isError ? (
         <p role="alert" className="mt-6 text-sm text-red-700">
           Could not load your applications.

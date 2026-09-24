@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Uid } from "@/components/ui/Uid";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { ReportButton } from "@/features/reports/ReportButton";
 import { SaveButton } from "@/features/saved/SaveButton";
 import { useAuth } from "@/features/auth/authContext";
@@ -55,7 +56,7 @@ export function OpportunityDetailPage() {
     },
   });
 
-  if (isPending) return <p className="text-sm text-ink-muted">Loading…</p>;
+  if (isPending) return <SkeletonList rows={3} />;
   if (isError) {
     return (
       <p role="alert" className="text-sm text-red-700">

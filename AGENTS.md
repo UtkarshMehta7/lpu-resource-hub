@@ -88,6 +88,20 @@ Current shape: ~128 API operations, 40 tables, 19 migrations, 22 ADRs,
   migration 0018 as well, and the users page now shows each coordinator's
   scope so a missing one is visible instead of silent.
 
+## UI conventions (white + LPU orange, tokens in frontend/src/index.css)
+- **One button recipe:** `components/ui/buttonClass` + `Button`/`ButtonLink`.
+  Never hand-write `rounded-md bg-brand-700 px-3 py-2 ...` again.
+- **One page top:** `components/ui/PageHeader` (title, one-sentence
+  description, actions). 50 pages had rolled their own.
+- **`components/layout/navigation.ts` is the single list of destinations.** It
+  drives the top bar, the grouped "All pages" menu and the command palette, so
+  a role can never reach a page through one and not another. Add a page there
+  or it is unreachable from two of the three.
+- **Cmd/Ctrl+K (or "/") opens the command palette.** 28 destinations, six fit
+  on the bar; the palette is how people actually get around. It only offers
+  pages the signed-in role can reach.
+- Loading shows `SkeletonList`, not the word "Loading".
+
 ## Gotchas that cost real time here
 - **Autogenerate does not see enum values.** It compares tables, not enum
   members, so `ALTER TYPE ... ADD VALUE IF NOT EXISTS` is written by hand

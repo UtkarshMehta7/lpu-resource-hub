@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { Uid } from "@/components/ui/Uid";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { useAuth } from "@/features/auth/authContext";
 import { ReportButton } from "@/features/reports/ReportButton";
 import { toApiError } from "@/lib/api/errors";
@@ -164,7 +165,7 @@ export function ThreadPage() {
         aria-live="polite"
         aria-label="Messages"
       >
-        {isPending ? <p className="text-sm text-ink-muted">Loading…</p> : null}
+        {isPending ? <SkeletonList rows={3} /> : null}
         {isError ? (
           <p role="alert" className="text-sm text-red-700">
             Could not load the messages.

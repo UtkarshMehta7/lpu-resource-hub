@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Uid } from "@/components/ui/Uid";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { useAuth } from "@/features/auth/authContext";
 
 import { fetchConversations, type Conversation } from "./api";
@@ -31,7 +32,11 @@ export function ConversationsPage() {
         Threads open when a collaboration request is accepted, or when a project team starts one.
       </p>
 
-      {isPending ? <p className="mt-6 text-sm text-ink-muted">Loading…</p> : null}
+      {isPending ? (
+        <div className="mt-6">
+          <SkeletonList rows={3} />
+        </div>
+      ) : null}
       {isError ? (
         <p role="alert" className="mt-6 text-sm text-red-700">
           Could not load your messages.
