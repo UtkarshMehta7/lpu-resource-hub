@@ -83,3 +83,26 @@ def test_an_explicit_setting_still_wins(db_settings: Settings) -> None:
     )
 
     assert production.run_migrations_at_boot is False
+
+
+def test_readiness_reports_a_failed_migration(db_settings: Settings) -> None:
+    """Starting degraded is only defensible if the degradation is visible.
+
+    Refusing to start was worse: the deploy failed, the previous image kept
+    serving, and the reason was only in logs I could not reach.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    app = create_app(db_settings)
+    with TestClient(app) as client:
+        app.state.migration_error = "ProgrammingError: relation does not exist"
+
+        response = client.get("/health/ready")
+
+        assert response.status_code == 503
+        body = response.json()
+        assert body["status"] == "degraded"
+        assert body["database"] == "ok", "the database is fine; the schema is not"
+        assert "relation does not exist" in body["migrations"]
