@@ -22,7 +22,12 @@ from app.db.session import get_db
 from app.modules.collaborations import service
 from app.modules.collaborations.models import CollaborationStatus
 from app.modules.collaborations.policies import InvalidTransitionError, WrongPartyError
-from app.modules.collaborations.schemas import Box, CollaborationCreate, CollaborationRead
+from app.modules.collaborations.schemas import (
+    Box,
+    CollaborationCreate,
+    CollaborationRead,
+    CollaborationSummary,
+)
 from app.modules.users.models import User
 
 router = APIRouter(tags=["collaborations"])
@@ -32,6 +37,10 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 _ERROR_MAP: dict[type[Exception], tuple[int, str]] = {
     service.CollaborationNotFoundError: (status.HTTP_404_NOT_FOUND, "Request not found."),
+    service.AlreadyCollaboratingError: (
+        status.HTTP_409_CONFLICT,
+        "You already have a collaboration with this person. Open the conversation instead.",
+    ),
     service.RecipientNotFoundError: (status.HTTP_404_NOT_FOUND, "Recipient not found."),
     service.ProjectNotFoundError: (status.HTTP_404_NOT_FOUND, "Project not found."),
     WrongPartyError: (
@@ -130,3 +139,16 @@ def end_collaboration(
     messages.
     """
     return _respond(db, actor, request_id, CollaborationStatus.ENDED)
+
+
+@router.get("/collaborations/with/{user_id}", response_model=CollaborationSummary)
+def read_collaboration_state(
+    user_id: uuid.UUID, db: DbSession, viewer: CurrentUser
+) -> CollaborationSummary:
+    """Where the viewer and this person stand.
+
+    One call behind the request button, so it can show what is actually true
+    -- pending, running, or nothing yet -- rather than always offering to
+    start something.
+    """
+    return service.state_between(db, viewer, user_id)

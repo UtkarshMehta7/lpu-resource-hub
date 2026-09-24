@@ -637,3 +637,120 @@ def test_accepting_still_works_when_the_thread_cannot_be_opened(
 
     assert accepted.status_code == 200, accepted.json()
     assert accepted.json()["status"] == "accepted", "the acceptance survives"
+
+
+# ----------------------------- one pair, one relationship, one history
+
+
+def _state(client: TestClient, viewer: SeededUser, other: SeededUser) -> dict[str, object]:
+    response = client.get(f"/api/v1/collaborations/with/{other.id}", headers=auth(viewer))
+    assert response.status_code == 200, response.json()
+    body: dict[str, object] = response.json()
+    return body
+
+
+def test_re_collaborating_reuses_the_same_thread(client: TestClient, world: World) -> None:
+    """The bug as reported: after one collaboration ends and another begins,
+    the pair had two threads and their history was split in two."""
+    first_request = _accepted_request_id(client, world)
+    first_thread = client.get("/api/v1/me/conversations", headers=auth(world.student)).json()[0][
+        "id"
+    ]
+    _send(client, world.student, first_thread, "Good working with you")
+    assert _end(client, world.faculty, first_request) == 200
+
+    # They start again.
+    again = client.post(
+        "/api/v1/collaborations",
+        headers=auth(world.student),
+        json={"recipient_id": str(world.faculty.id), "message": "Shall we pick this back up?"},
+    )
+    assert again.status_code == 201, again.json()
+    client.post(f"/api/v1/collaborations/{again.json()['id']}/accept", headers=auth(world.faculty))
+
+    threads = client.get("/api/v1/me/conversations", headers=auth(world.student)).json()
+    assert len(threads) == 1, "one pair, one thread"
+    assert threads[0]["id"] == first_thread, "the same thread, reopened"
+    assert threads[0]["open"] is True
+
+    # And the history survived the gap.
+    page = client.get(
+        f"/api/v1/conversations/{first_thread}/messages", headers=auth(world.student)
+    ).json()
+    assert [item["body"] for item in page["items"]] == ["Good working with you"]
+
+
+def test_you_cannot_request_someone_you_already_collaborate_with(
+    client: TestClient, world: World
+) -> None:
+    _accepted_request_id(client, world)
+
+    response = client.post(
+        "/api/v1/collaborations",
+        headers=auth(world.student),
+        json={"recipient_id": str(world.faculty.id), "message": "Shall we work together?"},
+    )
+
+    assert response.status_code == 409
+    assert "already have a collaboration" in response.json()["error"]["message"]
+
+
+def test_the_reverse_direction_is_the_same_relationship(client: TestClient, world: World) -> None:
+    """A->B and B->A were separate rows, so two people could hold pending
+    requests to each other and end up with two threads."""
+    _accepted_request_id(client, world)
+
+    response = client.post(
+        "/api/v1/collaborations",
+        headers=auth(world.faculty),
+        json={"recipient_id": str(world.student.id), "message": "Shall we work together?"},
+    )
+
+    assert response.status_code == 409
+
+
+def test_the_state_endpoint_tells_the_button_what_to_show(client: TestClient, world: World) -> None:
+    assert _state(client, world.student, world.faculty)["state"] == "none"
+
+    request_id = client.post(
+        "/api/v1/collaborations",
+        headers=auth(world.student),
+        json={"recipient_id": str(world.faculty.id), "message": "Shall we work together?"},
+    ).json()["id"]
+
+    sender_view = _state(client, world.student, world.faculty)
+    assert sender_view["state"] == "requested"
+    assert sender_view["i_sent_it"] is True
+    assert sender_view["request_id"] == request_id
+
+    recipient_view = _state(client, world.faculty, world.student)
+    assert recipient_view["state"] == "requested"
+    assert recipient_view["i_sent_it"] is False, "they owe the answer"
+
+    client.post(f"/api/v1/collaborations/{request_id}/accept", headers=auth(world.faculty))
+    active = _state(client, world.student, world.faculty)
+    assert active["state"] == "active"
+    assert active["conversation_id"] is not None, "so the button can link to it"
+
+    client.post(f"/api/v1/collaborations/{request_id}/end", headers=auth(world.student))
+    assert _state(client, world.student, world.faculty)["state"] == "ended"
+
+
+def test_declining_leaves_no_relationship_so_they_may_ask_again(
+    client: TestClient, world: World
+) -> None:
+    """A question that was answered no is not a relationship."""
+    request_id = client.post(
+        "/api/v1/collaborations",
+        headers=auth(world.student),
+        json={"recipient_id": str(world.faculty.id), "message": "Shall we work together?"},
+    ).json()["id"]
+    client.post(f"/api/v1/collaborations/{request_id}/decline", headers=auth(world.faculty))
+
+    assert _state(client, world.student, world.faculty)["state"] == "none"
+    again = client.post(
+        "/api/v1/collaborations",
+        headers=auth(world.student),
+        json={"recipient_id": str(world.faculty.id), "message": "Perhaps later in the term?"},
+    )
+    assert again.status_code == 201

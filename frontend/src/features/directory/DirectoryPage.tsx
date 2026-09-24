@@ -6,6 +6,7 @@ import type { Availability } from "@/features/profiles/types";
 import { fetchResearchers, type DirectoryFilters } from "./api";
 import { fetchDepartments, fetchSchools } from "./api-org";
 import { ResearcherCardItem } from "./ResearcherCardItem";
+import { SkeletonList } from "@/components/ui/Skeleton";
 
 const FIELD_CLASS = "mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm";
 
@@ -141,7 +142,7 @@ export function DirectoryPage() {
         </aside>
 
         <section>
-          {isPending ? <p className="text-sm text-ink-muted">Loading researchers…</p> : null}
+          {isPending ? <SkeletonList rows={3} /> : null}
 
           {isError ? (
             <p role="alert" className="text-sm text-red-700">

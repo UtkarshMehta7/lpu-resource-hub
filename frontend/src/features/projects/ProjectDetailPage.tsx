@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Uid } from "@/components/ui/Uid";
+import { SkeletonList } from "@/components/ui/Skeleton";
 import { useAuth } from "@/features/auth/authContext";
 import { RequestCollaborationButton } from "@/features/collaborations/RequestCollaborationButton";
 import { ReportButton } from "@/features/reports/ReportButton";
@@ -93,7 +94,7 @@ export function ProjectDetailPage() {
     },
   });
 
-  if (isPending) return <p className="text-sm text-ink-muted">Loading project…</p>;
+  if (isPending) return <SkeletonList rows={3} />;
   if (isError || !project) {
     return (
       <p role="alert" className="text-sm text-red-700">

@@ -5,6 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { toApiError } from "@/lib/api/errors";
 import { Uid } from "@/components/ui/Uid";
 import { SkeletonList } from "@/components/ui/Skeleton";
+import { StatusPill, type PillTone } from "@/components/ui/StatusPill";
 
 import {
   COLLABORATION_STATUS_LABEL,
@@ -14,6 +15,15 @@ import {
   type CollaborationRequest,
   type CollaborationStatus,
 } from "./api";
+
+/** What each status means, so the colour agrees with the word. */
+const STATUS_TONE: Record<CollaborationStatus, PillTone> = {
+  pending: "warning",
+  accepted: "positive",
+  declined: "negative",
+  cancelled: "neutral",
+  ended: "neutral",
+};
 
 const TAB =
   "rounded-md px-3 py-1.5 text-sm font-medium border border-line aria-selected:bg-brand-700 aria-selected:text-white";
@@ -167,9 +177,9 @@ function RequestItem({
             </>
           ) : null}
         </p>
-        <span className="rounded-md border border-line px-2 py-1 text-xs">
+        <StatusPill tone={STATUS_TONE[request.status]}>
           {COLLABORATION_STATUS_LABEL[request.status]}
-        </span>
+        </StatusPill>
       </div>
       <p className="mt-2 whitespace-pre-line text-sm">{request.message}</p>
       <p className="mt-1 text-xs text-ink-muted">{new Date(request.created_at).toLocaleString()}</p>

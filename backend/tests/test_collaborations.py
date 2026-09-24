@@ -126,15 +126,21 @@ def test_self_unknown_and_inactive_recipients(
     assert _send(client, world.faculty, inactive.id)[0] == 404
 
 
-def test_db_rejects_self_request(client: TestClient, world: World, db_settings: Settings) -> None:
+def test_db_rejects_a_pair_with_itself(
+    client: TestClient, world: World, db_settings: Settings
+) -> None:
+    """Nobody collaborates with themselves, and the database says so.
+
+    This used to insert a self-addressed request directly. Requests now carry
+    a NOT NULL collaboration_id, so that insert would raise for the wrong
+    reason and prove nothing. The guarantee moved up to the pair: user_a_id <
+    user_b_id cannot hold when they are the same person.
+    """
     engine = create_engine(str(db_settings.database_url))
     try:
         with pytest.raises(IntegrityError), engine.begin() as connection:
             connection.execute(
-                text(
-                    "INSERT INTO collaboration_requests (sender_id, recipient_id, message) "
-                    "VALUES (:u, :u, 'me')"
-                ),
+                text("INSERT INTO collaborations (user_a_id, user_b_id) VALUES (:u, :u)"),
                 {"u": str(world.faculty.id)},
             )
     finally:
@@ -173,27 +179,52 @@ def test_only_sender_cancels(client: TestClient, world: World) -> None:
     assert _act(client, world.faculty, request_id, "accept") == 409
 
 
-def test_duplicate_pending_blocked(client: TestClient, world: World) -> None:
+def test_one_live_relationship_per_pair(client: TestClient, world: World) -> None:
+    """The pair is one row, so there is one answer to "are we collaborating?".
+
+    This used to be three separate yeses: a second request in the same
+    direction was refused, but the reverse direction was allowed, and a
+    project-scoped request was allowed alongside a general one -- so two
+    people could end up with three live requests and, once accepted, three
+    conversations (ADR 0023).
+    """
     first = _request_id(client, world.faculty, world.other_faculty)
-    assert _send(client, world.faculty, world.other_faculty.id)[0] == 409
-    # The reverse direction is a different request.
-    assert _send(client, world.other_faculty, world.faculty.id)[0] == 201
-    # A request about a specific project is distinct from a general one.
+
+    assert _send(client, world.faculty, world.other_faculty.id)[0] == 409, "same direction"
+    assert _send(client, world.other_faculty, world.faculty.id)[0] == 409, "reverse direction"
+
     project_id = client.post(
         "/api/v1/projects",
         headers=_auth(world.faculty),
         json={"title": "Private draft", "summary": "S", "description": "D"},
     ).json()["id"]
+    code, _ = _send(client, world.faculty, world.other_faculty.id, project_id=project_id)
+    assert code == 409, "a project does not buy a second relationship"
+
+    # Once answered, there is no relationship, so either may ask again.
+    assert _act(client, world.other_faculty, first, "decline") == 200
+    assert _send(client, world.faculty, world.other_faculty.id)[0] == 201
+
+
+def test_a_project_scoped_request_still_carries_the_project(
+    client: TestClient, world: World
+) -> None:
+    """Keeping the pair as the relationship does not lose the project a
+    request is about -- nor show a draft to somebody who can't see it."""
+    project_id = client.post(
+        "/api/v1/projects",
+        headers=_auth(world.faculty),
+        json={"title": "Private draft", "summary": "S", "description": "D"},
+    ).json()["id"]
+
     code, body = _send(client, world.faculty, world.other_faculty.id, project_id=project_id)
+
     assert code == 201
-    assert body["project_title"] == "Private draft"  # the sender can see it
+    assert body["project_title"] == "Private draft", "the sender can see it"
     received = client.get(
         f"/api/v1/collaborations/{body['id']}", headers=_auth(world.other_faculty)
     ).json()
-    assert received["project_title"] is None  # the recipient can't see the draft
-    # Once answered, a new request may be sent.
-    assert _act(client, world.other_faculty, first, "decline") == 200
-    assert _send(client, world.faculty, world.other_faculty.id)[0] == 201
+    assert received["project_title"] is None, "the recipient cannot see the draft"
 
 
 def test_cannot_reference_a_project_you_cannot_see(client: TestClient, world: World) -> None:

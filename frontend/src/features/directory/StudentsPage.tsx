@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { RequestCollaborationButton } from "@/features/collaborations/RequestCollaborationButton";
 import { Uid } from "@/components/ui/Uid";
+import { SkeletonList } from "@/components/ui/Skeleton";
 
 import { fetchDiscoverableStudents } from "./api";
 
@@ -40,7 +41,11 @@ export function StudentsPage() {
         className="mt-4 w-full max-w-md rounded-md border border-line bg-surface px-3 py-2 text-sm"
       />
 
-      {isPending ? <p className="mt-6 text-sm text-ink-muted">Loading students…</p> : null}
+      {isPending ? (
+        <div className="mt-6">
+          <SkeletonList rows={3} />
+        </div>
+      ) : null}
 
       {isError ? (
         <p role="alert" className="mt-6 text-sm text-red-700">
