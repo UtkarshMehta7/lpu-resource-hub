@@ -13,6 +13,11 @@ from app.modules.bookings.models import Booking  # noqa: F401
 from app.modules.collaborations.models import CollaborationRequest  # noqa: F401
 from app.modules.facilities.models import Equipment, Facility  # noqa: F401
 from app.modules.funding.models import FundingOpportunity, FundingResearchArea  # noqa: F401
+from app.modules.messages.models import (  # noqa: F401
+    Conversation,
+    ConversationParticipant,
+    Message,
+)
 from app.modules.notifications.models import Notification  # noqa: F401
 from app.modules.opportunities.models import Opportunity, OpportunitySkill  # noqa: F401
 from app.modules.profiles.models import (  # noqa: F401

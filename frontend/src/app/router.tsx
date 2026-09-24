@@ -37,6 +37,8 @@ import { AnalyticsPage } from "@/features/analytics/AnalyticsPage";
 import { AuditLogPage } from "@/features/admin/AuditLogPage";
 import { PlatformSettingsPage } from "@/features/admin/PlatformSettingsPage";
 import { CreateAccountPage } from "@/features/admin/CreateAccountPage";
+import { ConversationsPage } from "@/features/messages/ConversationsPage";
+import { ThreadPage } from "@/features/messages/ThreadPage";
 import { PeoplePage } from "@/features/admin/PeoplePage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ModerationQueuePage } from "@/features/reports/ModerationQueuePage";
@@ -86,6 +88,10 @@ export const router = createBrowserRouter([
           { path: "opportunities/:opportunityId/applicants", element: <ApplicantsPage /> },
           { path: "me/applications", element: <MyApplicationsPage /> },
           { path: "collaborations", element: <CollaborationsPage /> },
+          // Any signed-in role can have threads: they only exist where a
+          // relationship already does (ADR 0022).
+          { path: "messages", element: <ConversationsPage /> },
+          { path: "messages/:conversationId", element: <ThreadPage /> },
           { path: "search", element: <SearchPage /> },
           { path: "recommendations", element: <RecommendationsPage /> },
           { path: "dashboard", element: <DashboardPage /> },

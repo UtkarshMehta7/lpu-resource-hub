@@ -28,6 +28,10 @@ SEARCH_RATE_LIMIT_WINDOW_SECONDS = 60.0
 # user (not IP): enough for genuine outreach, not enough to spam a department.
 COLLABORATION_RATE_LIMIT_MAX_REQUESTS = 10
 COLLABORATION_RATE_LIMIT_WINDOW_SECONDS = 3600.0
+# Chat is conversation, not outreach: the budget has to allow a real
+# back-and-forth while still stopping a script from flooding a thread.
+MESSAGE_RATE_LIMIT_MAX_REQUESTS = 60
+MESSAGE_RATE_LIMIT_WINDOW_SECONDS = 60.0
 
 
 @dataclass
@@ -68,6 +72,23 @@ def create_collaboration_rate_limiter() -> RateLimiter:
         max_requests=COLLABORATION_RATE_LIMIT_MAX_REQUESTS,
         window_seconds=COLLABORATION_RATE_LIMIT_WINDOW_SECONDS,
     )
+
+
+def create_message_rate_limiter() -> RateLimiter:
+    return RateLimiter(
+        max_requests=MESSAGE_RATE_LIMIT_MAX_REQUESTS,
+        window_seconds=MESSAGE_RATE_LIMIT_WINDOW_SECONDS,
+    )
+
+
+def enforce_message_rate_limit(request: Request, user_id: uuid.UUID) -> None:
+    """Per-user budget for sending messages."""
+    limiter: RateLimiter = request.app.state.message_rate_limiter
+    if not limiter.allow(str(user_id)):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="You're sending messages too quickly. Give it a moment.",
+        )
 
 
 def enforce_collaboration_rate_limit(request: Request, user_id: uuid.UUID) -> None:
