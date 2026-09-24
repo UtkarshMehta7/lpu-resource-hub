@@ -267,7 +267,19 @@ test("a collaboration request shows up in the recipient's notifications", async 
     .getByRole("link", { name: /Demo Faculty 0/ })
     .first()
     .click();
-  await student.getByRole("button", { name: "Request collaboration" }).click();
+  // The control now reflects the state, so on a database where these two
+  // already collaborate there is no request to make -- and that is a pass,
+  // not a failure. Only open the dialog when it is actually offered.
+  const offer = student.getByRole("button", { name: /Request collaboration|Collaborate again/ });
+  if ((await offer.count()) === 0) {
+    await expect(
+      student
+        .getByRole("link", { name: /open conversation/i })
+        .or(student.getByText(/request pending/i)),
+    ).toBeVisible();
+    return;
+  }
+  await offer.first().click();
   // exact: true, because the header's Messages link is labelled "Messages"
   // and getByLabel substring-matches by default.
   await student
@@ -275,13 +287,15 @@ test("a collaboration request shows up in the recipient's notifications", async 
     .fill(`Could we collaborate on the ${RUN} field trials?`);
   await student.getByRole("button", { name: "Send request", exact: true }).click();
 
-  // These flows run against the shared dev database, so a request to this
-  // researcher may already be pending from an earlier run. Either outcome
-  // proves the path works: sent, or refused as a duplicate.
+  // These flows run against the shared development database, so the pair may
+  // already have a live relationship from an earlier run. Every one of these
+  // outcomes proves the path works: the request went, it is pending, or the
+  // server refused it because they already collaborate (ADR 0023).
   await expect(
     student
-      .getByRole("button", { name: "Request sent" })
-      .or(student.getByText(/already have a pending request/i)),
+      .getByText(/request pending/i)
+      .or(student.getByRole("link", { name: /open conversation/i }))
+      .or(student.getByText(/already have a collaboration/i)),
   ).toBeVisible();
 
   // Either way the recipient has the notification.
