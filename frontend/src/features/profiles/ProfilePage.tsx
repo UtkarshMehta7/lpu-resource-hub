@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { StatusIndicator, type StatusTone } from "@/components/ui/StatusIndicator";
 import { useAuth } from "@/features/auth/authContext";
 import { toApiError } from "@/lib/api/errors";
+import { DepartmentCoordinatorCard } from "./DepartmentCoordinatorCard";
 
 import { fetchMyProfile, saveProfile } from "./api";
 import { ProfileForm } from "./ProfileForm";
@@ -52,6 +53,8 @@ export function ProfilePage() {
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-semibold tracking-tight">My profile</h1>
+
+      <DepartmentCoordinatorCard />
 
       {profile === null ? (
         <p className="mt-2 text-sm text-ink-muted">
