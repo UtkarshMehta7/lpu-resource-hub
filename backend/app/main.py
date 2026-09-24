@@ -92,7 +92,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.migration_error = None
     if settings.run_migrations_at_boot:
         try:
-            upgrade_to_head(engine, settings)
+            upgrade_to_head(settings)
         except Exception as exc:  # noqa: BLE001 -- recorded and reported, not swallowed
             # Refusing to start was the wrong call. It turned a migration
             # problem into a failed deploy, which left the *previous* image
