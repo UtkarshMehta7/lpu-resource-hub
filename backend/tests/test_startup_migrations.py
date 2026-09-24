@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from sqlalchemy import create_engine, text
 
-from app.core.config import Settings
+from app.core.config import Environment, Settings
 from app.db.migrations import MIGRATION_LOCK_ID, upgrade_to_head
 
 pytestmark = pytest.mark.db
@@ -60,7 +60,26 @@ def test_the_lock_is_released_afterwards(db_settings: Settings) -> None:
         engine.dispose()
 
 
-def test_it_is_off_unless_asked_for(db_settings: Settings) -> None:
-    """Local work and the test suite migrate explicitly; a surprise schema
-    change while you are mid-task is its own kind of unpleasant."""
-    assert Settings.model_fields["run_migrations_on_start"].default is False
+def test_production_migrates_itself_without_being_told(db_settings: Settings) -> None:
+    """It must not depend on an environment variable being set.
+
+    render.yaml only governs a Blueprint-synced service. The live service was
+    configured by hand, so RUN_MIGRATIONS_ON_START never reached it and the
+    site stayed broken with the fix already deployed.
+    """
+    production = db_settings.model_copy(update={"app_env": Environment.PRODUCTION})
+
+    assert production.run_migrations_at_boot is True
+
+
+def test_development_does_not(db_settings: Settings) -> None:
+    """A schema changing under you mid-task is its own kind of unpleasant."""
+    assert db_settings.run_migrations_at_boot is False
+
+
+def test_an_explicit_setting_still_wins(db_settings: Settings) -> None:
+    production = db_settings.model_copy(
+        update={"app_env": Environment.PRODUCTION, "run_migrations_on_start": False}
+    )
+
+    assert production.run_migrations_at_boot is False

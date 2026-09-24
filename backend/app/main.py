@@ -89,7 +89,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         logger.info("Database connection OK (%s)", settings.database_summary())
 
-    if settings.run_migrations_on_start:
+    if settings.run_migrations_at_boot:
         try:
             upgrade_to_head(engine, settings)
         except Exception:
