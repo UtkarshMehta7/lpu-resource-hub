@@ -33,6 +33,7 @@ Against a deployed database, pass the connection string explicitly:
 from __future__ import annotations
 
 import sys
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 
@@ -385,6 +386,10 @@ class Summary:
     funding: int = 0
     collaborations: int = 0
     messages: int = 0
+    applications: int = 0
+    saved_items: int = 0
+    notifications: int = 0
+    reports: int = 0
     notes: list[str] = field(default_factory=list)
 
 
@@ -929,6 +934,12 @@ def seed(db: Session) -> Summary:
     for plan in PLAN:
         _seed_school(db, plan, admin, summary)
 
+    # The screens that would otherwise be empty. A feature that works and
+    # shows nothing reads as unfinished.
+    _seed_applications(db, summary)
+    _seed_saved_items(db, summary)
+    _seed_moderation(db, summary)
+
     owner = (
         admin
         or db.execute(select(User).where(User.role == UserRole.RESEARCH_COORDINATOR))
@@ -937,6 +948,7 @@ def seed(db: Session) -> Summary:
     )
     if owner is not None:
         _seed_funding(db, owner, summary)
+        _seed_notifications(db, summary)
     else:
         summary.notes.append("No administrator or coordinator found; funding calls skipped.")
 
@@ -970,11 +982,242 @@ def main() -> int:
     print(f"  funding calls:  {summary.funding}")
     print(f"  collaborations: {summary.collaborations}")
     print(f"  messages:       {summary.messages}")
+    print(f"  applications:   {summary.applications}")
+    print(f"  saved items:    {summary.saved_items}")
+    print(f"  notifications:  {summary.notifications}")
+    print(f"  open reports:   {summary.reports}")
     for note in summary.notes:
         print(f"  note: {note}")
     print("\nPasswords follow first-name + 123456 (Aryan Verma -> Aryan123456).")
     print("Demonstration convenience only. Fictional data throughout.")
     return 0
+
+
+# --------------------------------------------------- the features that look empty
+#
+# A feature that works perfectly and shows an empty page reads as unfinished.
+# These fill the screens that had nothing on them: applications at several
+# stages, saved items, notifications, and one report waiting in the moderation
+# queue. Everything below is still fictional and still idempotent.
+
+
+def _seed_applications(db: Session, summary: Summary) -> None:
+    """Applications across the openings, at different stages.
+
+    The status timeline is the point of the applicant view, and a timeline
+    with one entry does not show it.
+    """
+    from app.modules.applications.models import Application, ApplicationStatus
+
+    openings = db.execute(select(Opportunity).order_by(Opportunity.title)).scalars().all()
+    students = (
+        db.execute(
+            select(User)
+            .where(User.role == UserRole.STUDENT, User.registration_number.like("124%"))
+            .order_by(User.registration_number)
+        )
+        .scalars()
+        .all()
+    )
+    if not openings or not students:
+        return
+
+    stages = [
+        ApplicationStatus.SUBMITTED,
+        ApplicationStatus.UNDER_REVIEW,
+        ApplicationStatus.SHORTLISTED,
+        ApplicationStatus.ACCEPTED,
+        ApplicationStatus.REJECTED,
+    ]
+    statements = [
+        "I have taken the relevant coursework and would like to work on the data collection.",
+        "I have been part of a similar project last semester and can start immediately.",
+        "I am interested in the methods side and would like to learn the analysis pipeline.",
+    ]
+
+    for index, opening in enumerate(openings):
+        for offset in range(2):
+            applicant = students[(index * 2 + offset) % len(students)]
+            existing = db.execute(
+                select(Application).where(
+                    Application.opportunity_id == opening.id,
+                    Application.applicant_id == applicant.id,
+                )
+            ).scalar_one_or_none()
+            if existing is not None:
+                continue
+            status = stages[(index + offset) % len(stages)]
+            decided = status in {ApplicationStatus.ACCEPTED, ApplicationStatus.REJECTED}
+            db.add(
+                Application(
+                    opportunity_id=opening.id,
+                    applicant_id=applicant.id,
+                    statement=statements[(index + offset) % len(statements)],
+                    status=status,
+                    decided_by=opening.created_by if decided else None,
+                    decided_at=NOW - timedelta(days=1) if decided else None,
+                    note="Strong fit for the fieldwork." if decided else None,
+                )
+            )
+            summary.applications += 1
+    db.flush()
+
+
+def _seed_saved_items(db: Session, summary: Summary) -> None:
+    """Bookmarks, so /me/saved is not an empty page during a demonstration."""
+    from app.modules.profiles.models import SavedItem
+
+    students = (
+        db.execute(
+            select(User)
+            .where(User.role == UserRole.STUDENT, User.registration_number.like("124%"))
+            .order_by(User.registration_number)
+        )
+        .scalars()
+        .all()
+    )
+    projects = (
+        db.execute(select(Project).where(Project.status == ProjectStatus.ACTIVE)).scalars().all()
+    )
+    openings = db.execute(select(Opportunity)).scalars().all()
+    funding = db.execute(select(FundingOpportunity)).scalars().all()
+    researchers = db.execute(select(User).where(User.role == UserRole.FACULTY)).scalars().all()
+    if not students:
+        return
+
+    def save(user: User, **target: uuid.UUID) -> None:
+        column, value = next(iter(target.items()))
+        exists = db.execute(
+            select(SavedItem).where(
+                SavedItem.user_id == user.id,
+                getattr(SavedItem, column) == value,
+            )
+        ).scalar_one_or_none()
+        if exists is None:
+            db.add(SavedItem(user_id=user.id, **target))
+            summary.saved_items += 1
+
+    for index, student in enumerate(students[:8]):
+        if projects:
+            save(student, project_id=projects[index % len(projects)].id)
+        if openings:
+            save(student, opportunity_id=openings[index % len(openings)].id)
+        if researchers:
+            save(student, researcher_id=researchers[index % len(researchers)].id)
+        if funding:
+            save(student, funding_id=funding[index % len(funding)].id)
+    db.flush()
+
+
+def _seed_notifications(db: Session, summary: Summary) -> None:
+    """A populated bell. Written directly rather than through the event bus,
+    because these describe things that already happened in the seed."""
+    from app.modules.notifications.models import Notification, NotificationType
+
+    people = (
+        db.execute(
+            select(User)
+            .where(User.registration_number.like("124%"), User.role != UserRole.ADMIN)
+            .order_by(User.registration_number)
+        )
+        .scalars()
+        .all()
+    )
+    funding = (
+        db.execute(select(FundingOpportunity).order_by(FundingOpportunity.deadline))
+        .scalars()
+        .first()
+    )
+    openings = db.execute(select(Opportunity).order_by(Opportunity.deadline)).scalars().all()
+    if not people or not openings:
+        return
+
+    for index, person in enumerate(people[:14]):
+        opening = openings[index % len(openings)]
+        entries: list[tuple[NotificationType, dict[str, object], str]] = [
+            (
+                NotificationType.RELEVANT_OPPORTUNITY,
+                {
+                    "opportunity_id": str(opening.id),
+                    "opportunity_title": opening.title,
+                    "reasons": ["Matches your declared skills"],
+                },
+                f"opportunity:{opening.id}",
+            )
+        ]
+        if funding is not None and index % 3 == 0:
+            entries.append(
+                (
+                    NotificationType.DEADLINE_REMINDER,
+                    {
+                        "kind": "funding",
+                        "item_id": str(funding.id),
+                        "title": funding.title,
+                        "days_left": max((funding.deadline - TODAY).days, 1),
+                    },
+                    f"funding:{funding.id}:7",
+                )
+            )
+        for kind, payload, key in entries:
+            exists = db.execute(
+                select(Notification).where(
+                    Notification.user_id == person.id, Notification.dedupe_key == key
+                )
+            ).scalar_one_or_none()
+            if exists is None:
+                db.add(
+                    Notification(
+                        user_id=person.id,
+                        notification_type=kind,
+                        payload=payload,
+                        dedupe_key=key,
+                    )
+                )
+                summary.notifications += 1
+    db.flush()
+
+
+def _seed_moderation(db: Session, summary: Summary) -> None:
+    """One open report, so the moderation queue has something to decide."""
+    from app.modules.reports.models import ContentReport, ReportStatus, ReportTargetType
+
+    project = (
+        db.execute(
+            select(Project).where(Project.status == ProjectStatus.ACTIVE).order_by(Project.title)
+        )
+        .scalars()
+        .first()
+    )
+    reporter = (
+        db.execute(
+            select(User).where(User.role == UserRole.STUDENT, User.registration_number.like("124%"))
+        )
+        .scalars()
+        .first()
+    )
+    if project is None or reporter is None:
+        return
+    exists = db.execute(
+        select(ContentReport).where(
+            ContentReport.reporter_id == reporter.id, ContentReport.target_id == project.id
+        )
+    ).scalar_one_or_none()
+    if exists is not None:
+        return
+    db.add(
+        ContentReport(
+            reporter_id=reporter.id,
+            target_type=ReportTargetType.PROJECT,
+            target_id=project.id,
+            reason=(
+                "The summary claims results that are not in the linked publication. "
+                "Please check before this is shown to applicants."
+            ),
+            status=ReportStatus.OPEN,
+        )
+    )
+    summary.reports += 1
+    db.flush()
 
 
 if __name__ == "__main__":
