@@ -6,6 +6,8 @@ import { useAuth } from "@/features/auth/authContext";
 import { MessagesLink } from "@/features/messages/MessagesLink";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 
+import { MenuIcon, SearchIcon } from "@/components/ui/icons";
+
 import { Brand } from "./Brand";
 import { CommandPalette } from "./CommandPalette";
 import { NAV_GROUPS, navigationFor } from "./navigation";
@@ -13,7 +15,8 @@ import { useCommandPalette } from "./useCommandPalette";
 import { Uid } from "@/components/ui/Uid";
 
 const LINK =
-  "whitespace-nowrap text-sm font-medium hover:underline aria-[current=page]:text-brand-700";
+  "whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors " +
+  "hover:bg-canvas aria-[current=page]:bg-brand-50 aria-[current=page]:text-brand-800";
 
 export function Header() {
   const { isAuthenticated, isLoading, user, logout } = useAuth();
@@ -30,57 +33,53 @@ export function Header() {
 
   return (
     <header className="border-b border-line bg-surface">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4">
+      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
         <Brand />
 
         {isLoading ? null : isAuthenticated && user ? (
           <>
-            <nav aria-label="Main" className="hidden items-center gap-3 lg:flex">
+            <nav aria-label="Main" className="ml-auto hidden items-center gap-1 xl:flex">
               {items.slice(0, 6).map((item) => (
                 <NavLink key={item.label} to={item.to} className={LINK}>
                   {item.label}
                 </NavLink>
               ))}
-              {/* Says out loud that the shortcut exists -- a palette nobody
-                  knows about is a palette nobody uses. */}
+            </nav>
+
+            {/* Actions sit together on the right, in one row that cannot wrap. */}
+            <div className="ml-auto flex shrink-0 items-center gap-1.5 xl:ml-0">
               <button
                 type="button"
                 onClick={() => palette.setOpen(true)}
-                className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm text-ink-muted hover:bg-canvas"
+                className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-line px-2.5 py-1.5 text-sm text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
                 aria-keyshortcuts="Meta+K Control+K"
+                aria-label="Go to a page"
+                title="Go to a page (⌘K)"
               >
-                <span aria-hidden="true">🔍</span>
-                Go to…
-                <kbd className="rounded border border-line bg-canvas px-1 font-sans text-xs">
+                <SearchIcon />
+                <span className="hidden sm:inline">Go to</span>
+                <kbd className="hidden rounded border border-line bg-canvas px-1 py-px font-sans text-[10px] font-medium sm:inline">
                   ⌘K
                 </kbd>
               </button>
+              <MessagesLink />
+              <NotificationBell />
               <button
                 type="button"
                 aria-expanded={menuOpen}
                 aria-controls="more-menu"
                 onClick={() => setMenuOpen((open) => !open)}
-                className="rounded-md border border-line px-3 py-1.5 text-sm font-medium"
+                className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-line px-2.5 py-1.5 text-sm font-medium transition-colors hover:bg-canvas"
               >
-                All pages
+                <MenuIcon />
+                <span className="hidden sm:inline">All pages</span>
               </button>
-            </nav>
-            <MessagesLink />
-            <NotificationBell />
-            <button
-              type="button"
-              aria-expanded={menuOpen}
-              aria-controls="more-menu"
-              onClick={() => setMenuOpen((open) => !open)}
-              className="rounded-md border border-line px-3 py-1.5 text-sm font-medium lg:hidden"
-            >
-              Menu
-            </button>
+            </div>
           </>
         ) : (
           <Link
             to="/login"
-            className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
+            className="ml-auto shrink-0 whitespace-nowrap rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-800"
           >
             Log in
           </Link>
@@ -93,7 +92,7 @@ export function Header() {
           aria-label="All pages"
           className="border-t border-line bg-surface px-4 py-3"
         >
-          <div className="mx-auto grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mx-auto grid max-w-7xl gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {NAV_GROUPS.map((group) => {
               const inGroup = items.filter((item) => item.group === group);
               if (inGroup.length === 0) return null;

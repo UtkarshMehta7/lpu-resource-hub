@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
+import { MessageIcon } from "@/components/ui/icons";
+
 import { fetchUnreadTotal } from "./api";
 import { UNREAD_TOTAL_QUERY_KEY } from "./queryKeys";
 
@@ -24,12 +26,12 @@ export function MessagesLink() {
   return (
     <Link
       to="/messages"
-      className="relative rounded-md px-2 py-1 text-sm font-medium hover:underline"
+      className="relative inline-flex size-9 shrink-0 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
       aria-label={unread > 0 ? `Messages (${unread} unread)` : "Messages"}
     >
-      <span aria-hidden="true">💬</span>
+      <MessageIcon className="size-5" />
       {unread > 0 ? (
-        <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-brand-700 px-1 text-[10px] font-semibold text-white">
+        <span className="absolute right-0.5 top-0.5 grid min-w-4 place-items-center rounded-full bg-brand-700 px-1 text-[10px] font-semibold leading-4 text-white">
           {unread > 9 ? "9+" : unread}
         </span>
       ) : null}
