@@ -42,23 +42,33 @@ export function Monogram({ className = "size-9 text-sm" }: { className?: string 
   );
 }
 
-/** The header mark: crest, university name, product name, prototype tag. */
+/**
+ * The header mark: crest, university, product, prototype tag.
+ *
+ * Every line is `whitespace-nowrap` and the whole thing is `shrink-0`. In a
+ * flex row beside the navigation it was being squeezed until it wrapped
+ * mid-phrase -- four lines of brand and a header three times taller than it
+ * needed to be. A mark that reflows as the window narrows reads as broken,
+ * so this one shortens instead: the full product name appears only where
+ * there is room for it, and the short form stands in everywhere else.
+ */
 export function Brand() {
   return (
     <Link
       to="/"
-      className="flex items-center gap-3 rounded-md"
+      className="flex shrink-0 items-center gap-2.5 rounded-md"
       aria-label={`${PRODUCT_SHORT} home`}
+      title={`${UNIVERSITY_NAME} — ${PRODUCT_NAME}`}
     >
-      <Crest />
+      <Crest className="size-8" />
       <span className="leading-tight">
-        <span className="block text-xs font-medium text-brand-700 sm:text-sm">
+        <span className="block whitespace-nowrap text-[11px] font-medium text-brand-700">
           {UNIVERSITY_NAME}
         </span>
-        <span className="block text-sm font-semibold sm:text-base">
-          <span className="sm:hidden">{PRODUCT_SHORT}</span>
-          <span className="hidden sm:inline">{PRODUCT_NAME}</span>
-          <span className="ml-2 rounded-md border border-line px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-muted">
+        <span className="flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold">
+          <span className="xl:hidden">{PRODUCT_SHORT}</span>
+          <span className="hidden xl:inline">{PRODUCT_NAME}</span>
+          <span className="rounded border border-line px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-ink-muted">
             Prototype
           </span>
         </span>

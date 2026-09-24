@@ -12,11 +12,11 @@ export function AppLayout() {
   return (
     <div className="flex min-h-dvh flex-col">
       <Header />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">
         <Outlet />
       </main>
       <footer className="border-t border-line bg-surface">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-4">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-4">
           <Monogram className="size-7 text-[10px]" />
           <p className="flex-1 text-xs text-ink-muted">
             <span className="font-medium text-ink">{UNIVERSITY_NAME}</span> · {PRODUCT_NAME} (
