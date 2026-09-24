@@ -92,6 +92,25 @@
     cursor: not-allowed;
   }
 
+  /* Put modal dialogs back in the middle of the screen.
+
+     A native <dialog> centres itself with `margin: auto`, and Tailwind's
+     preflight resets every element's margin to 0 — so every confirmation in
+     the app (verify, reject, report, end collaboration, delete an account)
+     was pinned to the top-left corner, far from the button that opened it and
+     off-centre on every screen size.
+
+     `inset: 0` with `margin: auto` is what the browser default does; stating
+     it here restores it without touching a single component. The width caps
+     keep it readable on a phone, where a fixed-width panel would otherwise
+     run past the edge. */
+  dialog:modal {
+    inset: 0;
+    margin: auto;
+    max-width: min(32rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - 2rem);
+  }
+
   /* Buttons sit beside inputs constantly -- in a search row, beside a code
      field -- so they match that height instead of hugging their text. */
   button:not(.btn-plain) {
