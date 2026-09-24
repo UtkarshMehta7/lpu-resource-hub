@@ -84,6 +84,12 @@ export function describeNotification(notification: AppNotification): Notificatio
         to: null,
         detail: `Your confirmation code is ${str(payload, "code")}. Read it back to them only if you expect this.`,
       };
+    case "message_received":
+      return {
+        text: `${str(payload, "sender_name")} sent you a message`,
+        to: `/messages/${str(payload, "conversation_id")}`,
+        detail: str(payload, "preview") || undefined,
+      };
     default:
       return { text: "You have a new notification", to: null };
   }

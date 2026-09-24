@@ -36,6 +36,7 @@ from app.modules.applications.models import Application
 from app.modules.audit import service as audit_service
 from app.modules.bookings.models import Booking
 from app.modules.collaborations.models import CollaborationRequest
+from app.modules.messages.models import Message
 from app.modules.opportunities.models import Opportunity
 from app.modules.profiles.models import ResearcherProfile, VerificationStatus
 from app.modules.projects.models import Project, ProjectMember
@@ -85,6 +86,7 @@ class DeletionImpact:
     collaboration_requests: int
     bookings: int
     reports_filed: int
+    messages_sent: int
     accounts_provisioned: int
 
     @property
@@ -122,6 +124,9 @@ def deletion_impact(db: Session, target: User) -> DeletionImpact:
         ),
         bookings=_count(db, Booking, Booking.user_id == target.id),
         reports_filed=_count(db, ContentReport, ContentReport.reporter_id == target.id),
+        # Their half of every thread goes with them. Counted so the
+        # confirmation says so rather than the other party finding out.
+        messages_sent=_count(db, Message, Message.sender_id == target.id),
         accounts_provisioned=_count(db, User, User.created_by == target.id),
     )
 

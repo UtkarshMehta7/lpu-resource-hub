@@ -184,6 +184,7 @@ class DeletionImpactRead(BaseModel):
     collaboration_requests: int
     bookings: int
     reports_filed: int
+    messages_sent: int
     #: Accounts this person provisioned. These are NOT deleted -- they simply
     #: stop recording who created them.
     accounts_provisioned: int

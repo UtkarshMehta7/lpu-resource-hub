@@ -86,6 +86,11 @@ ENDPOINTS = (
         frozenset({UserRole.ADMIN}),
         needs_target=True,
     ),
+    # Conversation threads. Every signed-in role may ask for its own list --
+    # it is scoped to the caller, so there is nothing to leak; a thread the
+    # caller is not in answers 404, covered in tests/test_messages.py.
+    Endpoint("GET", "/api/v1/me/conversations", frozenset(ALL_ROLES)),
+    Endpoint("GET", "/api/v1/me/conversations/unread-count", frozenset(ALL_ROLES)),
     Endpoint(
         "DELETE",
         "/api/v1/users/{id}",

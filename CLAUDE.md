@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration. CI is green on main.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: ~122 API operations, 37 tables, 18 migrations, 21 ADRs,
-~740 backend tests, ~135 frontend tests, 14 Playwright flows.
+Current shape: ~128 API operations, 40 tables, 19 migrations, 22 ADRs,
+~780 backend tests, ~158 frontend tests, 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
 - Nobody self-registers. `POST /auth/register` does not exist and must not
@@ -76,12 +76,23 @@ Current shape: ~122 API operations, 37 tables, 18 migrations, 21 ADRs,
   first (`GET /users/{id}/deletion-impact`) and shown before it is confirmed.
   Deactivate for someone who has left; delete for an account that should
   never have existed (it frees the registration number).
+- **Threads are scoped, and there is no endpoint that creates one.** A
+  conversation belongs to an accepted collaboration request or a project
+  team; it appears when that happens. Never add a create-conversation
+  route, or the student opt-in (`can_contact`) is repealed by the back
+  door. A non-participant always gets 404, never 403 -- admins included.
+  New messages arrive by polling, not sockets (ADR 0022): the cursor is a
+  keyset over (created_at, id), never an offset.
 - A fix to the service layer does not fix the rows already in the deployed
   database. The coordinators appointed before `_sync_coordinator_scope` needed
   migration 0018 as well, and the users page now shows each coordinator's
   scope so a missing one is visible instead of silent.
 
 ## Gotchas that cost real time here
+- **Autogenerate does not see enum values.** It compares tables, not enum
+  members, so `ALTER TYPE ... ADD VALUE IF NOT EXISTS` is written by hand
+  (migrations 0017, 0019). A test DB already stamped at that revision will
+  not pick it up -- rebuild it rather than debugging the enum error.
 - **Tests passing is not the screen working.** The OTP code was delivered and
   invisible because `describeNotification` had no case for it, and every test
   passed. Drive new UI in a browser before calling it done.

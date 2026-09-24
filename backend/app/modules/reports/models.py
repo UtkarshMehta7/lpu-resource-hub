@@ -18,6 +18,9 @@ class ReportTargetType(StrEnum):
     OPPORTUNITY = "opportunity"
     PUBLICATION = "publication"
     PROFILE = "profile"
+    #: A message in a conversation thread. Hiding one withholds its text but
+    #: leaves it in place, so the thread does not develop holes (ADR 0022).
+    MESSAGE = "message"
 
 
 class ReportStatus(StrEnum):

@@ -114,6 +114,29 @@ def _on_opportunity_published(db: Session, event: Event) -> None:
     notify_relevant_users(db, event.payload["opportunity_id"])
 
 
+def _on_message_sent(db: Session, event: Event) -> None:
+    """One notification per thread, not one per message.
+
+    The dedupe key is the conversation, so twenty messages in a row produce a
+    single "you have a message" line. Reading the thread deletes that row
+    (app/modules/messages/service.py::mark_read), which re-arms this for the
+    next thing said -- so a live conversation does not bury the bell, and a
+    message after a lull is still announced.
+    """
+    conversation_id = event.payload["conversation_id"]
+    notify(
+        db,
+        user_id=event.payload["recipient_id"],
+        notification_type=NotificationType.MESSAGE_RECEIVED,
+        payload={
+            "conversation_id": str(conversation_id),
+            "sender_name": event.payload["sender_name"],
+            "preview": event.payload["preview"],
+        },
+        dedupe_key=f"conversation:{conversation_id}",
+    )
+
+
 def register_notification_handlers(bus: EventBus = EVENT_BUS) -> None:
     bus.subscribe(EventName.APPLICATION_SUBMITTED, _on_application_submitted)
     bus.subscribe(EventName.APPLICATION_DECIDED, _on_application_decided)
@@ -123,3 +146,4 @@ def register_notification_handlers(bus: EventBus = EVENT_BUS) -> None:
     bus.subscribe(EventName.PROJECT_REVIEWED, _on_project_reviewed)
     bus.subscribe(EventName.PROFILE_VERIFIED, _on_profile_verified)
     bus.subscribe(EventName.OPPORTUNITY_PUBLISHED, _on_opportunity_published)
+    bus.subscribe(EventName.MESSAGE_SENT, _on_message_sent)
