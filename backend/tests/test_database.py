@@ -29,4 +29,6 @@ def test_readiness_with_real_database(db_settings: Settings) -> None:
         response = client.get("/health/ready")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "database": "ok"}
+    # `migrations` joined the probe so a schema behind the code is visible
+    # from outside rather than found one broken button at a time (ADR 0024).
+    assert response.json() == {"status": "ok", "database": "ok", "migrations": "ok"}
