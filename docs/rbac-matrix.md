@@ -56,6 +56,7 @@ refused on self and audited.
 | `user:update_role` | | | | ✅ | 2 |
 | `user:activate` | | | | ✅ | 2 |
 | `user:deactivate` | | | | ✅ | 2 |
+| *(no permission)* conversation threads | participant only | participant only | participant only | participant only | 22 |
 | `user:delete` | | ✅ → students, own dept, verified profile only | ✅ → faculty + students, assigned scope only | ✅ → anyone but themselves | 21 |
 | `audit:read` | | | | ✅ | 2 |
 | `school:manage` | | | | ✅ | 3 |

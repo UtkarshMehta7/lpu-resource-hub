@@ -10,7 +10,8 @@ export type NotificationType =
   | "profile_verified"
   | "relevant_opportunity"
   | "deadline_reminder"
-  | "admin_promotion_code";
+  | "admin_promotion_code"
+  | "message_received";
 
 export interface AppNotification {
   id: string;

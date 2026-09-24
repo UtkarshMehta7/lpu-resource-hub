@@ -54,6 +54,27 @@ describe("describeNotification", () => {
     });
   });
 
+  it("renders a message notification and links to the thread", () => {
+    // The admin OTP once shipped invisible because this switch had no case
+    // for it, and every test still passed. This is that test, for chat.
+    expect(
+      describeNotification(
+        notification({
+          notification_type: "message_received",
+          payload: {
+            conversation_id: "c1",
+            sender_name: "Demo Faculty 07",
+            preview: "Welcome aboard",
+          },
+        }),
+      ),
+    ).toEqual({
+      text: "Demo Faculty 07 sent you a message",
+      to: "/messages/c1",
+      detail: "Welcome aboard",
+    });
+  });
+
   it("links a deadline reminder to the thing that's closing", () => {
     const line = describeNotification(
       notification({

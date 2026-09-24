@@ -16,6 +16,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.audit import service as audit_service
+from app.modules.messages.models import Message
+from app.modules.messages.policies import is_participant
 from app.modules.opportunities.models import Opportunity, OpportunityStatus
 from app.modules.opportunities.policies import visibility_filter as opportunity_visibility
 from app.modules.profiles.models import ResearcherProfile
@@ -61,6 +63,14 @@ def _target_title(
                 Opportunity.id == target_id, opportunity_visibility(viewer)
             )
         ).scalar_one_or_none()
+    if target_type is ReportTargetType.MESSAGE:
+        # Gated on membership, not just existence: without this, reporting
+        # would be a way to ask "is this message id real", and a thread's
+        # existence is exactly what it keeps private.
+        message = db.get(Message, target_id)
+        if message is None or not is_participant(db, message.conversation_id, viewer.id):
+            return None
+        return message.body[:80]
     if target_type is ReportTargetType.PUBLICATION:
         return db.execute(
             select(Publication.title).where(Publication.id == target_id)
@@ -132,7 +142,7 @@ def list_reports(
     return _to_reads(db, moderator, list(rows))
 
 
-def _hide_target(db: Session, report: ContentReport) -> bool:
+def _hide_target(db: Session, report: ContentReport, moderator: User) -> bool:
     """Takes the reported content out of circulation, where that's meaningful.
 
     A project is archived and an opening is closed -- both existing states, so
@@ -145,6 +155,15 @@ def _hide_target(db: Session, report: ContentReport) -> bool:
         if project is None or project.status is ProjectStatus.ARCHIVED:
             return False
         project.status = ProjectStatus.ARCHIVED
+        return True
+    if report.target_type is ReportTargetType.MESSAGE:
+        message = db.get(Message, report.target_id)
+        if message is None or message.hidden_at is not None:
+            return False
+        # Hidden, never deleted: the other party's thread still reads in
+        # order, with a placeholder where the text was.
+        message.hidden_at = datetime.now(UTC)
+        message.hidden_by = moderator.id
         return True
     if report.target_type is ReportTargetType.OPPORTUNITY:
         opportunity = db.get(Opportunity, report.target_id)
@@ -163,7 +182,7 @@ def resolve_report(
         raise ReportNotFoundError
     if report.status is not ReportStatus.OPEN:
         raise AlreadyResolvedError
-    hidden = _hide_target(db, report) if data.hide_target else False
+    hidden = _hide_target(db, report, moderator) if data.hide_target else False
     report.status = data.status
     report.reviewed_by = moderator.id
     report.reviewed_at = datetime.now(UTC)

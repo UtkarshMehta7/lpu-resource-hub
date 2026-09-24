@@ -36,6 +36,7 @@ class EventName(StrEnum):
     PROJECT_REVIEWED = "project.reviewed"
     PROFILE_VERIFIED = "profile.verified"
     OPPORTUNITY_PUBLISHED = "opportunity.published"
+    MESSAGE_SENT = "message.sent"
 
 
 @dataclass(frozen=True, slots=True)

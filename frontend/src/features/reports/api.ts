@@ -1,6 +1,12 @@
 import { apiClient } from "@/lib/api/client";
 
-export type ReportTargetType = "project" | "opportunity" | "publication" | "profile";
+export type ReportTargetType =
+  | "project"
+  | "opportunity"
+  | "publication"
+  | "profile"
+  // Hiding a message withholds its text but leaves it in the thread.
+  | "message";
 export type ReportStatus = "open" | "dismissed" | "actioned";
 
 export interface ContentReport {

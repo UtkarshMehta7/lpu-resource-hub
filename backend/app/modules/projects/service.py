@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.events import EVENT_BUS, Event, EventName
 from app.core.pagination import Page, PageParams
 from app.modules.audit import service as audit_service
+from app.modules.messages import service as messages_service
 from app.modules.profiles.models import ResearcherProfile, VerificationStatus
 from app.modules.projects.models import (
     Project,
@@ -478,6 +479,10 @@ def add_member(
         raise MemberNotFoundError
     db.add(ProjectMember(project_id=project.id, user_id=data.user_id, member_role=data.member_role))
     try:
+        db.flush()
+        # A team thread's membership follows the team's. Joining grants access
+        # to what the team has been saying; no-op until the thread exists.
+        messages_service.sync_project_participants(db, project.id)
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -496,4 +501,8 @@ def remove_member(db: Session, actor: User, project_id: uuid.UUID, user_id: uuid
     if member is None:
         raise MemberNotFoundError
     db.delete(member)
+    db.flush()
+    # Leaving revokes the thread, but not what they said in it: the messages
+    # stay, still attributed. A conversation is a record, not a possession.
+    messages_service.sync_project_participants(db, project.id)
     db.commit()

@@ -26,6 +26,8 @@ class NotificationType(StrEnum):
     DEADLINE_REMINDER = "deadline_reminder"
     # Carries a one-time code to someone being made an administrator.
     ADMIN_PROMOTION_CODE = "admin_promotion_code"
+    #: One per thread until it is read, never one per message.
+    MESSAGE_RECEIVED = "message_received"
 
 
 class Notification(Base):

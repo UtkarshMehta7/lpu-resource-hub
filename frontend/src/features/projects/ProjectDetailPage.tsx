@@ -7,6 +7,7 @@ import { Uid } from "@/components/ui/Uid";
 import { useAuth } from "@/features/auth/authContext";
 import { RequestCollaborationButton } from "@/features/collaborations/RequestCollaborationButton";
 import { ReportButton } from "@/features/reports/ReportButton";
+import { TeamThreadButton } from "@/features/messages/TeamThreadButton";
 import { SaveButton } from "@/features/saved/SaveButton";
 import { PublicationsSection } from "@/features/publications/PublicationList";
 import { toApiError } from "@/lib/api/errors";
@@ -204,7 +205,12 @@ export function ProjectDetailPage() {
       ) : null}
 
       <section className="mt-8">
-        <h2 className="text-base font-semibold">Team</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">Team</h2>
+          {isOwner || project.members.some((member) => member.user_id === user?.id) ? (
+            <TeamThreadButton projectId={project.id} />
+          ) : null}
+        </div>
         {project.members.length === 0 ? (
           <p className="mt-2 text-sm text-ink-muted">No team members yet.</p>
         ) : (
