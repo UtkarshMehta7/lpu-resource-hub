@@ -539,6 +539,59 @@ COMMIT: chore: add CI and deployment  -> tag v1.0.0
 
 ---
 
+## PART C2: Post-v1.0.0 correction prompts
+
+The roadmap finished at v1.0.0. What follows are prompts for work decided
+afterwards, from using the deployed instance. Same rules, same workflow:
+one per session, PLAN first.
+
+### Step 17: Scoped conversation threads (chat)
+
+```
+Add scoped conversation threads to the LPU Research Hub. Read CLAUDE.md and
+docs/architecture.md first; do not restate their rules back to me.
+
+WHY: collaboration_requests.message is a single Text column. Two people
+connect and then the platform has nothing more to offer. Close that.
+
+SHAPE - decided, do not redesign:
+- Threads are SCOPED to an existing relationship, never an open inbox:
+  one thread per ACCEPTED collaboration request, one per project team.
+  No generic user-to-user DMs, no new way to reach someone who never
+  agreed to be reached. Reuse the can_contact privacy rule; do not weaken it.
+- POLLING, not WebSockets. Sync SQLAlchemy, no Redis, Render free tier
+  (the instance sleeps), and NotificationBell already polls at 60s.
+  Thread view polls every 10s and pauses when the tab is hidden.
+  GET .../messages?after=<cursor> returns only what is new.
+- Moderation HIDES a message (hidden_at, hidden_by); it never deletes the
+  row, so threads don't develop holes. Add one ReportTargetType value and
+  reuse the existing moderation queue.
+
+MUST NOT BREAK:
+- describeNotification in the frontend needs a case for the new notification
+  type. The OTP code once shipped invisible with every test passing.
+- Notify at most once per thread until the recipient has read it - use the
+  existing dedupe_key. 20 messages must not make 20 notifications.
+- DeletionImpact in app/modules/admin/deletion.py must count messages, or
+  account deletion will destroy more than the confirmation dialog admits.
+- Every person named in the UI shows their UID via components/ui/Uid.
+- Membership is loaded from the DB per request; never trust a client id.
+
+DELIVER:
+1. A concise PLAN - tables, migration 0019, endpoints, policies, tests,
+   deviations from the approved module list. Then STOP for my approval.
+2. After approval: ADR 0022 recording scoped-not-open and poll-not-socket
+   with the alternatives you rejected; the migration; modules/messages/;
+   the frontend thread view; tests including that a non-participant gets
+   404 (not 403 - they must not learn the thread exists), that a declined
+   request has no thread, and that a hidden message stays in the thread as
+   hidden rather than vanishing.
+3. Run every check in CLAUDE.md. Report PASSED / FAILED / NOT VERIFIED
+   honestly, and say plainly what you did not verify in a browser.
+```
+
+---
+
 ## PART D: Useful follow-up prompts
 
 - **Verify a step:** "Run the full verification for Step N again from a clean state and report PASSED/FAILED/NOT VERIFIED for each item. Fix nothing yet; just report."
