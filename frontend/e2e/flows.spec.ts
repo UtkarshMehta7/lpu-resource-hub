@@ -270,16 +270,22 @@ test("a collaboration request shows up in the recipient's notifications", async 
     .getByRole("link", { name: /Demo Faculty 0/ })
     .first()
     .click();
-  // The control now reflects the state, so on a database where these two
-  // already collaborate there is no request to make -- and that is a pass,
-  // not a failure. Only open the dialog when it is actually offered.
+  // The control reflects the relationship, so it renders one of four things.
+  // Wait for whichever it is BEFORE counting: count() does not auto-wait, so
+  // asking too early returns 0 and the branch below reads "already
+  // collaborating" from a page that simply had not finished loading.
   const offer = student.getByRole("button", { name: /Request collaboration|Collaborate again/ });
+  const settled = student
+    .getByRole("link", { name: /open conversation/i })
+    .or(student.getByText(/request pending/i))
+    .or(student.getByRole("button", { name: "Accept" }));
+  await expect(offer.or(settled).first()).toBeVisible();
+
   if ((await offer.count()) === 0) {
-    await expect(
-      student
-        .getByRole("link", { name: /open conversation/i })
-        .or(student.getByText(/request pending/i)),
-    ).toBeVisible();
+    // Nothing to request: they already have a live relationship, or one is
+    // waiting on an answer. Either is a pass -- it is the state the interface
+    // is supposed to show instead of offering to start it again (ADR 0023).
+    await expect(settled.first()).toBeVisible();
     return;
   }
   await offer.first().click();
