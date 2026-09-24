@@ -48,3 +48,10 @@ Thumbs.db
 
 # Local deployment secrets (Neon connection string). Never committed.
 backend/.env.production
+
+# Credential sheets generated for demonstrations. The passwords are guessable
+# by design (first name + 123456), so they must never reach the repository --
+# the generated file is written outside it, and this is the second line of
+# defence.
+*demo-accounts*.csv
+*credentials*.csv
