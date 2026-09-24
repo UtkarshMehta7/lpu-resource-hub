@@ -24,7 +24,6 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
-    Index,
     Text,
     UniqueConstraint,
     func,
@@ -104,18 +103,13 @@ class CollaborationRequest(Base):
     __tablename__ = "collaboration_requests"
     __table_args__ = (
         CheckConstraint("sender_id <> recipient_id", name="not_self"),
-        # At most one PENDING request per sender/recipient/project. NULLS NOT
-        # DISTINCT makes "no project" count as one value, so two pending
-        # project-less requests to the same person also collide.
-        Index(
-            "uq_collaboration_requests_pending",
-            "sender_id",
-            "recipient_id",
-            "project_id",
-            unique=True,
-            postgresql_where=text("status = 'pending'"),
-            postgresql_nulls_not_distinct=True,
-        ),
+        # There used to be a partial unique index here allowing one PENDING
+        # request per sender/recipient/project. It is gone, dropped by
+        # migration 0021: duplicates are now prevented one level up, by the
+        # unique constraint on the pair in `collaborations`. Keeping both
+        # would mean two rules that can disagree -- the index counted a
+        # direction and a project as distinct, which is exactly how two
+        # people ended up with three live requests and two conversations.
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
