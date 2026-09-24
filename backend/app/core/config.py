@@ -63,9 +63,9 @@ class Settings(BaseSettings):
     # Deadline-reminder scheduler (Step 12). Off in tests; on in a real run.
     enable_scheduler: bool = False
     #: Apply outstanding migrations at startup, under an advisory lock.
-    #: Off locally and in tests, on for deployments (render.yaml): twice now,
-    #: code has reached production ahead of its migration and answered 500.
-    run_migrations_on_start: bool = False
+    #: Defaults to ON in production and off everywhere else -- see
+    #: `run_migrations_at_boot` below. Set it explicitly to override.
+    run_migrations_on_start: bool | None = None
     reminder_interval_minutes: int = Field(default=60, ge=5, le=1440)
 
     @field_validator("database_url", "test_database_url", mode="before")
@@ -140,6 +140,23 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env is Environment.PRODUCTION
+
+    @property
+    def run_migrations_at_boot(self) -> bool:
+        """Whether this instance brings its own schema up to date.
+
+        On in production by default, and deliberately not dependent on an
+        environment variable being set. render.yaml only governs a service
+        synced from the Blueprint; this one was configured by hand, so the
+        variable never reached it and the site stayed broken while the code
+        that needed the migration was already live (ADR 0024).
+
+        A deployment that cannot migrate itself is a deployment that depends
+        on somebody remembering, which is the thing that failed.
+        """
+        if self.run_migrations_on_start is not None:
+            return self.run_migrations_on_start
+        return self.is_production
 
     @property
     def docs_enabled(self) -> bool:
