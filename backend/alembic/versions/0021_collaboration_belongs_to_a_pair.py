@@ -242,7 +242,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Drops what was added. A merge cannot be unpicked -- see the docstring."""
-    op.drop_constraint("ck_conversations_exactly_one_subject", "conversations", type_="check")
+    # Bare name: the metadata naming convention adds the ck_conversations_
+    # prefix, so passing the full name asks for it twice.
+    op.drop_constraint("exactly_one_subject", "conversations", type_="check")
     op.drop_constraint(
         op.f("fk_conversations_collaboration_id_collaborations"),
         "conversations",
@@ -255,7 +257,9 @@ def downgrade() -> None:
         "uq_conversations_collaboration", "conversations", ["collaboration_request_id"]
     )
     op.create_foreign_key(
-        "fk_conversations_collaboration_request_id_collaboration_requests",
+        # Shortened deliberately: PostgreSQL truncates identifiers at 63
+        # characters, and SQLAlchemy refuses to emit one that would be cut.
+        "fk_conversations_collaboration_request",
         "conversations",
         "collaboration_requests",
         ["collaboration_request_id"],
