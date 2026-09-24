@@ -10,7 +10,10 @@ from app.modules.applications.models import Application, ApplicationEvent  # noq
 from app.modules.audit.models import AuditLog  # noqa: F401
 from app.modules.auth.models import RefreshToken  # noqa: F401
 from app.modules.bookings.models import Booking  # noqa: F401
-from app.modules.collaborations.models import CollaborationRequest  # noqa: F401
+from app.modules.collaborations.models import (  # noqa: F401
+    Collaboration,
+    CollaborationRequest,
+)
 from app.modules.facilities.models import Equipment, Facility  # noqa: F401
 from app.modules.funding.models import FundingOpportunity, FundingResearchArea  # noqa: F401
 from app.modules.messages.models import (  # noqa: F401

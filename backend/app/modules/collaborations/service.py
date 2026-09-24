@@ -16,10 +16,23 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.events import EVENT_BUS, Event, EventName
-from app.modules.collaborations.models import CollaborationRequest, CollaborationStatus
+from app.modules.collaborations.models import (
+    Collaboration,
+    CollaborationRequest,
+    CollaborationState,
+    CollaborationStatus,
+    normalise_pair,
+)
 from app.modules.collaborations.policies import Actor, assert_transition, can_contact
-from app.modules.collaborations.schemas import Box, CollaborationCreate, CollaborationRead, Party
+from app.modules.collaborations.schemas import (
+    Box,
+    CollaborationCreate,
+    CollaborationRead,
+    CollaborationSummary,
+    Party,
+)
 from app.modules.messages import service as messages_service
+from app.modules.messages.models import Conversation
 from app.modules.profiles.models import StudentProfile
 from app.modules.projects.models import Project
 from app.modules.projects.policies import visibility_filter as project_visibility
@@ -40,6 +53,11 @@ class SelfRequestError(Exception):
 
 class ProjectNotFoundError(Exception):
     """The project doesn't exist or isn't visible to the sender."""
+
+
+class AlreadyCollaboratingError(Exception):
+    """A live relationship already exists with this person, so there is
+    nothing to request. Covers both directions: the pair is one row."""
 
 
 class DuplicatePendingError(Exception):
@@ -122,7 +140,14 @@ def send_request(db: Session, sender: User, data: CollaborationCreate) -> Collab
         if visible is None:
             raise ProjectNotFoundError
 
+    collaboration = get_or_create_collaboration(db, sender.id, data.recipient_id)
+    if collaboration.state in {CollaborationState.REQUESTED, CollaborationState.ACTIVE}:
+        # Nothing to ask for: they are already talking, or already asked.
+        raise AlreadyCollaboratingError
+    collaboration.state = CollaborationState.REQUESTED
+
     request = CollaborationRequest(
+        collaboration_id=collaboration.id,
         sender_id=sender.id,
         recipient_id=data.recipient_id,
         project_id=data.project_id,
@@ -143,14 +168,83 @@ def send_request(db: Session, sender: User, data: CollaborationCreate) -> Collab
                 },
             ),
         )
-        # The partial unique index is the duplicate guard, so two concurrent
-        # sends can't both create a pending request.
+        # The unique constraint on the pair is the real guard: two concurrent
+        # sends, in either direction, cannot both create a relationship.
         db.commit()
     except IntegrityError as exc:
         db.rollback()
         raise DuplicatePendingError from exc
     db.refresh(request)
     return _to_reads(db, sender, [request])[0]
+
+
+def get_or_create_collaboration(db: Session, one: uuid.UUID, other: uuid.UUID) -> Collaboration:
+    """The pair's relationship row, creating it the first time they interact.
+
+    Normalised, so asking for {a,b} and {b,a} returns the same row -- which is
+    what stops two people holding simultaneous requests to each other.
+    """
+    user_a, user_b = normalise_pair(one, other)
+    collaboration = db.execute(
+        select(Collaboration).where(
+            Collaboration.user_a_id == user_a, Collaboration.user_b_id == user_b
+        )
+    ).scalar_one_or_none()
+    if collaboration is None:
+        collaboration = Collaboration(user_a_id=user_a, user_b_id=user_b)
+        db.add(collaboration)
+        db.flush()
+    return collaboration
+
+
+#: Where a request's outcome leaves the pair.
+_STATE_AFTER: dict[CollaborationStatus, CollaborationState] = {
+    CollaborationStatus.ACCEPTED: CollaborationState.ACTIVE,
+    # Declining or cancelling leaves no relationship, so either of them may
+    # ask again -- it was a question, and the answer was no.
+    CollaborationStatus.DECLINED: CollaborationState.NONE,
+    CollaborationStatus.CANCELLED: CollaborationState.NONE,
+    CollaborationStatus.ENDED: CollaborationState.ENDED,
+}
+
+
+def state_between(db: Session, viewer: User, other_id: uuid.UUID) -> CollaborationSummary:
+    """What the two of them are to each other, and what to do about it.
+
+    One query behind the button, so the interface never offers to start
+    something that already exists.
+    """
+    user_a, user_b = normalise_pair(viewer.id, other_id)
+    collaboration = db.execute(
+        select(Collaboration).where(
+            Collaboration.user_a_id == user_a, Collaboration.user_b_id == user_b
+        )
+    ).scalar_one_or_none()
+    if collaboration is None:
+        return CollaborationSummary(state=CollaborationState.NONE)
+
+    live = (
+        db.execute(
+            select(CollaborationRequest)
+            .where(
+                CollaborationRequest.collaboration_id == collaboration.id,
+                CollaborationRequest.status == CollaborationStatus.PENDING,
+            )
+            .order_by(CollaborationRequest.created_at.desc())
+        )
+        .scalars()
+        .first()
+    )
+    conversation_id = db.execute(
+        select(Conversation.id).where(Conversation.collaboration_id == collaboration.id)
+    ).scalar_one_or_none()
+
+    return CollaborationSummary(
+        state=collaboration.state,
+        request_id=live.id if live is not None else None,
+        i_sent_it=live.sender_id == viewer.id if live is not None else None,
+        conversation_id=conversation_id,
+    )
 
 
 def get_request(db: Session, viewer: User, request_id: uuid.UUID) -> CollaborationRead:
@@ -170,7 +264,7 @@ def list_requests(
     return _to_reads(db, viewer, rows)
 
 
-def _open_thread_if_possible(db: Session, request: CollaborationRequest) -> None:
+def _open_thread_if_possible(db: Session, collaboration: Collaboration) -> None:
     """Give the accepted request a thread, but never at the cost of the answer.
 
     Chat is additive. Accepting a collaboration is the older, more important
@@ -182,12 +276,12 @@ def _open_thread_if_possible(db: Session, request: CollaborationRequest) -> None
     """
     try:
         with db.begin_nested():
-            messages_service.open_for_collaboration(db, request)
+            messages_service.open_for_collaboration(db, collaboration)
     except SQLAlchemyError:
         logger.exception(
             "Could not open a conversation for collaboration %s; the request is "
-            "still accepted. Has migration 0019 run on this database?",
-            request.id,
+            "still accepted. Have migrations 0019-0021 run on this database?",
+            collaboration.id,
         )
 
 
@@ -199,12 +293,16 @@ def respond(
     assert_transition(request.status, target, party)
     request.status = target
     request.responded_at = datetime.now(UTC)
+    collaboration = db.get(Collaboration, request.collaboration_id)
+    assert collaboration is not None
+    collaboration.state = _STATE_AFTER[target]
+
     if target is CollaborationStatus.ACCEPTED:
         # Saying yes is what creates somewhere to talk. Nothing a client sends
         # can open a thread, so there is no channel to anyone who hasn't
         # agreed to one (ADR 0022).
         db.flush()
-        _open_thread_if_possible(db, request)
+        _open_thread_if_possible(db, collaboration)
     # Tell the other party what happened.
     other_party = request.sender_id if party == "recipient" else request.recipient_id
     EVENT_BUS.publish(

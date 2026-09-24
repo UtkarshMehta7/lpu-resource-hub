@@ -16,7 +16,7 @@ from sqlalchemy import delete, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.core.events import EVENT_BUS, Event, EventName
-from app.modules.collaborations.models import CollaborationRequest, CollaborationStatus
+from app.modules.collaborations.models import Collaboration, CollaborationState
 from app.modules.messages.models import Conversation, ConversationParticipant, Message
 from app.modules.messages.policies import ThreadNotFoundError, assert_participant
 from app.modules.messages.schemas import (
@@ -48,25 +48,27 @@ class ThreadClosedError(Exception):
 # --------------------------------------------------------------- opening threads
 
 
-def open_for_collaboration(db: Session, request: CollaborationRequest) -> Conversation | None:
+def open_for_collaboration(db: Session, collaboration: Collaboration) -> Conversation | None:
     """Give an accepted request somewhere to continue.
 
     Called when a request is accepted, not when it is sent: a pending request
     is a question, and the answer may be no. Idempotent -- accepting is a
     single transition, but a retry must not produce a second thread.
     """
-    if request.status is not CollaborationStatus.ACCEPTED:
+    if collaboration.state is not CollaborationState.ACTIVE:
         return None
     existing = db.execute(
-        select(Conversation).where(Conversation.collaboration_request_id == request.id)
+        select(Conversation).where(Conversation.collaboration_id == collaboration.id)
     ).scalar_one_or_none()
     if existing is not None:
+        # Collaborating again reopens the thread they already had. Two people
+        # have one history, however many times they start and stop.
         return existing
 
-    conversation = Conversation(collaboration_request_id=request.id)
+    conversation = Conversation(collaboration_id=collaboration.id)
     db.add(conversation)
     db.flush()
-    _add_participants(db, conversation.id, [request.sender_id, request.recipient_id])
+    _add_participants(db, conversation.id, [collaboration.user_a_id, collaboration.user_b_id])
     return conversation
 
 
@@ -220,8 +222,8 @@ def _title_for(
     # A one-to-one thread is named after the other person, not after itself.
     others = [person for person in participants if person.id != viewer.id]
     name = others[0].full_name if others else "Conversation"
-    assert conversation.collaboration_request_id is not None
-    return SubjectKind.COLLABORATION, conversation.collaboration_request_id, name
+    assert conversation.collaboration_id is not None
+    return SubjectKind.COLLABORATION, conversation.collaboration_id, name
 
 
 def _unread_counts(
@@ -285,16 +287,12 @@ def _closed_threads(db: Session, conversation_ids: list[uuid.UUID]) -> dict[uuid
     if not conversation_ids:
         return {}
     rows = db.execute(
-        select(Conversation.id, CollaborationRequest.status)
-        .join(
-            CollaborationRequest,
-            CollaborationRequest.id == Conversation.collaboration_request_id,
-        )
+        select(Conversation.id, Collaboration.state)
+        .join(Collaboration, Collaboration.id == Conversation.collaboration_id)
         .where(Conversation.id.in_(conversation_ids))
     ).all()
     return {
-        conversation_id: status is not CollaborationStatus.ACCEPTED
-        for conversation_id, status in rows
+        conversation_id: state is not CollaborationState.ACTIVE for conversation_id, state in rows
     }
 
 
@@ -410,12 +408,12 @@ def is_closed(db: Session, conversation_id: uuid.UUID) -> bool:
     Project threads never close this way: a project has its own lifecycle, and
     an archived project's team can still need to talk about what happened.
     """
-    status = db.execute(
-        select(CollaborationRequest.status)
-        .join(Conversation, Conversation.collaboration_request_id == CollaborationRequest.id)
+    state = db.execute(
+        select(Collaboration.state)
+        .join(Conversation, Conversation.collaboration_id == Collaboration.id)
         .where(Conversation.id == conversation_id)
     ).scalar_one_or_none()
-    return status is not None and status is not CollaborationStatus.ACCEPTED
+    return state is not None and state is not CollaborationState.ACTIVE
 
 
 def send_message(db: Session, sender: User, conversation_id: uuid.UUID, body: str) -> MessageRead:

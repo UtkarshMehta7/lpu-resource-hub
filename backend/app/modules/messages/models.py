@@ -8,8 +8,11 @@ who never opted in to being reachable (ADR 0022).
 `conversations` therefore carries two nullable foreign keys rather than one
 polymorphic `subject_id`, with a CHECK that exactly one is set. The same shape
 as `tag_aliases`, and for the same reason: they are real foreign keys, so a
-deleted project or request takes its thread with it. A polymorphic id cannot
-cascade, and would leave threads pointing at nothing forever.
+deleted project or collaboration takes its thread with it. A polymorphic id
+cannot cascade, and would leave threads pointing at nothing forever.
+
+The collaboration key is the *pair*, not a request: two people who collaborate,
+stop, and collaborate again keep one thread and one history (ADR 0023).
 """
 
 from __future__ import annotations
@@ -42,21 +45,24 @@ class Conversation(Base):
     __tablename__ = "conversations"
     __table_args__ = (
         CheckConstraint(
-            "(collaboration_request_id IS NULL) <> (project_id IS NULL)",
+            "(collaboration_id IS NULL) <> (project_id IS NULL)",
             name="exactly_one_subject",
         ),
         # One thread per subject. Accepting a request twice, or two members
         # opening a project thread at once, cannot produce a second one.
-        UniqueConstraint("collaboration_request_id", name="uq_conversations_collaboration"),
+        UniqueConstraint("collaboration_id", name="uq_conversations_collaboration"),
         UniqueConstraint("project_id", name="uq_conversations_project"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
-    collaboration_request_id: Mapped[uuid.UUID | None] = mapped_column(
+    #: The pair this thread belongs to, for the life of the pair. Keyed here
+    #: rather than on a request so re-collaborating reopens the same thread
+    #: instead of splitting two people's history in two (ADR 0023).
+    collaboration_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("collaboration_requests.id", ondelete="CASCADE"),
+        ForeignKey("collaborations.id", ondelete="CASCADE"),
         nullable=True,
     )
     project_id: Mapped[uuid.UUID | None] = mapped_column(

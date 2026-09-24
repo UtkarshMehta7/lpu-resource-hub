@@ -5,6 +5,7 @@ import { useAuth } from "@/features/auth/authContext";
 
 import { fetchPublications } from "./api";
 import { PublicationItem } from "./PublicationList";
+import { SkeletonList } from "@/components/ui/Skeleton";
 
 const FIELD_CLASS = "mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm";
 
@@ -92,7 +93,11 @@ export function PublicationsPage({ mine = false }: { mine?: boolean }) {
         </div>
       </div>
 
-      {isPending ? <p className="mt-6 text-sm text-ink-muted">Loading publications…</p> : null}
+      {isPending ? (
+        <div className="mt-6">
+          <SkeletonList rows={3} />
+        </div>
+      ) : null}
       {isError ? (
         <p role="alert" className="mt-6 text-sm text-red-700">
           Could not load publications.

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/authContext";
 import { Uid } from "@/components/ui/Uid";
+import { SkeletonList } from "@/components/ui/Skeleton";
 
 import { fetchProjects, STATUS_LABEL, type ProjectStatus } from "./api";
 
@@ -85,7 +86,11 @@ export function ProjectsPage({ mine = false }: { mine?: boolean }) {
         </div>
       </div>
 
-      {isPending ? <p className="mt-6 text-sm text-ink-muted">Loading projects…</p> : null}
+      {isPending ? (
+        <div className="mt-6">
+          <SkeletonList rows={3} />
+        </div>
+      ) : null}
       {isError ? (
         <p role="alert" className="mt-6 text-sm text-red-700">
           Could not load projects.

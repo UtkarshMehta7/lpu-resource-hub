@@ -82,6 +82,12 @@ Current shape: ~128 API operations, 40 tables, 19 migrations, 22 ADRs,
   every acceptance answer 500 -- an additive feature took down an
   existing one. A new dependency from old code to new code gets the same
   treatment.
+- **A collaboration is a PAIR, not a request** (ADR 0023). `collaborations`
+  stores user_a_id < user_b_id under a unique constraint, so a duplicate is
+  impossible in the database rather than guarded in a service somebody can
+  forget. One conversation per pair, for the life of the pair: collaborating
+  again after ending reopens the same thread. Never key a thread or a
+  relationship to a request again.
 - **Threads are scoped, and there is no endpoint that creates one.** A
   conversation belongs to an accepted collaboration request or a project
   team; it appears when that happens. Never add a create-conversation

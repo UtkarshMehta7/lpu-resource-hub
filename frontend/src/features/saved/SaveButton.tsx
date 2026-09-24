@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toApiError } from "@/lib/api/errors";
 
 import { fetchSaved, saveItem, unsaveItem, type SaveTarget, type SavedType } from "./api";
+import { StarIcon } from "@/components/ui/icons";
 
 /** Bookmark toggle. Reads the saved list so the state survives a reload. */
 export function SaveButton({ type, targetId }: { type: SavedType; targetId: string }) {
@@ -43,9 +44,10 @@ export function SaveButton({ type, targetId }: { type: SavedType; targetId: stri
         aria-pressed={Boolean(existing)}
         disabled={toggle.isPending}
         onClick={() => toggle.mutate()}
-        className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium transition-colors hover:bg-canvas disabled:opacity-60"
       >
-        {existing ? "★ Saved" : "☆ Save"}
+        <StarIcon filled={Boolean(existing)} />
+        {existing ? "Saved" : "Save"}
       </button>
       {error ? (
         <p role="alert" className="mt-1 text-xs text-red-700">
