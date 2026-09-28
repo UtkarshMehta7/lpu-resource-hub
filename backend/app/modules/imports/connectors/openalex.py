@@ -24,6 +24,7 @@ import httpx
 from rapidfuzz import fuzz
 
 from app.modules.imports.connectors.base import (
+    AuthorCandidate,
     ConnectorError,
     ExternalProfile,
     ExternalWork,
@@ -87,6 +88,10 @@ class OpenAlexConnector:
     # ------------------------------------------------------------------ lookup
 
     def _find_author(self, client: httpx.Client, query: ProfileQuery) -> Mapping[str, Any] | None:
+        # A person who picked themselves off a list is the best evidence
+        # there is, so it is checked before anything is inferred.
+        if query.openalex_author_id:
+            return self._by_id(client, query.openalex_author_id)
         if query.orcid:
             author = self._by_orcid(client, query.orcid, query.name)
             if author is not None:
@@ -129,9 +134,23 @@ class OpenAlexConnector:
             "so it cannot tell which one is you. The other sources were still used."
         )
 
+    def _by_id(self, client: httpx.Client, author_id: str) -> Mapping[str, Any] | None:
+        """Fetch one author the researcher chose explicitly."""
+        short = author_id.rsplit("/", 1)[-1]
+        rows = self._get(client, "/authors", {"filter": f"openalex:{short}", "per-page": "1"})
+        return rows[0] if rows else None
+
     def _by_name(
         self, client: httpx.Client, name: str, affiliation: str | None
     ) -> Mapping[str, Any] | None:
+        """The single best name match, or nothing.
+
+        Used only when the caller did not pick a candidate. An affiliation
+        that matches is good evidence; without one this refuses to guess,
+        because a name alone is how somebody ends up importing a stranger's
+        publication list. The caller is expected to offer
+        `search_candidates` instead.
+        """
         results = self._get(client, "/authors", {"search": name, "per-page": "25"})
         if not results:
             return None
@@ -139,11 +158,62 @@ class OpenAlexConnector:
             needle = affiliation.casefold()
             for author in results:
                 place = (_affiliation(author) or "").casefold()
-                if needle in place or place in needle:
+                if needle and (needle in place or place in needle):
                     return author
-        # A name search with no affiliation to disambiguate on is a guess, so
-        # it is returned but the caller shows it as unconfirmed.
-        return results[0]
+        if len(results) == 1:
+            return results[0]
+        raise ConnectorError(
+            f"{len(results)} researchers on OpenAlex match that name. Choose which one is you."
+        )
+
+    def search_candidates(
+        self, client: httpx.Client, name: str, affiliation: str | None, *, limit: int = 10
+    ) -> list[AuthorCandidate]:
+        """People who might be the one searching, best match first.
+
+        Returned instead of a guess: the point is that the researcher picks,
+        having seen where each one works and what they publish on.
+        """
+        results = self._get(client, "/authors", {"search": name, "per-page": str(limit * 2)})
+        candidates: list[AuthorCandidate] = []
+        for author in results:
+            identifier = clean(author.get("id"))
+            display = clean(author.get("display_name"), limit=200)
+            if not identifier or not display:
+                continue
+            stats = author.get("summary_stats")
+            orcid = clean(author.get("orcid"))
+            candidates.append(
+                AuthorCandidate(
+                    source=self.name,
+                    source_id=identifier.rsplit("/", 1)[-1],
+                    source_url=identifier,
+                    full_name=display,
+                    affiliation=_affiliation(author),
+                    other_affiliations=_all_affiliations(author)[:3],
+                    orcid=orcid.rsplit("/", 1)[-1] if orcid else None,
+                    works_count=(
+                        author.get("works_count")
+                        if isinstance(author.get("works_count"), int)
+                        else None
+                    ),
+                    cited_by_count=(
+                        author.get("cited_by_count")
+                        if isinstance(author.get("cited_by_count"), int)
+                        else None
+                    ),
+                    h_index=(
+                        stats.get("h_index")
+                        if isinstance(stats, Mapping) and isinstance(stats.get("h_index"), int)
+                        else None
+                    ),
+                    topics=_topics(author)[:4],
+                )
+            )
+        if affiliation:
+            needle = affiliation.casefold()
+            candidates.sort(key=lambda c: needle not in (c.affiliation or "").casefold())
+        return candidates[:limit]
 
     def _works(self, client: httpx.Client, author_id: str) -> tuple[ExternalWork, ...]:
         rows = self._get(
@@ -232,6 +302,29 @@ def _closest_by_name(
         if score > best_score:
             best, best_score = author, score
     return best, best_score
+
+
+def _all_affiliations(author: Mapping[str, Any]) -> tuple[str, ...]:
+    """Every institution OpenAlex associates with them, most recent first."""
+    found: list[str] = []
+    for key in ("last_known_institutions", "affiliations"):
+        entries = author.get(key)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            institution = (
+                entry.get("institution")
+                if isinstance(entry, Mapping) and "institution" in entry
+                else entry
+            )
+            name = (
+                clean(institution.get("display_name"), limit=200)
+                if isinstance(institution, Mapping)
+                else None
+            )
+            if name and name not in found:
+                found.append(name)
+    return tuple(found)
 
 
 def _topics(author: Mapping[str, Any]) -> tuple[str, ...]:

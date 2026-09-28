@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { NudgeButton } from "@/features/nudges/NudgeButton";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonList } from "@/components/ui/Skeleton";
@@ -89,6 +90,11 @@ export function MyBookingsPage() {
               <p className="mt-2 text-sm">{booking.purpose}</p>
               {booking.decision_note ? (
                 <p className="mt-1 text-xs text-ink-muted">Note: {booking.decision_note}</p>
+              ) : null}
+              {/* Pending means somebody has to approve it; this is the only
+                  useful thing the requester can do while they wait. */}
+              {booking.status === "pending" ? (
+                <NudgeButton kind="booking_approval" entityId={booking.id} label="Still waiting?" />
               ) : null}
               {cancellable ? (
                 <button

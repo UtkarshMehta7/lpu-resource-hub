@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { NudgeButton } from "@/features/nudges/NudgeButton";
 import { Link } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -74,15 +75,25 @@ export function MyApplicationsPage() {
             </div>
             <p className="text-xs text-ink-muted">{TYPE_LABEL[application.opportunity_type]}</p>
             <StatusTimeline events={application.events} />
-            {WITHDRAWABLE.has(application.status) ? (
-              <button
-                type="button"
-                onClick={() => setWithdrawing(application.id)}
-                className="mt-3 text-xs text-red-700 hover:underline"
-              >
-                Withdraw
-              </button>
-            ) : null}
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              {/* Only while it is genuinely still waiting on somebody. */}
+              {application.status === "submitted" ? (
+                <NudgeButton
+                  kind="application_decision"
+                  entityId={application.id}
+                  label="Still waiting?"
+                />
+              ) : null}
+              {WITHDRAWABLE.has(application.status) ? (
+                <button
+                  type="button"
+                  onClick={() => setWithdrawing(application.id)}
+                  className="text-xs text-red-700 hover:underline"
+                >
+                  Withdraw
+                </button>
+              ) : null}
+            </div>
           </li>
         ))}
       </ul>
