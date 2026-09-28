@@ -128,3 +128,9 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_milestones_due_date"), table_name="milestones")
     op.drop_table("milestones")
     # ### end Alembic commands ###
+
+    # dropping the table does NOT drop the type it created, so a downgrade
+    # followed by an upgrade fails with "type milestone_status already
+    # exists". Caught by CI's reversibility check, not by a local run, which
+    # only ever migrates forward. Same treatment as booking_status in 0011.
+    sa.Enum(name="milestone_status").drop(op.get_bind(), checkfirst=True)
