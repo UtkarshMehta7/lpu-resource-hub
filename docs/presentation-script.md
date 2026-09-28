@@ -702,6 +702,169 @@ could not.
 
 ---
 
+## Explaining the stack, and how the whole thing works
+
+The worst answer to "what is your tech stack" is a list of names, because a list invites the
+follow-up "and why?" while you are still reciting. The best answer follows **one click through the
+system**, because every layer then appears in the order it actually runs, and each one arrives with
+its own reason attached.
+
+Three depths below. Learn the second one properly; the first is a compression of it and the third is
+only for when somebody digs.
+
+### Depth 1 — the forty-second answer
+
+> React and TypeScript on the front, FastAPI and Python on the back, PostgreSQL underneath. All of
+> it open source, all of it free to run. The frontend is a static bundle served from Netlify, the API
+> is a container on Render, and the database is PostgreSQL 18 on Neon. Nothing is paid and nothing is
+> proprietary — even the matching runs locally with scikit-learn rather than calling somebody's API.
+>
+> Three choices in it are deliberate rather than default. The API is proxied through the frontend's
+> own domain, so the session cookie is first-party and survives a reload. The business rules sit in a
+> layer that is not allowed to import the web framework, so they can be tested without a server. And
+> the database enforces the important guarantees itself instead of trusting the code to remember
+> them. Happy to walk a request through it if that is useful.
+
+That last sentence is the point of the whole answer: it hands them the choice to go deeper, which is
+much better than you guessing how much detail they wanted.
+
+### Depth 2 — the three-minute walkthrough (rehearse this one)
+
+> The easiest way to answer that is to follow one click all the way through, because every layer
+> shows up in order.
+>
+> **A student opens the site.** What the browser downloads is a static bundle — React 19 in strict
+> TypeScript, built by Vite, styled with Tailwind 4. It comes off Netlify's CDN and it is just files.
+> There is no server rendering and there are no secrets in it, because anything shipped to a browser
+> is public whether you intend it or not.
+>
+> **They sign in.** The form is React Hook Form with a Zod schema, so the shape of what they typed is
+> checked before it leaves the browser — and the same shape is checked again on the server, because
+> client-side validation is a courtesy, not a control. Axios posts it to `/api/v1/auth/login`. Notice
+> the `/api` part: Netlify forwards that path through to the backend, so as far as the browser is
+> concerned the API lives on the same origin as the page. That is not a convenience. The refresh
+> token comes back as an httpOnly cookie, and on the same origin that cookie is first-party and
+> survives; on a separate API domain it would be a third-party cookie, which browsers now block, and
+> sessions would quietly stop surviving a reload.
+>
+> **The request reaches FastAPI**, running as a Docker container on Render. The router's only job is
+> HTTP: parse the body into a Pydantic model, call a service, turn the answer into a response. The
+> service does the real work — find the registration number, verify the password with Argon2id, check
+> they are using the right entrance, because administrators are only accepted at `/admin/login`, then
+> mint a fifteen-minute access token and a refresh token. The service file is not allowed to import
+> FastAPI at all. That rule is the reason the business rules can be tested without starting a web
+> server, and it is the reason the same rule cannot be enforced differently in two places.
+>
+> **Underneath is PostgreSQL 18** on Neon, reached through SQLAlchemy 2.0 over psycopg 3. Every table
+> in it arrived through an Alembic migration — a reviewed file in git, twenty-one of them — so the
+> schema has a readable history and a way back. Nothing was ever created by letting the framework
+> guess.
+>
+> **Now the student searches for a researcher.** That request carries the access token, and one
+> dependency checks one map from role to permission. Here is the part worth emphasising: the role and
+> the active flag are read from the database on that request, not taken from the token. So
+> deactivating somebody takes effect on their very next click rather than whenever their token
+> happens to expire.
+>
+> **The search itself is PostgreSQL doing four jobs** I would otherwise be running and paying for
+> four separate services to do. Full-text search ranks the real words. The pg_trgm extension catches
+> the misspellings. pgvector stores the embeddings for semantic matching. And btree_gist enforces that
+> two equipment bookings cannot overlap in time — that one is a constraint, not a check in my code,
+> so two people clicking book at the same instant cannot both succeed. That is the single biggest
+> reason this stack is as small as it is.
+>
+> **On the way back**, TanStack Query caches the result in the browser, so moving between pages does
+> not refetch what it already has, and a mutation invalidates exactly the queries it affects.
+>
+> And that is the whole path: static bundle, proxy, router, service, policy, database, and back —
+> with 122 operations and 39 tables behind it, and four CI jobs standing between any change and the
+> main branch.
+
+### Depth 3 — layer by layer, with the reason
+
+Use this when somebody picks one layer and asks why. The third column is the sentence to say out
+loud; do not read the second.
+
+| Layer | What it is | Say this if asked "why that one?" |
+|---|---|---|
+| **React 19 + TypeScript strict** | The user interface | "Strict TypeScript means the types are checked, not decorative. It has caught real bugs here — the frontend types mirror the backend schemas, and when they drifted, the compiler said so." |
+| **Vite** | Build tool | "Builds in seconds, so the feedback loop while developing is instant. That changes how much you are willing to try." |
+| **Tailwind 4** | Styling | "The design tokens live in one file, so the white-and-orange theme is one place to change rather than three hundred." |
+| **TanStack Query** | Server-state cache | "It removes a whole class of bug: nobody hand-writes loading, error and refetch logic per page, so nobody forgets one." |
+| **React Hook Form + Zod** | Forms and validation | "One schema describes a form's shape, and the same shape is validated again on the server. The client one is for the human, the server one is the control." |
+| **FastAPI + Pydantic v2** | The API | "The request and response types are the validation, so the API documents itself and the docs cannot go stale. And it is fast enough that the database is the bottleneck, which is where a bottleneck belongs." |
+| **SQLAlchemy 2.0 + psycopg 3** | Database access | "Typed queries, and no hand-built SQL strings, so SQL injection is not a category of bug I have to keep remembering." |
+| **Alembic** | Schema migrations | "Twenty-one reviewed files, sequential and reversible. The schema is in git with the code that needs it, so any environment can be brought to any version." |
+| **PostgreSQL 18** | The database | "Because most of the hard guarantees here are constraints: one collaboration per pair, no overlapping booking, one DOI claimed once. PostgreSQL enforces those for free. And its extensions gave me search, fuzzy matching, time ranges and vectors in the one service I already had to run." |
+| **scikit-learn (TF-IDF)** | Matching | "It runs locally, it costs nothing, and it can explain itself — every recommendation lists the shared tags and terms that produced it." |
+| **sentence-transformers + pgvector** | Semantic search | "Meaning as well as words, with the vectors stored in the database I already have. It is switched off in production because the model exceeds a free instance, and the platform runs fully without it." |
+| **Netlify / Render / Neon** | Hosting | "Three free tiers, no vendor SDK anywhere in the code. Everything is configured by environment variable, so moving host is a configuration change, not a rewrite." |
+| **Docker** | Packaging | "Optional by design. Render builds the image; you never need Docker to run this locally, which matters for anyone picking it up." |
+| **ruff, mypy strict, pytest / eslint, prettier, tsc, Vitest, Playwright** | Quality | "Four CI jobs on every push. 459 backend test functions against a real PostgreSQL database, 195 frontend tests, and 14 flows that drive a real browser." |
+
+### The two traces worth having ready
+
+**Trace A — signing in** (the one above, compressed): browser → `/api/v1/auth/login` via the Netlify
+proxy → router parses → service verifies with Argon2id, checks the portal, issues a 15-minute token
+plus an httpOnly rotating refresh cookie → database → response. Rate limited to five attempts a
+minute. Refresh happens silently in the background; the user never sees a session expire mid-task.
+
+**Trace B — booking a microscope** (use this one if they want to see why the database matters):
+browser sends the booking → `require_permission` checks the role, freshly read from the database →
+the service validates the slot against the equipment's maximum hours → the `INSERT` hits a
+`btree_gist` exclusion constraint over the time range → if somebody else took that slot a
+millisecond earlier, PostgreSQL refuses the row and the service turns that into a clear conflict
+message. **The point to land:** I did not write a check-then-write, because there is always a gap
+between checking and writing and under load something slips through it. The database closes the gap.
+
+### Follow-ups to expect
+
+**"Why FastAPI and not Django?"** — Django brings an admin, templates and its own ORM, and I needed
+none of those: the frontend is a separate React application and the admin console is a real part of
+the product with real permissions on it, not a scaffold. FastAPI gave me typed request and response
+models that validate and document themselves, which is what I actually wanted.
+
+**"Is this microservices?"** — No, and deliberately so. It is one modular monolith: twenty-two
+modules inside one deployable, each with its own router, service and policies. One person can run it,
+one migration history covers it, and a transaction can span two modules — which matters, because
+accepting an application has to add the student to the team in the same transaction. Microservices
+would have bought me deployment independence I do not need and distributed transactions I do not
+want.
+
+**"Why not MongoDB or a NoSQL database?"** — Because the valuable guarantees in this system are
+relational and constraint-shaped: one collaboration row per pair of people, no two bookings
+overlapping, a DOI claimed exactly once, author order preserved. Those are things a relational
+database enforces and a document database asks you to remember.
+
+**"Where does the AI actually sit?"** — Inside the same API process, not behind a paid endpoint.
+Tag overlap plus TF-IDF text similarity with scikit-learn, and optionally sentence-transformer
+embeddings in pgvector. Nothing leaves the server, nothing is billed, and every suggestion shows its
+reasons, which is what makes people click it rather than ignore it.
+
+**"What happens when the free tier sleeps?"** — The first request after an idle period is slow while
+the instance wakes. That is the honest cost of zero rupees a month, and for a pilot it is the right
+trade. A paid instance removes it whenever that becomes worth paying for.
+
+**"How do you deploy?"** — Push to main. Four CI jobs have to pass; then Netlify publishes the site
+and Render builds the API image. Migrations are reviewed files that the deployment applies, and the
+result is reported on `/health/ready`, so a schema that is behind the code says so out loud instead
+of pretending to be healthy.
+
+**"Could you have used a no-code tool or a template?"** — For the screens, maybe. Not for the rules.
+The value in this project is the part a template does not have: who may create whom, who may see a
+draft, what a coordinator's scope is, what cannot be double-booked. That is the actual work.
+
+### Three habits while answering
+
+1. **Never recite versions defensively.** "React 19" once is confidence; "React 19.0.0 with Vite 6
+   and Tailwind 4.0" is nerves.
+2. **Give the reason before they ask for it.** Every name in your answer should arrive with a "because".
+   A stack with reasons sounds designed; a stack without them sounds copied.
+3. **Offer the trace.** "Would it help if I followed one request through it?" turns an interrogation
+   into a walkthrough, and a walkthrough is the thing you have actually rehearsed.
+
+---
+
 ## Facts card — keep this in view while speaking
 
 | | |

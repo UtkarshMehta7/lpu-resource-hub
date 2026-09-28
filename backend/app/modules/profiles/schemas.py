@@ -66,6 +66,8 @@ class ResearcherProfileRead(BaseModel):
     verification_status: VerificationStatus
     verified_by: uuid.UUID | None
     verified_at: datetime | None
+    orcid_id: str | None = None
+    orcid_last_imported_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

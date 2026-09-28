@@ -22,6 +22,7 @@ from app.core.logging import configure_logging
 from app.core.rate_limit import (
     create_auth_rate_limiter,
     create_collaboration_rate_limiter,
+    create_import_rate_limiter,
     create_message_rate_limiter,
     create_search_rate_limiter,
 )
@@ -44,6 +45,7 @@ from app.modules.collaborations.router import router as collaborations_router
 from app.modules.facilities.router import router as facilities_router
 from app.modules.funding.router import router as funding_router
 from app.modules.health.router import router as health_router
+from app.modules.imports.router import router as imports_router
 from app.modules.messages.router import router as messages_router
 from app.modules.notifications.handlers import register_notification_handlers
 from app.modules.notifications.router import router as notifications_router
@@ -146,6 +148,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.search_rate_limiter = create_search_rate_limiter()
     app.state.collaboration_rate_limiter = create_collaboration_rate_limiter()
     app.state.message_rate_limiter = create_message_rate_limiter()
+    app.state.import_rate_limiter = create_import_rate_limiter()
 
     # Outermost: every response, including errors, carries the headers.
     app.add_middleware(SecurityHeadersMiddleware, production=settings.is_production)
@@ -188,4 +191,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(funding_router, prefix=API_V1_PREFIX)
     app.include_router(notifications_router, prefix=API_V1_PREFIX)
     app.include_router(search_router, prefix=API_V1_PREFIX)
+    app.include_router(imports_router, prefix=API_V1_PREFIX)
     return app

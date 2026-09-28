@@ -1,6 +1,9 @@
 import { apiClient } from "@/lib/api/client";
 
 import type {
+  ImportLookup,
+  ImportPreview,
+  ImportResult,
   Profile,
   ResearchAreaEntry,
   ResearcherProfileUpdate,
@@ -53,5 +56,19 @@ export interface DepartmentCoordinator {
 
 export async function fetchMyDepartment(): Promise<DepartmentCoordinator | null> {
   const response = await apiClient.get<DepartmentCoordinator | null>("/api/v1/me/department");
+  return response.data;
+}
+
+/* ---------------------------------------------------------------- import */
+
+export async function previewProfileImport(lookup: ImportLookup): Promise<ImportPreview> {
+  const response = await apiClient.post<ImportPreview>("/api/v1/me/profile/import/preview", lookup);
+  return response.data;
+}
+
+export async function applyProfileImport(
+  lookup: ImportLookup & { fields: string[]; work_keys: string[] },
+): Promise<ImportResult> {
+  const response = await apiClient.post<ImportResult>("/api/v1/me/profile/import", lookup);
   return response.data;
 }

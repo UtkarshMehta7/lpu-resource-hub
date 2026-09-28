@@ -28,6 +28,13 @@ dependencies = [
     # even when the optional model below isn't installed. Small and pure
     # Python; the heavy part of semantic search is the `ml` extra.
     "pgvector>=0.3,<1.0",
+    # Profile import (ORCID / OpenAlex / Crossref / Semantic Scholar): the
+    # connectors make outbound HTTPS calls, so httpx is a runtime dependency,
+    # not just the test client it used to be.
+    "httpx>=0.28,<1.0",
+    # Publication de-duplication: token-set ratio over normalised titles, to
+    # score the shortlist that pg_trgm generates. Pure wheels, no native build.
+    "rapidfuzz>=3.10,<4.0",
 ]
 
 [project.optional-dependencies]
@@ -38,7 +45,6 @@ ml = [
 ]
 dev = [
     "pytest>=8.3,<10.0",
-    "httpx>=0.28,<1.0",
     "python-dotenv>=1.0,<2.0",
     "ruff>=0.15,<0.16",
     "mypy>=1.15,<2.0",

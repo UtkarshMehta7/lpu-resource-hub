@@ -9,6 +9,7 @@ reached the deployed instance ahead of its migration, and the feature answered
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -19,6 +20,21 @@ from app.db.migrations import upgrade_to_head
 pytestmark = pytest.mark.db
 
 
+def _expected_head() -> str:
+    """The head Alembic itself reports.
+
+    Previously this was the literal "0021", which meant every new migration
+    broke a test that has nothing to do with the schema it adds. What the test
+    means is "startup brought the database to the latest revision", so it asks
+    the script directory what that is.
+    """
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    return ScriptDirectory.from_config(config).get_current_head() or ""
+
+
 def test_it_brings_the_schema_to_head(db_settings: Settings) -> None:
     engine = create_engine(str(db_settings.database_url))
     try:
@@ -27,7 +43,7 @@ def test_it_brings_the_schema_to_head(db_settings: Settings) -> None:
             revision = connection.execute(
                 text("SELECT version_num FROM alembic_version")
             ).scalar_one()
-            assert revision == "0021"
+            assert revision == _expected_head()
     finally:
         engine.dispose()
 

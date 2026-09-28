@@ -42,8 +42,9 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: ~128 API operations, 40 tables, 19 migrations, 22 ADRs,
-~780 backend tests, ~158 frontend tests, 14 Playwright flows.
+Current shape: 139 API operations over 111 paths, 41 tables, 22 migrations,
+25 ADRs, 24 backend modules, 880 backend tests, 195 frontend tests,
+14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
 - Nobody self-registers. `POST /auth/register` does not exist and must not
@@ -95,6 +96,24 @@ Current shape: ~128 API operations, 40 tables, 19 migrations, 22 ADRs,
   door. A non-participant always gets 404, never 403 -- admins included.
   New messages arrive by polling, not sockets (ADR 0022): the cursor is a
   keyset over (created_at, id), never an offset.
+- **Profile import pulls from four public sites, and none of them is the one
+  the brief names** (ADR 0025). ORCID resolves identity, OpenAlex supplies
+  breadth in place of Scopus, Crossref canonicalises metadata by DOI, and
+  Semantic Scholar adds abstracts best-effort. Scopus and Web of Science need
+  a paid licence; ResearchGate answers a server-side request with 403 and a
+  CAPTCHA; JSTOR has no profiles to import and no API; DBLP serves an anti-bot
+  page. All four rejections were tested, not assumed -- don't re-litigate them
+  from the brief's list.
+- **Import is preview-then-apply, and apply re-reads the sources.** Never
+  change it to trust the payload the browser sends back: that would let any
+  account post arbitrary publications labelled as imported from Crossref.
+- **A DOI is normalised before it is compared or stored** (`normalise_doi`).
+  OpenAlex percent-encodes the slash on some records, and one malformed DOI
+  makes Crossref reject the entire 40-item batch it appears in. Found live.
+- **Two different DOIs are never merged, however alike the titles.** An
+  erratum, a preprint and its version of record are separate works. The
+  de-duplication rules and their known failure cases are written up in
+  `docs/publication-deduplication.md`.
 - A fix to the service layer does not fix the rows already in the deployed
   database. The coordinators appointed before `_sync_coordinator_scope` needed
   migration 0018 as well, and the users page now shows each coordinator's

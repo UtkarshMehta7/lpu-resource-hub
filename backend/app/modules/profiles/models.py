@@ -101,6 +101,14 @@ class ResearcherProfile(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The researcher's ORCID iD, stored bare (0000-0002-1825-0097) once an
+    # import has resolved it. Unique: an ORCID identifies one person, so two
+    # accounts claiming the same iD is a data error worth refusing at the
+    # database rather than detecting later. Nullable -- most profiles have none.
+    orcid_id: Mapped[str | None] = mapped_column(String(19), nullable=True, unique=True)
+    orcid_last_imported_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     # Weighted full-text document (A: name, B: designation + skills + research
     # areas, C: bio). Not a generated column: the inputs live in users,
     # user_skills and user_research_areas, and a generated column can only

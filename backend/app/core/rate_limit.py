@@ -33,6 +33,12 @@ COLLABORATION_RATE_LIMIT_WINDOW_SECONDS = 3600.0
 MESSAGE_RATE_LIMIT_MAX_REQUESTS = 60
 MESSAGE_RATE_LIMIT_WINDOW_SECONDS = 60.0
 
+# Profile import. Tight on purpose: each call fans out to four external APIs,
+# so an unthrottled endpoint would let one account spend this deployment's
+# goodwill with Crossref and OpenAlex and get the whole server rate-limited.
+IMPORT_RATE_LIMIT_MAX_REQUESTS = 6
+IMPORT_RATE_LIMIT_WINDOW_SECONDS = 3600.0
+
 
 @dataclass
 class RateLimiter:
@@ -81,6 +87,13 @@ def create_message_rate_limiter() -> RateLimiter:
     )
 
 
+def create_import_rate_limiter() -> RateLimiter:
+    return RateLimiter(
+        max_requests=IMPORT_RATE_LIMIT_MAX_REQUESTS,
+        window_seconds=IMPORT_RATE_LIMIT_WINDOW_SECONDS,
+    )
+
+
 def enforce_message_rate_limit(request: Request, user_id: uuid.UUID) -> None:
     """Per-user budget for sending messages."""
     limiter: RateLimiter = request.app.state.message_rate_limiter
@@ -88,6 +101,16 @@ def enforce_message_rate_limit(request: Request, user_id: uuid.UUID) -> None:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="You're sending messages too quickly. Give it a moment.",
+        )
+
+
+def enforce_import_rate_limit(request: Request, user_id: uuid.UUID) -> None:
+    """Per-user budget for profile imports, which fan out to external sites."""
+    limiter: RateLimiter = request.app.state.import_rate_limiter
+    if not limiter.allow(str(user_id)):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="You've run several imports recently. Try again in a little while.",
         )
 
 
