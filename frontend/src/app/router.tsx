@@ -17,6 +17,7 @@ import { RoleRoute } from "@/features/auth/RoleRoute";
 import { HomePage } from "@/features/home/HomePage";
 import { NotFoundPage } from "@/features/home/NotFoundPage";
 import { OnboardingPage } from "@/features/onboarding/OnboardingPage";
+import { AtRiskBoardPage } from "@/features/milestones/AtRiskBoardPage";
 import { ProjectDetailPage } from "@/features/projects/ProjectDetailPage";
 import { ProjectFormPage } from "@/features/projects/ProjectFormPage";
 import { ProjectsPage } from "@/features/projects/ProjectsPage";
@@ -110,6 +111,7 @@ export const router = createBrowserRouter([
           {
             element: <RoleRoute allow={["research_coordinator", "admin"]} />,
             children: [
+              { path: "coordinator/at-risk", element: <AtRiskBoardPage /> },
               { path: "coordinator/verification-queue", element: <VerificationQueuePage /> },
               { path: "coordinator/review-queue", element: <ReviewQueuePage /> },
               { path: "admin/reports", element: <ModerationQueuePage /> },

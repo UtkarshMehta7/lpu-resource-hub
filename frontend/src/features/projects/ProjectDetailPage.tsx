@@ -9,6 +9,7 @@ import { useAuth } from "@/features/auth/authContext";
 import { RequestCollaborationButton } from "@/features/collaborations/RequestCollaborationButton";
 import { ReportButton } from "@/features/reports/ReportButton";
 import { TeamThreadButton } from "@/features/messages/TeamThreadButton";
+import { MilestoneSection } from "@/features/milestones/MilestoneList";
 import { SaveButton } from "@/features/saved/SaveButton";
 import { PublicationsSection } from "@/features/publications/PublicationList";
 import { toApiError } from "@/lib/api/errors";
@@ -238,6 +239,17 @@ export function ProjectDetailPage() {
           </ul>
         )}
       </section>
+
+      {/* The plan sits between the team and the output: it is what the team
+          is working towards, and the publications are what came of it. */}
+      <MilestoneSection
+        projectId={project.id}
+        canPlan={canEdit}
+        canMove={
+          (isOwner || project.members.some((member) => member.user_id === user?.id)) &&
+          (project.status === "draft" || project.status === "active")
+        }
+      />
 
       <PublicationsSection filters={{ project_id: project.id }} />
 

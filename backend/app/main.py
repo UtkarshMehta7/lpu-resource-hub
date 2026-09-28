@@ -47,6 +47,7 @@ from app.modules.funding.router import router as funding_router
 from app.modules.health.router import router as health_router
 from app.modules.imports.router import router as imports_router
 from app.modules.messages.router import router as messages_router
+from app.modules.milestones.router import router as milestones_router
 from app.modules.notifications.handlers import register_notification_handlers
 from app.modules.notifications.router import router as notifications_router
 from app.modules.opportunities.router import router as opportunities_router
@@ -192,4 +193,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(notifications_router, prefix=API_V1_PREFIX)
     app.include_router(search_router, prefix=API_V1_PREFIX)
     app.include_router(imports_router, prefix=API_V1_PREFIX)
+    app.include_router(milestones_router, prefix=API_V1_PREFIX)
     return app

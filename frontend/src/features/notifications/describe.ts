@@ -76,6 +76,24 @@ export function describeNotification(notification: AppNotification): Notificatio
         to: `${base}/${str(payload, "item_id")}`,
       };
     }
+    case "milestone_due": {
+      const days = payload.days_left;
+      const count = typeof days === "number" ? days : null;
+      return {
+        text:
+          count === 1
+            ? `“${str(payload, "title")}” is due tomorrow`
+            : `“${str(payload, "title")}” is due in ${count ?? "a few"} days`,
+        to: `/projects/${str(payload, "project_id")}`,
+        detail: str(payload, "project_title") || undefined,
+      };
+    }
+    case "milestone_overdue":
+      return {
+        text: `“${str(payload, "title")}” is past its due date`,
+        to: `/projects/${str(payload, "project_id")}`,
+        detail: str(payload, "project_title") || undefined,
+      };
     case "admin_promotion_code":
       // The whole point of the ceremony is that this code is readable here
       // and nowhere else, so it goes in the line itself, not behind a link.

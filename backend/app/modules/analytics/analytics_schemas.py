@@ -30,6 +30,17 @@ class VerificationBacklog(BaseModel):
     oldest_waiting_since: str | None
 
 
+class MilestoneAdherence(BaseModel):
+    """Outstanding milestones by risk, and how much of what finished was late."""
+
+    on_track: int
+    at_risk: int
+    overdue: int
+    blocked: int
+    completed: int
+    completed_on_time: int
+
+
 class AnalyticsOverview(BaseModel):
     # "department" or "platform": says plainly whose numbers these are.
     scope: str
@@ -42,6 +53,7 @@ class AnalyticsOverview(BaseModel):
     verification_backlog: VerificationBacklog
     accepted_collaborations: int
     open_reports: int
+    milestone_adherence: MilestoneAdherence
     trends: list[TrendPoint]
 
 

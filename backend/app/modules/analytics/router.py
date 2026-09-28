@@ -18,6 +18,7 @@ from app.modules.analytics.analytics_schemas import (
     CollaborationNetwork,
     EquipmentUsage,
     LabelledCount,
+    MilestoneAdherence,
     NetworkEdge,
     NetworkNode,
     PlatformSettings,
@@ -62,6 +63,7 @@ def read_analytics_overview(
         verification_backlog=VerificationBacklog(**insights.verification_backlog(db, scope)),
         accepted_collaborations=insights.collaboration_totals(db, scope)["accepted_collaborations"],
         open_reports=insights.open_reports(db),
+        milestone_adherence=MilestoneAdherence(**insights.milestone_adherence(db, scope)),
         trends=[TrendPoint(**row) for row in insights.trends(db, scope)],
     )
 
@@ -100,6 +102,7 @@ def read_platform_settings(
             },
             "semantic_search_available": embeddings.is_available(),
             "deadline_reminder_scheduler": settings.enable_scheduler,
+            "milestone_at_risk_days": settings.milestone_at_risk_days,
             "reminder_interval_minutes": settings.reminder_interval_minutes,
             "access_token_expire_minutes": settings.access_token_expire_minutes,
             "refresh_token_expire_days": settings.refresh_token_expire_days,

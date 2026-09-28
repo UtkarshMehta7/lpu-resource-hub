@@ -26,6 +26,12 @@ from app.modules.bookings.models import Booking, BookingStatus
 from app.modules.collaborations.models import CollaborationRequest, CollaborationStatus
 from app.modules.facilities.models import Equipment, Facility
 from app.modules.funding.models import FundingOpportunity
+from app.modules.milestones.models import (
+    SETTLED_STATUSES,
+    Milestone,
+    MilestoneDependency,
+)
+from app.modules.milestones.risk import Risk, RiskInput, assess
 from app.modules.opportunities.models import Opportunity, OpportunityStatus
 from app.modules.profiles.models import ResearcherProfile, SavedItem, VerificationStatus
 from app.modules.projects.models import Project, ProjectResearchArea, ProjectStatus
@@ -37,6 +43,17 @@ from app.modules.users.models import CoordinatorScopeType, User, UserRole
 class LabelledCountRow(TypedDict):
     label: str
     count: int
+
+
+class MilestoneAdherenceRow(TypedDict):
+    """How the outstanding milestones in scope are doing, plus what's landed."""
+
+    on_track: int
+    at_risk: int
+    overdue: int
+    blocked: int
+    completed: int
+    completed_on_time: int
 
 
 class EquipmentUsageRow(TypedDict):
@@ -271,3 +288,75 @@ def collaboration_totals(db: Session, scope: Scope) -> dict[str, int]:
             )
         )
     return {"accepted_collaborations": int(db.execute(query).scalar_one())}
+
+
+def milestone_adherence(db: Session, scope: Scope) -> MilestoneAdherenceRow:
+    """Counts per risk state, plus how much of what finished finished on time.
+
+    Risk is derived the same way the API derives it, by calling the same
+    function -- an analytics view that computed "at risk" its own way would
+    eventually disagree with the project page, and the number people trust is
+    whichever one they saw last.
+    """
+    from app.core.config import get_settings
+
+    today = datetime.now(UTC).date()
+    threshold = get_settings().milestone_at_risk_days
+
+    rows = db.execute(
+        select(Milestone.id, Milestone.status, Milestone.due_date, Milestone.completed_at)
+        .join(Project, Project.id == Milestone.project_id)
+        .where(Project.deleted_at.is_(None), Project.id.in_(_scoped_projects(scope)))
+    ).all()
+
+    edges: dict[uuid.UUID, list[uuid.UUID]] = {}
+    by_id = {row.id: row for row in rows}
+    if by_id:
+        for milestone_id, depends_on_id in db.execute(
+            select(MilestoneDependency.milestone_id, MilestoneDependency.depends_on_id).where(
+                MilestoneDependency.milestone_id.in_(by_id)
+            )
+        ).all():
+            edges.setdefault(milestone_id, []).append(depends_on_id)
+
+    counts: dict[str, int] = {
+        "on_track": 0,
+        "at_risk": 0,
+        "overdue": 0,
+        "blocked": 0,
+        "completed": 0,
+        "completed_on_time": 0,
+    }
+    for row in rows:
+        if row.status in SETTLED_STATUSES:
+            if row.completed_at is not None:
+                counts["completed"] += 1
+                if row.completed_at.date() <= row.due_date:
+                    counts["completed_on_time"] += 1
+            continue
+        risk = assess(
+            RiskInput(status=row.status, due_date=row.due_date),
+            today=today,
+            threshold_days=threshold,
+            depends_on=[
+                RiskInput(status=by_id[dep].status, due_date=by_id[dep].due_date)
+                for dep in edges.get(row.id, [])
+                if dep in by_id
+            ],
+        )
+        if risk is Risk.ON_TRACK:
+            counts["on_track"] += 1
+        elif risk is Risk.AT_RISK:
+            counts["at_risk"] += 1
+        elif risk is Risk.OVERDUE:
+            counts["overdue"] += 1
+        elif risk is Risk.BLOCKED:
+            counts["blocked"] += 1
+    return MilestoneAdherenceRow(
+        on_track=counts["on_track"],
+        at_risk=counts["at_risk"],
+        overdue=counts["overdue"],
+        blocked=counts["blocked"],
+        completed=counts["completed"],
+        completed_on_time=counts["completed_on_time"],
+    )
