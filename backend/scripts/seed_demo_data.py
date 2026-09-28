@@ -289,9 +289,38 @@ def _seed_taxonomy(db: Session, summary: SeedSummary) -> tuple[list[Skill], list
     return list(existing_skills.values()), list(existing_areas.values())
 
 
+#: Demo accounts are numbered in the 125xxxxx block. Everything a person
+#: created by hand here lives in 124xxxxx, so the two can never collide, and a
+#: seeded row is still identifiable by `users.is_demo` rather than by the
+#: shape of its number.
+_DEMO_NUMBER_BASE = 12_500_000
+# The administrator has no number of its own in the email, so it takes the
+# first slot rather than ...000, which reads like a placeholder.
+_ROLE_BLOCK = {"admin": 1, "coordinator": 100, "faculty": 200, "student": 300}
+
+
 def _demo_registration_number(email: str) -> str:
+    """An LPU-shaped registration number, derived from the seed email.
+
+    `demo.faculty07@example.com` -> `12500207`. Deterministic, so re-running
+    the seed matches the same row and a database seeded later lines up with a
+    record exported earlier.
+
+    These used to be `DEMOFACULTY07`, which had the virtue of being obviously
+    fake. Numbers read as real ones do, which is what makes a demonstration
+    convincing and is why this changed -- `is_demo` carries that meaning now,
+    and the accounts page and the exported record both show it.
+    """
     local_part = email.split("@", 1)[0]
-    return "".join(character for character in local_part if character.isalnum()).upper()
+    stripped = "".join(c for c in local_part if c.isalnum()).lower().removeprefix("demo")
+    digits = "".join(c for c in stripped if c.isdigit())
+    role = "".join(c for c in stripped if c.isalpha())
+    block = _ROLE_BLOCK.get(role)
+    if block is None:
+        # An email the scheme does not know: fall back to the old, obviously
+        # fake form rather than inventing a number that might mean something.
+        return "".join(c for c in local_part if c.isalnum()).upper()
+    return str(_DEMO_NUMBER_BASE + block + int(digits or 0))
 
 
 def _coordinator_for(coordinators: list[User], department: Department) -> User | None:
@@ -328,8 +357,9 @@ def _seed_user(
     if user is not None:
         return user
     user = User(
-        # Obviously fake, so a demo row can never be mistaken for a real LPU
-        # registration number: demo.faculty01@example.com -> DEMOFACULTY01.
+        # LPU-shaped and derived from the email, so it is stable across runs:
+        # demo.faculty01@example.com -> 12500201. See the function's note on
+        # why these stopped being obviously fake.
         registration_number=_demo_registration_number(email),
         email=email,
         password_hash=password_hash,

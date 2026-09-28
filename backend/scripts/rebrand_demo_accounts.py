@@ -32,6 +32,9 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from seed_demo_data import _demo_registration_number  # noqa: E402  - one scheme, one place
 
 import app.db.model_registry  # noqa: F401,E402  - registers every table, so
 
@@ -197,6 +200,11 @@ PASSWORD_SUFFIX = "123456"
 #: replacing; anything else was chosen by a person and is left alone.
 PLACEHOLDER = re.compile(r"^Demo\s", re.IGNORECASE)
 
+#: The old obviously-fake registration numbers, e.g. DEMOFACULTY07. A demo
+#: account still carrying one gets an LPU-shaped number derived from its email
+#: by the same function the seed uses, so both routes agree.
+OLD_STYLE_NUMBER = re.compile(r"^DEMO[A-Z]", re.IGNORECASE)
+
 
 def password_for(full_name: str) -> str:
     """The given name in lower case, then 123456.
@@ -260,6 +268,10 @@ def main() -> int:
                 return 0
 
             renamed = 0
+            renumbered = 0
+            taken = {
+                number for number in db.scalars(select(User.registration_number)).all() if number
+            }
             for index, user in enumerate(users):
                 # A name somebody chose is left alone unless asked otherwise;
                 # the password scheme still applies to every demo account, so
@@ -273,12 +285,30 @@ def main() -> int:
                         file=sys.stderr,
                     )
                     return 1
+                # A DEMO-prefixed number becomes an LPU-shaped one. Anything
+                # already numeric was assigned deliberately and is kept.
+                new_number = user.registration_number
+                if OLD_STYLE_NUMBER.match(user.registration_number or "") and user.email:
+                    candidate = _demo_registration_number(user.email)
+                    if candidate != user.registration_number and candidate not in taken:
+                        taken.discard(user.registration_number)
+                        taken.add(candidate)
+                        new_number = candidate
+
                 if full_name != user.full_name:
                     renamed += 1
+                if new_number != user.registration_number:
+                    renumbered += 1
                 if args.dry_run:
-                    arrow = f" -> {full_name!r}" if full_name != user.full_name else " (kept)"
-                    print(f"  {user.registration_number:18s} {user.full_name!r}{arrow}")
+                    arrow = f" -> {full_name!r}" if full_name != user.full_name else " (name kept)"
+                    number = (
+                        f"{user.registration_number} -> {new_number}"
+                        if new_number != user.registration_number
+                        else user.registration_number
+                    )
+                    print(f"  {number:24s} {user.full_name!r}{arrow}")
                 else:
+                    user.registration_number = new_number
                     user.full_name = full_name
                     user.password_hash = hash_password(password)
                     # A demo account is meant to be signed straight into.
@@ -291,9 +321,15 @@ def main() -> int:
         engine.dispose()
 
     if args.dry_run:
-        print(f"\n{changed} demo accounts would be updated. Real accounts are never touched.")
+        print(
+            f"\n{changed} demo accounts would be updated "
+            f"({renamed} renamed, {renumbered} renumbered). Real accounts are never touched."
+        )
     else:
-        print(f"\n{changed} demo accounts updated. Real accounts were not touched.")
+        print(
+            f"\n{changed} demo accounts updated "
+            f"({renamed} renamed, {renumbered} renumbered). Real accounts were not touched."
+        )
         print("Every password is the given name in lower case followed by 123456.")
     return 0
 
