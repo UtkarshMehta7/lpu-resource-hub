@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 139 API operations over 111 paths, 41 tables, 22 migrations,
-25 ADRs, 24 backend modules, 880 backend tests, 195 frontend tests,
+Current shape: 149 API operations over 118 paths, 43 tables, 23 migrations,
+26 ADRs, 25 backend modules, 931 backend tests, 212 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -96,6 +96,26 @@ Current shape: 139 API operations over 111 paths, 41 tables, 22 migrations,
   door. A non-participant always gets 404, never 403 -- admins included.
   New messages arrive by polling, not sockets (ADR 0022): the cursor is a
   keyset over (created_at, id), never an offset.
+- **A milestone's risk is DERIVED on every read, never stored** (ADR 0026).
+  `milestones/risk.py` is a pure function of status, due date, today and what
+  it waits on; the analytics view calls that same function rather than
+  reimplementing the rules in SQL. Never add an `at_risk` column -- a stored
+  flag is wrong between job runs, and the board would disagree with the
+  project page. The scheduled job exists only to notify exactly once.
+- **Milestones have two actors, not one.** Members may move work along
+  (`in_progress`, `done`); only the owner may create, edit, delete or cancel.
+  `milestones/policies.py:TRANSITIONS` is the single table both are checked
+  against.
+- **Milestone visibility is composed, not restated.** A milestone is visible
+  exactly when its project is, so the service calls
+  `projects.service._load_visible`; one on an invisible project is a 404.
+  Don't grow a second copy of the visibility rule.
+- **Dependency cycles are refused in the service**, not the database: no
+  constraint can express acyclicity, and a cycle makes the risk walk
+  non-terminating. Self-dependency is the one case a CHECK does catch.
+- **The seed script creates projects and milestones now.** It previously
+  created none, so any plan that says "add X to the demo projects" should
+  check they exist first.
 - **Profile import pulls from four public sites, and none of them is the one
   the brief names** (ADR 0025). ORCID resolves identity, OpenAlex supplies
   breadth in place of Scopus, Crossref canonicalises metadata by DOI, and

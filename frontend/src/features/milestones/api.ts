@@ -9,6 +9,11 @@ import type {
   MyMilestone,
 } from "./types";
 
+/** The cache key for one project's plan, shared by every mutation here. */
+export function milestoneQueryKey(projectId: string) {
+  return ["milestones", projectId] as const;
+}
+
 export async function fetchMilestones(projectId: string): Promise<Milestone[]> {
   const response = await apiClient.get<Milestone[]>(`/api/v1/projects/${projectId}/milestones`);
   return response.data;

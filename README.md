@@ -56,6 +56,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Collaboration is one relationship per pair of people, so it cannot be started twice or split a conversation in two; either party may end it ([ADR 0023](docs/adr/0023-collaboration-belongs-to-a-pair.md)) | Done |
 | Conversation threads scoped to an accepted collaboration request or a project team: polled not socketed, one notification per thread, moderation hides rather than deletes ([ADR 0022](docs/adr/0022-scoped-conversation-threads.md)) | Done |
 | Researchers pull their whole profile and publication list in from ORCID, OpenAlex, Crossref and Semantic Scholar — preview first, nothing written until it is ticked ([ADR 0025](docs/adr/0025-profile-import-from-public-research-sites.md)) | Done |
+| Project milestones with dependencies, at-risk states derived on every read, a Gantt timeline beside the list, reminders before and after the date, and an at-risk board for coordinators ([ADR 0026](docs/adr/0026-milestones-and-at-risk.md)) | Done |
 
 ## Technology stack
 
@@ -347,6 +348,12 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `POST /api/v1/me/profile/import/preview` | researchers | Reads ORCID, OpenAlex, Crossref and Semantic Scholar for `{orcid}` or `{name, affiliation}` and reports what it found. **Writes nothing.** Each work is marked `new`, `already_in_register`, `possible_duplicate` or `not_importable`. See [ADR 0025](docs/adr/0025-profile-import-from-public-research-sites.md). |
 | `POST /api/v1/me/profile/import` | researchers | Applies only the `fields` and `work_keys` that were ticked. Re-reads the sources rather than trusting the payload, so bibliographic data never comes from the browser. |
 | `GET /api/v1/me/profile/import/history` | researchers | The caller's own past imports. Never anyone else's. |
+| `GET/POST /api/v1/projects/{id}/milestones` | see the project / its owner | The plan, in plan order. Each milestone carries a **derived** `risk` (`on_track`, `at_risk`, `overdue`, `blocked`), `days_until_due` and `blocked_by`. See [ADR 0026](docs/adr/0026-milestones-and-at-risk.md). |
+| `PATCH/DELETE /api/v1/milestones/{id}` | project owner | Only while the project is a draft or active. |
+| `POST /api/v1/milestones/{id}/status` | owner **or** team member | Members may start and complete; cancelling and reopening are the owner's. |
+| `POST/DELETE /api/v1/milestones/{id}/dependencies` | project owner | Same-project only; cycles are refused. |
+| `GET /api/v1/me/milestones` | any signed-in user | What the caller owes, across projects, soonest first. |
+| `GET /api/v1/coordinator/at-risk-projects` | coordinator, admin | Projects with slipping milestones, most overdue first. |
 | `PUT /api/v1/me/skills` | any signed-in user | `[{skill_id, proficiency}]`, replaces the whole set. |
 | `PUT /api/v1/me/research-areas` | any signed-in user | `[{research_area_id, is_expertise}]`, replaces the whole set. |
 | `GET /api/v1/skills?q=`, `GET /api/v1/research-areas?q=&parent_id=` | any signed-in user | Name search; an exact alias hit (`ML`) also returns its canonical tag. |

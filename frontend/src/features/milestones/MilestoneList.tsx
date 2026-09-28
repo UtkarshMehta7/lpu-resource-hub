@@ -7,7 +7,13 @@ import { SkeletonList } from "@/components/ui/Skeleton";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { toApiError } from "@/lib/api/errors";
 
-import { changeMilestoneStatus, deleteMilestone, fetchMilestones, removeDependency } from "./api";
+import {
+  changeMilestoneStatus,
+  deleteMilestone,
+  fetchMilestones,
+  milestoneQueryKey,
+  removeDependency,
+} from "./api";
 import { MilestoneFormDialog } from "./MilestoneFormDialog";
 import { MilestoneTimeline } from "./MilestoneTimeline";
 import { RISK_LABELS, RISK_TONES, STATUS_LABELS, describeDue, formatDate } from "./labels";
@@ -20,10 +26,6 @@ import type { Milestone, MilestoneStatus } from "./types";
  * words ("waits on X"), which a chart can only imply, and it is the whole of
  * the feature on a phone.
  */
-
-export function milestoneQueryKey(projectId: string) {
-  return ["milestones", projectId] as const;
-}
 
 /** What a given viewer may do, decided by the backend and mirrored here. */
 interface Abilities {
@@ -113,7 +115,7 @@ export function MilestoneSection({
           <div className="mt-4">
             <MilestoneTimeline milestones={milestones} />
           </div>
-          <ul className="mt-4 space-y-2">
+          <ul aria-label="Milestone plan" className="mt-4 space-y-2">
             {milestones.map((milestone) => (
               <MilestoneRow
                 key={milestone.id}

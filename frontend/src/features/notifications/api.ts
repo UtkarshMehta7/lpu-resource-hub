@@ -11,7 +11,9 @@ export type NotificationType =
   | "relevant_opportunity"
   | "deadline_reminder"
   | "admin_promotion_code"
-  | "message_received";
+  | "message_received"
+  | "milestone_due"
+  | "milestone_overdue";
 
 export interface AppNotification {
   id: string;

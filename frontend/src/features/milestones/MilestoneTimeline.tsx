@@ -36,19 +36,30 @@ function dayOf(iso: string): number {
 
 const DAY = 86_400_000;
 
-export function MilestoneTimeline({ milestones }: { milestones: Milestone[] }) {
+export function MilestoneTimeline({
+  milestones,
+  now,
+}: {
+  milestones: Milestone[];
+  /** Overridable so a test can pin the marker; captured once otherwise. */
+  now?: number;
+}) {
   const [focused, setFocused] = useState<string | null>(null);
+  // Read once on mount rather than on every render: a clock read during
+  // render makes the component impure, and the marker would drift between
+  // renders for no benefit on a chart measured in days.
+  const [mountedAt] = useState(() => Date.now());
+  const today = now ?? mountedAt;
 
   const bounds: Bounds | null = useMemo(() => {
     if (milestones.length === 0) return null;
     const dates = milestones.map((m) => dayOf(m.due_date));
-    const today = Date.now();
     // Always include today, so the marker is never off the edge, and pad a
     // little either side so the first and last bars aren't flush to the frame.
     const start = Math.min(...dates, today) - 3 * DAY;
     const end = Math.max(...dates, today) + 3 * DAY;
     return { start, end: end === start ? start + DAY : end };
-  }, [milestones]);
+  }, [milestones, today]);
 
   if (!bounds || milestones.length === 0) return null;
 
@@ -64,7 +75,7 @@ export function MilestoneTimeline({ milestones }: { milestones: Milestone[] }) {
 
   const rowY = (index: number): number => TOP_PAD + index * ROW_HEIGHT;
   const positions = new Map(milestones.map((m, index) => [m.id, index]));
-  const todayX = x(Date.now());
+  const todayX = x(today);
 
   // A bar starts at the milestone it waits on, or at the left edge when it
   // waits on nothing -- so its length reads as the time it actually has.

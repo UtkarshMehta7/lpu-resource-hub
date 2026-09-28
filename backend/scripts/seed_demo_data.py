@@ -25,7 +25,7 @@ import os
 import random
 import sys
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -35,6 +35,11 @@ from app.core.security import MIN_PASSWORD_LENGTH, hash_password, is_common_pass
 from app.db.session import create_db_engine, create_session_factory
 from app.modules.admin.models import Department, School
 from app.modules.funding.models import FundingOpportunity
+from app.modules.milestones.models import (
+    Milestone,
+    MilestoneDependency,
+    MilestoneStatus,
+)
 from app.modules.profiles.models import (
     ResearcherAvailability,
     ResearcherProfile,
@@ -43,6 +48,7 @@ from app.modules.profiles.models import (
     UserSkill,
     VerificationStatus,
 )
+from app.modules.projects.models import Project, ProjectStatus
 from app.modules.taxonomy.models import ResearchArea, Skill, TagAlias
 from app.modules.users.models import CoordinatorScopeType, User, UserRole
 
@@ -184,6 +190,8 @@ class SeedSummary:
     users: int = 0
     profiles: int = 0
     funding_calls: int = 0
+    projects: int = 0
+    milestones: int = 0
 
     def render(self) -> str:
         return (
@@ -194,7 +202,9 @@ class SeedSummary:
             f"  aliases:        {self.aliases}\n"
             f"  users:          {self.users}\n"
             f"  profiles:       {self.profiles}\n"
-            f"  funding calls:  {self.funding_calls}"
+            f"  funding calls:  {self.funding_calls}\n"
+            f"  projects:       {self.projects}\n"
+            f"  milestones:     {self.milestones}"
         )
 
 
@@ -415,6 +425,102 @@ def _seed_funding(db: Session, summary: SeedSummary, admin: User) -> None:
         summary.funding_calls += 1
 
 
+# Each tuple is (title, [(milestone title, days from today)]). The offsets are
+# chosen so a freshly seeded database exercises every risk state at once:
+# something finished, something comfortably ahead, something due this week,
+# something already late, and something waiting on the late one. Without that
+# the at-risk board and the timeline are demonstrably empty on a new install.
+DEMO_PROJECTS: tuple[tuple[str, str, tuple[tuple[str, int], ...]], ...] = (
+    (
+        "Low-cost soil moisture sensors",
+        "Fictional demo project: cheap sensors for smallholder farms.",
+        (
+            ("Survey existing sensors", -60),
+            ("Build the first prototype", -14),
+            ("Field trial on two farms", 5),
+            ("Write up the results", 45),
+        ),
+    ),
+    (
+        "Campus traffic flow modelling",
+        "Fictional demo project: modelling movement between campus blocks.",
+        (
+            ("Collect movement data", -30),
+            ("Calibrate the model", -3),
+            ("Publish the simulation", 60),
+        ),
+    ),
+    (
+        "Regional crop yield forecasting",
+        "Fictional demo project: seasonal yield forecasts from open data.",
+        (
+            ("Assemble the dataset", -90),
+            ("Baseline model", 2),
+            ("Compare against the district record", 30),
+        ),
+    ),
+)
+
+
+def _seed_projects(
+    db: Session, summary: SeedSummary, owners: list[User], rng: random.Random
+) -> None:
+    """A handful of projects with milestones spanning every risk state.
+
+    Idempotent by title, like everything else here: re-running skips what
+    already exists rather than making a second copy.
+    """
+    if not owners:
+        return
+    today = date.today()
+    existing = {row for row in db.execute(select(Project.title)).scalars()}
+    for index, (title, description, plan) in enumerate(DEMO_PROJECTS):
+        if title in existing:
+            continue
+        owner = owners[index % len(owners)]
+        project = Project(
+            title=title,
+            summary=description,
+            description=f"{description} All data here is fictional demo data.",
+            owner_id=owner.id,
+            department_id=owner.department_id,
+            status=ProjectStatus.ACTIVE,
+            start_date=today - timedelta(days=120),
+            end_date=today + timedelta(days=120),
+        )
+        db.add(project)
+        db.flush()
+        summary.projects += 1
+
+        created: list[Milestone] = []
+        for position, (milestone_title, offset) in enumerate(plan, start=1):
+            # Anything comfortably in the past is finished work; the rest is
+            # outstanding, which is what makes the board interesting.
+            done = offset < -20
+            milestone = Milestone(
+                project_id=project.id,
+                title=milestone_title,
+                due_date=today + timedelta(days=offset),
+                position=position,
+                status=MilestoneStatus.DONE if done else MilestoneStatus.PENDING,
+                completed_at=(
+                    datetime.now(UTC) - timedelta(days=abs(offset) - 5) if done else None
+                ),
+                completed_by=owner.id if done else None,
+            )
+            db.add(milestone)
+            created.append(milestone)
+            summary.milestones += 1
+        db.flush()
+
+        # Chain each outstanding milestone to the one before it, so a late
+        # one visibly blocks what follows.
+        outstanding = [m for m in created if m.status is not MilestoneStatus.DONE]
+        for earlier, later in zip(outstanding, outstanding[1:], strict=False):
+            db.add(MilestoneDependency(milestone_id=later.id, depends_on_id=earlier.id))
+    db.flush()
+
+
 def seed(db: Session, password_hash: str) -> SeedSummary:
     rng = random.Random(RANDOM_SEED)
     summary = SeedSummary()
@@ -533,6 +639,7 @@ def seed(db: Session, password_hash: str) -> SeedSummary:
         summary.profiles += 1
 
     _seed_funding(db, summary, admin)
+    _seed_projects(db, summary, faculty, rng)
 
     db.commit()
     return summary
