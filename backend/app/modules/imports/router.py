@@ -21,6 +21,8 @@ from app.modules.imports import service
 from app.modules.imports.connectors.base import ProfileQuery
 from app.modules.imports.models import ProfileImport
 from app.modules.imports.schemas import (
+    AuthorCandidateRead,
+    CandidateSearchRequest,
     ImportApplyRequest,
     ImportHistoryRead,
     ImportLookupRequest,
@@ -63,13 +65,15 @@ def _translate(exc: Exception) -> HTTPException:
 
 def _query_from(payload: ImportLookupRequest) -> ProfileQuery:
     """Turn the request into a validated lookup, or a 422 explaining why not."""
-    if not payload.orcid and not payload.name:
+    if not payload.orcid and not payload.name and not payload.openalex_author_id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Give an ORCID iD or a name to look up.",
+            detail="Give an ORCID iD, a name, or choose a researcher to look up.",
         )
     try:
-        return service.build_query(payload.orcid, payload.name, payload.affiliation)
+        return service.build_query(
+            payload.orcid, payload.name, payload.affiliation, payload.openalex_author_id
+        )
     except service.InvalidOrcidError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -118,6 +122,27 @@ def apply_import(
     except Exception as exc:  # noqa: BLE001 - mapped to HTTP below, re-raised if unknown
         raise _translate(exc) from exc
     return ImportResultRead.model_validate(result)
+
+
+@router.post("/me/profile/import/candidates", response_model=list[AuthorCandidateRead])
+def search_candidates(
+    request: Request,
+    payload: CandidateSearchRequest,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> list[AuthorCandidateRead]:
+    """Researchers who might be the caller, for them to pick from.
+
+    A name is not an identifier: searching one returns namesakes, and the
+    first hit is frequently somebody else entirely. This is what the caller
+    chooses from instead of the system guessing.
+    """
+    enforce_import_rate_limit(request, current_user.id)
+    try:
+        found = service.search_candidates(db, current_user, payload.name, payload.affiliation)
+    except Exception as exc:  # noqa: BLE001 - mapped to HTTP below, re-raised if unknown
+        raise _translate(exc) from exc
+    return [AuthorCandidateRead.model_validate(c) for c in found]
 
 
 @router.get("/me/profile/import/history", response_model=list[ImportHistoryRead])

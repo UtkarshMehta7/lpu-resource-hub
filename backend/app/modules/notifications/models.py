@@ -32,6 +32,8 @@ class NotificationType(StrEnum):
     MILESTONE_DUE = "milestone_due"
     #: A milestone's date has passed with the work still outstanding. Once only.
     MILESTONE_OVERDUE = "milestone_overdue"
+    #: Somebody is waiting on the recipient to verify, review or decide.
+    NUDGE_RECEIVED = "nudge_received"
 
 
 class Notification(Base):

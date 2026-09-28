@@ -9,6 +9,30 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.modules.imports.service import IMPORTABLE_FIELDS
 
 
+class CandidateSearchRequest(BaseModel):
+    """Find people who might be the caller, for them to choose between."""
+
+    name: str = Field(min_length=2, max_length=200)
+    affiliation: str | None = Field(default=None, max_length=200)
+
+
+class AuthorCandidateRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    source: str
+    source_id: str
+    #: Links to the record itself, so a choice can be checked, not guessed.
+    source_url: str | None
+    full_name: str
+    affiliation: str | None
+    other_affiliations: list[str]
+    orcid: str | None
+    works_count: int | None
+    cited_by_count: int | None
+    h_index: int | None
+    topics: list[str]
+
+
 class ImportLookupRequest(BaseModel):
     """What the researcher gives us to find themselves with.
 
@@ -20,6 +44,8 @@ class ImportLookupRequest(BaseModel):
     orcid: str | None = Field(default=None, max_length=100)
     name: str | None = Field(default=None, max_length=200)
     affiliation: str | None = Field(default=None, max_length=200)
+    #: `source_id` of a candidate the researcher picked. Wins over the name.
+    openalex_author_id: str | None = Field(default=None, max_length=64)
 
 
 class ImportApplyRequest(ImportLookupRequest):
@@ -48,6 +74,7 @@ class WorkCandidateRead(BaseModel):
     year: int | None
     pub_type: str
     abstract: str | None
+    url: str | None
     authors: list[str]
     sources: list[str]
     status: str
@@ -84,6 +111,7 @@ class ImportResultRead(BaseModel):
     works_skipped: int
     works_failed: int
     source_errors: dict[str, str]
+    verification_reset: bool
 
 
 class ImportHistoryRead(BaseModel):
@@ -99,6 +127,8 @@ class ImportHistoryRead(BaseModel):
 
 
 __all__ = [
+    "AuthorCandidateRead",
+    "CandidateSearchRequest",
     "ImportApplyRequest",
     "ImportHistoryRead",
     "ImportLookupRequest",

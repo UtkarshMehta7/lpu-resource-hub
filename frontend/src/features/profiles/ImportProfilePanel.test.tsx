@@ -4,11 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ImportProfilePanel } from "./ImportProfilePanel";
-import type { ImportLookup, ImportPreview, ImportResult } from "./types";
+import type { AuthorCandidate, ImportLookup, ImportPreview, ImportResult } from "./types";
 
 // Typed explicitly: an untyped vi.fn() returns `any`, which the lint rules
 // (rightly) refuse to let through into the component under test.
 const previewProfileImport = vi.fn<(lookup: ImportLookup) => Promise<ImportPreview>>();
+const searchImportCandidates =
+  vi.fn<(name: string, affiliation?: string | null) => Promise<AuthorCandidate[]>>();
+const fetchImportHistory = vi.fn<() => Promise<never[]>>();
 const applyProfileImport =
   vi.fn<
     (lookup: ImportLookup & { fields: string[]; work_keys: string[] }) => Promise<ImportResult>
@@ -16,6 +19,8 @@ const applyProfileImport =
 
 vi.mock("./api", () => ({
   previewProfileImport: (lookup: ImportLookup) => previewProfileImport(lookup),
+  searchImportCandidates: (name: string) => searchImportCandidates(name),
+  fetchImportHistory: () => fetchImportHistory(),
   applyProfileImport: (lookup: ImportLookup & { fields: string[]; work_keys: string[] }) =>
     applyProfileImport(lookup),
 }));
@@ -42,6 +47,7 @@ const PREVIEW: ImportPreview = {
       year: 2024,
       pub_type: "journal_article",
       abstract: null,
+      url: "https://doi.org/10.1/new",
       authors: ["A. Sharma"],
       sources: ["orcid"],
       status: "new",
@@ -59,6 +65,7 @@ const PREVIEW: ImportPreview = {
       year: 2020,
       pub_type: "journal_article",
       abstract: null,
+      url: null,
       authors: [],
       sources: ["openalex"],
       status: "already_in_register",
@@ -76,6 +83,7 @@ const PREVIEW: ImportPreview = {
       year: 2019,
       pub_type: "other",
       abstract: null,
+      url: null,
       authors: [],
       sources: ["openalex"],
       status: "possible_duplicate",
@@ -90,6 +98,23 @@ const PREVIEW: ImportPreview = {
   known_count: 1,
 };
 
+function candidate(overrides: Partial<AuthorCandidate> = {}): AuthorCandidate {
+  return {
+    source: "openalex",
+    source_id: "A1",
+    source_url: "https://openalex.org/A1",
+    full_name: "Nitish Kumar",
+    affiliation: "Lovely Professional University",
+    other_affiliations: [],
+    orcid: null,
+    works_count: 12,
+    cited_by_count: 30,
+    h_index: 4,
+    topics: ["Soil Science"],
+    ...overrides,
+  };
+}
+
 function renderPanel() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -103,6 +128,9 @@ describe("ImportProfilePanel", () => {
   beforeEach(() => {
     previewProfileImport.mockReset();
     applyProfileImport.mockReset();
+    searchImportCandidates.mockReset();
+    fetchImportHistory.mockReset();
+    fetchImportHistory.mockResolvedValue([]);
   });
 
   it("will not look anything up until given an ORCID iD or a name", () => {
@@ -156,6 +184,7 @@ describe("ImportProfilePanel", () => {
       works_skipped: 0,
       works_failed: 0,
       source_errors: {},
+      verification_reset: false,
     });
     renderPanel();
 
@@ -184,5 +213,98 @@ describe("ImportProfilePanel", () => {
     await user.click(screen.getByRole("button", { name: "Look me up" }));
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
+  });
+});
+
+describe("choosing between namesakes", () => {
+  it("offers candidates instead of guessing when only a name is given", async () => {
+    const user = userEvent.setup();
+    searchImportCandidates.mockResolvedValue([
+      candidate({ source_id: "A1", full_name: "Nitish Srivastava", affiliation: "Google" }),
+      candidate({ source_id: "A2", full_name: "Nitish Kumar", affiliation: "SRM Institute" }),
+    ]);
+    renderPanel();
+
+    await user.type(screen.getByLabelText("or your published name"), "Nitish Kumar");
+    await user.click(screen.getByRole("button", { name: "Look me up" }));
+
+    expect(await screen.findByText(/Which of these is you\?/)).toBeInTheDocument();
+    expect(screen.getByText("Nitish Srivastava")).toBeInTheDocument();
+    expect(screen.getByText("Nitish Kumar")).toBeInTheDocument();
+    // Nothing was imported or previewed off the back of a name alone.
+    expect(previewProfileImport).not.toHaveBeenCalled();
+  });
+
+  it("links each candidate to the record so the choice can be checked", async () => {
+    const user = userEvent.setup();
+    searchImportCandidates.mockResolvedValue([candidate()]);
+    renderPanel();
+
+    await user.type(screen.getByLabelText("or your published name"), "Nitish Kumar");
+    await user.click(screen.getByRole("button", { name: "Look me up" }));
+
+    const link = await screen.findByRole("link", { name: /Open the record to check/ });
+    expect(link).toHaveAttribute("href", "https://openalex.org/A1");
+  });
+
+  it("previews only the candidate the researcher picked", async () => {
+    const user = userEvent.setup();
+    searchImportCandidates.mockResolvedValue([candidate({ source_id: "A2" })]);
+    previewProfileImport.mockResolvedValue(PREVIEW);
+    renderPanel();
+
+    await user.type(screen.getByLabelText("or your published name"), "Nitish Kumar");
+    await user.click(screen.getByRole("button", { name: "Look me up" }));
+    await user.click(await screen.findByRole("button", { name: "This is me" }));
+
+    expect(previewProfileImport).toHaveBeenCalledWith(
+      expect.objectContaining({ openalex_author_id: "A2" }),
+    );
+  });
+
+  it("says so plainly when nobody matches", async () => {
+    const user = userEvent.setup();
+    searchImportCandidates.mockResolvedValue([]);
+    renderPanel();
+
+    await user.type(screen.getByLabelText("or your published name"), "Nobody At All");
+    await user.click(screen.getByRole("button", { name: "Look me up" }));
+
+    expect(await screen.findByText(/No researcher on OpenAlex matches/)).toBeInTheDocument();
+  });
+
+  it("links a publication to its DOI so it can be verified before importing", async () => {
+    const user = userEvent.setup();
+    previewProfileImport.mockResolvedValue(PREVIEW);
+    renderPanel();
+
+    await user.type(screen.getByLabelText("ORCID iD"), "0000-0002-1825-0097");
+    await user.click(screen.getByRole("button", { name: "Look me up" }));
+    await screen.findByText(/1 new, 1 already saved/);
+
+    const title = screen.getByRole("link", { name: "A brand new paper" });
+    expect(title).toHaveAttribute("href", "https://doi.org/10.1/new");
+  });
+
+  it("says when an import sent the profile back for verification", async () => {
+    const user = userEvent.setup();
+    previewProfileImport.mockResolvedValue(PREVIEW);
+    applyProfileImport.mockResolvedValue({
+      import_id: "1",
+      applied_fields: ["bio"],
+      works_imported: 1,
+      works_skipped: 0,
+      works_failed: 0,
+      source_errors: {},
+      verification_reset: true,
+    });
+    renderPanel();
+
+    await user.type(screen.getByLabelText("ORCID iD"), "0000-0002-1825-0097");
+    await user.click(screen.getByRole("button", { name: "Look me up" }));
+    await screen.findByText(/1 new, 1 already saved/);
+    await user.click(screen.getByRole("button", { name: /Import 2 selected/ }));
+
+    expect(await screen.findByText(/back to your department coordinator/)).toBeInTheDocument();
   });
 });

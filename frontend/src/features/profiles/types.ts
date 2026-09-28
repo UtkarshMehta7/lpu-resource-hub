@@ -82,6 +82,8 @@ export interface ImportWorkCandidate {
   year: number | null;
   pub_type: string;
   abstract: string | null;
+  /** Where to read the work itself, when it has no DOI. */
+  url: string | null;
   authors: string[];
   sources: string[];
   status: ImportWorkStatus;
@@ -114,6 +116,21 @@ export interface ImportPreview {
   known_count: number;
 }
 
+export interface AuthorCandidate {
+  source: string;
+  source_id: string;
+  /** Links to the record itself, so a choice can be checked rather than guessed. */
+  source_url: string | null;
+  full_name: string;
+  affiliation: string | null;
+  other_affiliations: string[];
+  orcid: string | null;
+  works_count: number | null;
+  cited_by_count: number | null;
+  h_index: number | null;
+  topics: string[];
+}
+
 export interface ImportResult {
   import_id: string;
   applied_fields: string[];
@@ -121,10 +138,24 @@ export interface ImportResult {
   works_skipped: number;
   works_failed: number;
   source_errors: Record<string, string>;
+  /** True when the import sent an already-verified profile back for review. */
+  verification_reset: boolean;
 }
 
 export interface ImportLookup {
   orcid?: string | null;
   name?: string | null;
   affiliation?: string | null;
+  /** `source_id` of a candidate the researcher picked. Wins over the name. */
+  openalex_author_id?: string | null;
+}
+
+export interface ImportHistoryEntry {
+  id: string;
+  orcid_id: string | null;
+  works_found: number;
+  works_imported: number;
+  works_already_known: number;
+  applied_fields: string[];
+  created_at: string;
 }

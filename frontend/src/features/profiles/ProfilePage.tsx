@@ -8,6 +8,8 @@ import { toApiError } from "@/lib/api/errors";
 import { DepartmentCoordinatorCard } from "./DepartmentCoordinatorCard";
 
 import { fetchMyProfile, saveProfile } from "./api";
+import { NudgeButton } from "@/features/nudges/NudgeButton";
+
 import { ImportProfilePanel } from "./ImportProfilePanel";
 import { ProfileForm } from "./ProfileForm";
 import type { ResearcherProfileUpdate, StudentProfileUpdate, VerificationStatus } from "./types";
@@ -68,12 +70,17 @@ export function ProfilePage() {
       ) : null}
 
       {profile?.profile_type === "researcher" ? (
-        <div className="mt-4 flex items-center gap-3 rounded-card border border-line bg-surface px-4 py-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-card border border-line bg-surface px-4 py-3">
           <span className="text-sm text-ink-muted">Verification</span>
           <StatusIndicator
             tone={VERIFICATION_VIEW[profile.verification_status].tone}
             label={VERIFICATION_VIEW[profile.verification_status].label}
           />
+          {/* Waiting on somebody else is the one case where there is nothing
+              useful to do on this page -- so offer the one useful thing. */}
+          {profile.verification_status === "pending" ? (
+            <NudgeButton kind="profile_verification" entityId={user.id} />
+          ) : null}
         </div>
       ) : null}
 
@@ -123,6 +130,7 @@ export function ProfilePage() {
           onImported={async () => {
             await queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
             await queryClient.invalidateQueries({ queryKey: ["publications"] });
+            await queryClient.invalidateQueries({ queryKey: ["import-history"] });
           }}
         />
       ) : null}
