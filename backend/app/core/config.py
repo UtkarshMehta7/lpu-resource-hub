@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     rec_semantic_weight: float = Field(default=0.0, ge=0.0, le=0.9)
     # Deadline-reminder scheduler (Step 12). Off in tests; on in a real run.
     enable_scheduler: bool = False
+    # Profile import. The contact address is sent to Crossref and OpenAlex as
+    # `mailto`; both route identified callers into a faster pool and throttle
+    # anonymous ones first, so this is not optional politeness. It is not a
+    # secret and appears in outbound request headers.
+    import_contact_email: str = "research-hub@lpu.example.edu"
+    import_enabled: bool = True
+    import_timeout_seconds: int = Field(default=15, ge=3, le=60)
     #: Apply outstanding migrations at startup, under an advisory lock.
     #: Defaults to ON in production and off everywhere else -- see
     #: `run_migrations_at_boot` below. Set it explicitly to override.
