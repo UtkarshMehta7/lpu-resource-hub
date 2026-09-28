@@ -106,8 +106,8 @@ def db_settings(migrated_test_database_url: str) -> Settings:
 
 
 TABLES_TO_CLEAN = (
-    "profile_imports, entity_embeddings, notifications, funding_research_areas, "
-    "funding_opportunities, "
+    "milestone_dependencies, milestones, profile_imports, entity_embeddings, "
+    "notifications, funding_research_areas, funding_opportunities, "
     "bookings, equipment, facilities, saved_items, content_reports, collaboration_requests, "
     "application_events, applications, opportunity_skills, opportunities, "
     "project_publications, publication_authors, publications, "

@@ -15,7 +15,7 @@ from collections.abc import Callable
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.jobs.reminders import send_deadline_reminders
+from app.jobs.reminders import send_deadline_reminders, send_milestone_reminders
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +24,9 @@ def run_reminders(session_factory: Callable[[], Session]) -> None:
     """One reminder pass, with its own session and its own failure domain."""
     session = session_factory()
     try:
-        sent = send_deadline_reminders(session)
+        sent = send_deadline_reminders(session) + send_milestone_reminders(session)
         if sent:
-            logger.info("deadline reminders sent: %d", sent)
+            logger.info("reminders sent: %d", sent)
     except Exception:  # noqa: BLE001 - a scheduled job must not kill the thread
         session.rollback()
         logger.exception("deadline reminder job failed")

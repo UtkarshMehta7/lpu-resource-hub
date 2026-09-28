@@ -110,6 +110,13 @@ export const NAV: NavItem[] = [
     keywords: "approve slots",
   },
   {
+    to: "/coordinator/at-risk",
+    label: "At-risk projects",
+    group: "Review",
+    roles: ["research_coordinator", "admin"],
+    keywords: "milestones overdue slipping late deadlines",
+  },
+  {
     to: "/admin/reports",
     label: "Reports",
     group: "Review",

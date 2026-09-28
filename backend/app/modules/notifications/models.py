@@ -28,6 +28,10 @@ class NotificationType(StrEnum):
     ADMIN_PROMOTION_CODE = "admin_promotion_code"
     #: One per thread until it is read, never one per message.
     MESSAGE_RECEIVED = "message_received"
+    #: A milestone falls due shortly. Sent at each configured lead time.
+    MILESTONE_DUE = "milestone_due"
+    #: A milestone's date has passed with the work still outstanding. Once only.
+    MILESTONE_OVERDUE = "milestone_overdue"
 
 
 class Notification(Base):
