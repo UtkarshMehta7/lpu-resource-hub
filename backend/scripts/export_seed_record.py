@@ -6,14 +6,12 @@ the day and impossible to reconstruct six months later.
 
     DATABASE_URL=... python scripts/export_seed_record.py [-o record.xlsx]
 
-Two deliberate omissions:
-
-* **No passwords.** Every seeded account shares one password, and writing it
-  into a file that gets emailed around would turn this record into a
-  credential. It is reported once, on the terminal, by the seed script.
-* **No real people.** Only rows the seed created (`users.is_demo`) are listed.
-  Accounts somebody made by hand are counted so the totals reconcile, but
-  their names and addresses are nobody's business.
+**This workbook contains demo credentials.** Every demonstration account's
+password follows one published rule -- the given name in lower case, then
+123456 -- so the sheet records it alongside the account. That makes the file a
+credential for the demo deployment: keep it as one. Accounts a person created
+by hand are listed too, but their passwords are theirs and are never known
+here, so those cells say so instead of guessing.
 
 The workbook also records what was deliberately NOT seeded: the publication
 register and the ORCID/OpenAlex/Crossref import carry no fabricated data, so
@@ -38,6 +36,9 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from rebrand_demo_accounts import password_for  # noqa: E402  - one rule, one place
 
 import app.db.model_registry  # noqa: F401,E402  - registers every table
 from app.core.config import get_settings  # noqa: E402
@@ -92,11 +93,18 @@ def _write(sheet: Worksheet, columns: list[str], rows: list[list[Any]]) -> None:
 
 
 def _accounts(db: Session) -> list[list[Any]]:
+    """Every account, demo and hand-made alike, with the demo passwords.
+
+    Hand-made accounts are included so the roster is complete -- somebody
+    reading this should not have to cross-reference a second list -- but their
+    passwords were chosen by them and are not recoverable from a hash, so the
+    cell says that rather than being left ambiguously blank.
+    """
     departments = {d.id: d.name for d in db.scalars(select(Department)).all()}
     names = {u.id: u.full_name for u in db.scalars(select(User)).all()}
     rows = []
     for user in db.scalars(
-        select(User).where(User.is_demo.is_(True)).order_by(User.role, User.registration_number)
+        select(User).order_by(User.is_demo.desc(), User.role, User.registration_number)
     ).all():
         rows.append(
             [
@@ -105,6 +113,8 @@ def _accounts(db: Session) -> list[list[Any]]:
                 user.role.value,
                 departments.get(user.department_id, "—") if user.department_id else "—",
                 user.email or "—",
+                password_for(user.full_name) if user.is_demo else "set by the account holder",
+                "demo" if user.is_demo else "created by hand",
                 names.get(user.created_by, "—") if user.created_by else "—",
                 "yes" if user.is_active else "no",
                 user.created_at.strftime("%Y-%m-%d %H:%M") if user.created_at else "—",
@@ -196,7 +206,8 @@ def _summary_sheet(sheet: Worksheet, db: Session, database_label: str) -> None:
     # Counted with formulas rather than written as numbers, so the totals
     # still agree if somebody edits a sheet by hand.
     rows: list[tuple[str, str]] = [
-        ("Demo accounts", "=COUNTA(Accounts!A:A)-1"),
+        ("Accounts, all origins", "=COUNTA(Accounts!A:A)-1"),
+        ("  of which demo", '=COUNTIF(Accounts!G:G,"demo")'),
         ("  of which administrators", '=COUNTIF(Accounts!C:C,"admin")'),
         ("  of which coordinators", '=COUNTIF(Accounts!C:C,"research_coordinator")'),
         ("  of which faculty", '=COUNTIF(Accounts!C:C,"faculty")'),
@@ -222,7 +233,8 @@ def _summary_sheet(sheet: Worksheet, db: Session, database_label: str) -> None:
         column=1,
         value=(
             "Counts are formulas over the other sheets, so they stay correct if a "
-            "sheet is edited. Passwords are deliberately not recorded here."
+            "sheet is edited. The Accounts sheet carries demo passwords: treat "
+            "this file as a credential for the demonstration deployment."
         ),
     )
     note.font = NOTE_FONT
@@ -300,6 +312,8 @@ def build(db: Session, database_label: str) -> Workbook:
             "Role",
             "Department",
             "Email",
+            "Password",
+            "Origin",
             "Provisioned by",
             "Active",
             "Created (UTC)",
@@ -388,7 +402,7 @@ def main() -> int:
     destination = Path(args.output).expanduser()
     workbook.save(destination)
     print(f"Wrote {destination}")
-    print("Passwords are not recorded in this file.")
+    print("This file records demo passwords. Treat it as a credential.")
     return 0
 
 
