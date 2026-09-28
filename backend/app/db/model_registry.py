@@ -22,6 +22,10 @@ from app.modules.messages.models import (  # noqa: F401
     ConversationParticipant,
     Message,
 )
+from app.modules.milestones.models import (  # noqa: F401
+    Milestone,
+    MilestoneDependency,
+)
 from app.modules.notifications.models import Notification  # noqa: F401
 from app.modules.opportunities.models import Opportunity, OpportunitySkill  # noqa: F401
 from app.modules.profiles.models import (  # noqa: F401

@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     import_contact_email: str = "research-hub@lpu.example.edu"
     import_enabled: bool = True
     import_timeout_seconds: int = Field(default=15, ge=3, le=60)
+    # Milestones. How many days before its due date a milestone starts being
+    # reported as at risk. Read at request time, so risk is never stale --
+    # see app/modules/milestones/risk.py for why it is derived, not stored.
+    milestone_at_risk_days: int = Field(default=7, ge=1, le=90)
     #: Apply outstanding migrations at startup, under an advisory lock.
     #: Defaults to ON in production and off everywhere else -- see
     #: `run_migrations_at_boot` below. Set it explicitly to override.
