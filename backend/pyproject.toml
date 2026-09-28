@@ -45,6 +45,9 @@ ml = [
 ]
 dev = [
     "pytest>=8.3,<10.0",
+    # scripts/export_seed_record.py writes the XLSX record of what a seed
+    # created. A tooling dependency, never imported by the application.
+    "openpyxl>=3.1,<4.0",
     "python-dotenv>=1.0,<2.0",
     "ruff>=0.15,<0.16",
     "mypy>=1.15,<2.0",

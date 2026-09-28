@@ -467,56 +467,76 @@ def _seed_projects(
 ) -> None:
     """A handful of projects with milestones spanning every risk state.
 
-    Idempotent by title, like everything else here: re-running skips what
-    already exists rather than making a second copy.
+    Idempotent per project *and* per milestone. Checking only the project
+    would leave a project whose milestones went missing broken for good --
+    which is exactly what a downgrade and re-upgrade of migration 0023 does,
+    since dropping the table brings it back empty.
     """
     if not owners:
         return
     today = date.today()
-    existing = {row for row in db.execute(select(Project.title)).scalars()}
+    existing = {p.title: p for p in db.execute(select(Project)).scalars()}
     for index, (title, description, plan) in enumerate(DEMO_PROJECTS):
-        if title in existing:
-            continue
         owner = owners[index % len(owners)]
-        project = Project(
-            title=title,
-            summary=description,
-            description=f"{description} All data here is fictional demo data.",
-            owner_id=owner.id,
-            department_id=owner.department_id,
-            status=ProjectStatus.ACTIVE,
-            start_date=today - timedelta(days=120),
-            end_date=today + timedelta(days=120),
-        )
-        db.add(project)
-        db.flush()
-        summary.projects += 1
-
-        created: list[Milestone] = []
-        for position, (milestone_title, offset) in enumerate(plan, start=1):
-            # Anything comfortably in the past is finished work; the rest is
-            # outstanding, which is what makes the board interesting.
-            done = offset < -20
-            milestone = Milestone(
-                project_id=project.id,
-                title=milestone_title,
-                due_date=today + timedelta(days=offset),
-                position=position,
-                status=MilestoneStatus.DONE if done else MilestoneStatus.PENDING,
-                completed_at=(
-                    datetime.now(UTC) - timedelta(days=abs(offset) - 5) if done else None
-                ),
-                completed_by=owner.id if done else None,
+        project = existing.get(title)
+        if project is None:
+            project = Project(
+                title=title,
+                summary=description,
+                description=f"{description} All data here is fictional demo data.",
+                owner_id=owner.id,
+                department_id=owner.department_id,
+                status=ProjectStatus.ACTIVE,
+                start_date=today - timedelta(days=120),
+                end_date=today + timedelta(days=120),
             )
-            db.add(milestone)
-            created.append(milestone)
-            summary.milestones += 1
-        db.flush()
+            db.add(project)
+            db.flush()
+            summary.projects += 1
+        _seed_milestones_for(db, summary, project, owner, plan)
 
-        # Chain each outstanding milestone to the one before it, so a late
-        # one visibly blocks what follows.
-        outstanding = [m for m in created if m.status is not MilestoneStatus.DONE]
-        for earlier, later in zip(outstanding, outstanding[1:], strict=False):
+
+def _seed_milestones_for(
+    db: Session,
+    summary: SeedSummary,
+    project: Project,
+    owner: User,
+    plan: tuple[tuple[str, int], ...],
+) -> None:
+    """Add whichever of this project's milestones are missing, and chain them."""
+    today = date.today()
+    present = {
+        m.title: m
+        for m in db.execute(select(Milestone).where(Milestone.project_id == project.id)).scalars()
+    }
+    ordered: list[Milestone] = []
+    for position, (milestone_title, offset) in enumerate(plan, start=1):
+        found = present.get(milestone_title)
+        if found is not None:
+            ordered.append(found)
+            continue
+        # Anything comfortably in the past is finished work; the rest is
+        # outstanding, which is what makes the board interesting.
+        done = offset < -20
+        milestone = Milestone(
+            project_id=project.id,
+            title=milestone_title,
+            due_date=today + timedelta(days=offset),
+            position=position,
+            status=MilestoneStatus.DONE if done else MilestoneStatus.PENDING,
+            completed_at=(datetime.now(UTC) - timedelta(days=abs(offset) - 5) if done else None),
+            completed_by=owner.id if done else None,
+        )
+        db.add(milestone)
+        ordered.append(milestone)
+        summary.milestones += 1
+    db.flush()
+
+    # Chain each outstanding milestone to the one before it, so a late one
+    # visibly blocks what follows. Skipped where the edge already exists.
+    outstanding = [m for m in ordered if m.status is not MilestoneStatus.DONE]
+    for earlier, later in zip(outstanding, outstanding[1:], strict=False):
+        if db.get(MilestoneDependency, (later.id, earlier.id)) is None:
             db.add(MilestoneDependency(milestone_id=later.id, depends_on_id=earlier.id))
     db.flush()
 
