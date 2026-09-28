@@ -55,6 +55,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Account deletion down the hierarchy — admin anyone, coordinator their department's faculty and students, faculty their students — with the cascade counted and shown before it happens ([ADR 0021](docs/adr/0021-account-deletion.md)) | Done |
 | Collaboration is one relationship per pair of people, so it cannot be started twice or split a conversation in two; either party may end it ([ADR 0023](docs/adr/0023-collaboration-belongs-to-a-pair.md)) | Done |
 | Conversation threads scoped to an accepted collaboration request or a project team: polled not socketed, one notification per thread, moderation hides rather than deletes ([ADR 0022](docs/adr/0022-scoped-conversation-threads.md)) | Done |
+| Researchers pull their whole profile and publication list in from ORCID, OpenAlex, Crossref and Semantic Scholar — preview first, nothing written until it is ticked ([ADR 0025](docs/adr/0025-profile-import-from-public-research-sites.md)) | Done |
 
 ## Technology stack
 
@@ -343,6 +344,9 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | Endpoint | Auth | Notes |
 |---|---|---|
 | `GET/PUT /api/v1/me/profile` | any signed-in user | Shape depends on your role (student vs researcher); responses carry a `profile_type` discriminator. `GET` is `404` until you create one. Saving a *researcher* profile submits it for verification. `department_id` says where you belong — self-declared until a coordinator verifies you, then `409` and `department_locked: true` (an admin can still change it). See [ADR 0018](docs/adr/0018-department-membership.md). |
+| `POST /api/v1/me/profile/import/preview` | researchers | Reads ORCID, OpenAlex, Crossref and Semantic Scholar for `{orcid}` or `{name, affiliation}` and reports what it found. **Writes nothing.** Each work is marked `new`, `already_in_register`, `possible_duplicate` or `not_importable`. See [ADR 0025](docs/adr/0025-profile-import-from-public-research-sites.md). |
+| `POST /api/v1/me/profile/import` | researchers | Applies only the `fields` and `work_keys` that were ticked. Re-reads the sources rather than trusting the payload, so bibliographic data never comes from the browser. |
+| `GET /api/v1/me/profile/import/history` | researchers | The caller's own past imports. Never anyone else's. |
 | `PUT /api/v1/me/skills` | any signed-in user | `[{skill_id, proficiency}]`, replaces the whole set. |
 | `PUT /api/v1/me/research-areas` | any signed-in user | `[{research_area_id, is_expertise}]`, replaces the whole set. |
 | `GET /api/v1/skills?q=`, `GET /api/v1/research-areas?q=&parent_id=` | any signed-in user | Name search; an exact alias hit (`ML`) also returns its canonical tag. |

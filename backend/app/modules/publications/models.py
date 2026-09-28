@@ -44,6 +44,15 @@ class Publication(Base):
     __table_args__ = (
         CheckConstraint(f"year BETWEEN {MIN_YEAR} AND {MAX_YEAR}", name="year_in_range"),
         Index("ix_publications_search_document", "search_document", postgresql_using="gin"),
+        # Profile import de-duplicates by comparing an incoming title against
+        # the register with the pg_trgm `%` operator, which needs the trigram
+        # operator class to use an index at all (migration 0022).
+        Index(
+            "ix_publications_title_trgm",
+            "title",
+            postgresql_using="gin",
+            postgresql_ops={"title": "gin_trgm_ops"},
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

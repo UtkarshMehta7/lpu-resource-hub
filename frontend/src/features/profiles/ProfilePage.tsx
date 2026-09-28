@@ -8,6 +8,7 @@ import { toApiError } from "@/lib/api/errors";
 import { DepartmentCoordinatorCard } from "./DepartmentCoordinatorCard";
 
 import { fetchMyProfile, saveProfile } from "./api";
+import { ImportProfilePanel } from "./ImportProfilePanel";
 import { ProfileForm } from "./ProfileForm";
 import type { ResearcherProfileUpdate, StudentProfileUpdate, VerificationStatus } from "./types";
 
@@ -114,6 +115,17 @@ export function ProfilePage() {
           Edit skills and research areas
         </Link>
       </section>
+
+      {/* Researchers only: a student has no publication record to pull in. */}
+      {profile?.profile_type === "researcher" ? (
+        <ImportProfilePanel
+          linkedOrcid={profile.orcid_id}
+          onImported={async () => {
+            await queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
+            await queryClient.invalidateQueries({ queryKey: ["publications"] });
+          }}
+        />
+      ) : null}
     </div>
   );
 }
