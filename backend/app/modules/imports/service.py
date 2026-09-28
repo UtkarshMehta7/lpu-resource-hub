@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.modules.imports.connectors import (
+    AuthorCandidate,
     ConnectorError,
     CrossrefConnector,
     ExternalProfile,
@@ -48,7 +49,7 @@ from app.modules.imports.merge import (
     title_similarity,
 )
 from app.modules.imports.models import ProfileImport
-from app.modules.profiles.models import ResearcherProfile
+from app.modules.profiles.models import ResearcherProfile, VerificationStatus
 from app.modules.publications.models import MAX_YEAR, MIN_YEAR, Publication, PublicationType
 from app.modules.publications.schemas import AuthorInput, PublicationCreate
 from app.modules.publications.service import DuplicateDoiError, create_publication
@@ -91,6 +92,9 @@ class WorkCandidate:
     year: int | None
     pub_type: str
     abstract: str | None
+    #: Where to read the work itself. The DOI is preferred where there is one,
+    #: but books, theses and older papers often have only this.
+    url: str | None
     authors: tuple[str, ...]
     sources: tuple[str, ...]
     # "new" | "already_in_register" | "possible_duplicate" | "not_importable"
@@ -143,6 +147,8 @@ class ImportResult:
     works_skipped: int
     works_failed: int
     source_errors: dict[str, str]
+    #: True when the import sent an already-verified profile back for review.
+    verification_reset: bool = False
 
 
 # --------------------------------------------------------------------- fetch
@@ -167,7 +173,12 @@ def _gather(query: ProfileQuery) -> tuple[MergedProfile, dict[str, str]]:
     with build_client(settings.import_contact_email) as client:
         # ORCID first: it is the only source that resolves identity rather
         # than guessing it, and the name it returns disambiguates the rest.
-        resolved = ProfileQuery(orcid=query.orcid, name=query.name, affiliation=query.affiliation)
+        resolved = ProfileQuery(
+            orcid=query.orcid,
+            name=query.name,
+            affiliation=query.affiliation,
+            openalex_author_id=query.openalex_author_id,
+        )
         for connector in (orcid, openalex):
             try:
                 found = connector.fetch(client, resolved)
@@ -183,6 +194,7 @@ def _gather(query: ProfileQuery) -> tuple[MergedProfile, dict[str, str]]:
                     orcid=resolved.orcid,
                     name=found.full_name,
                     affiliation=found.affiliation or resolved.affiliation,
+                    openalex_author_id=resolved.openalex_author_id,
                 )
 
         # Enrichment: both are keyed by DOI, so they add detail to works we
@@ -241,6 +253,7 @@ def _candidate(
         year=work.year,
         pub_type=_pub_type(work.pub_type).value,
         abstract=work.abstract,
+        url=work.url,
         authors=work.authors,
         sources=work.sources,
         status=status,
@@ -341,7 +354,34 @@ class InvalidOrcidError(Exception):
     """The caller sent something that is not an ORCID iD."""
 
 
-def build_query(orcid: str | None, name: str | None, affiliation: str | None) -> ProfileQuery:
+def search_candidates(
+    db: Session, user: User, name: str, affiliation: str | None
+) -> list[AuthorCandidate]:
+    """People who might be the caller, for them to choose between.
+
+    Exists because a name is not an identifier. Searching "Nitish Kumar"
+    returns a Nitish Srivastava at Google before it returns either actual
+    Nitish Kumar, and silently importing the first hit attributes a
+    stranger's entire publication list to somebody else.
+    """
+    settings = get_settings()
+    if not settings.import_enabled:
+        raise ImportDisabledError
+    _profile_for(db, user)
+    connector = OpenAlexConnector(settings.import_contact_email)
+    with build_client(settings.import_contact_email) as client:
+        try:
+            return connector.search_candidates(client, name, affiliation)
+        except ConnectorError:
+            return []
+
+
+def build_query(
+    orcid: str | None,
+    name: str | None,
+    affiliation: str | None,
+    openalex_author_id: str | None = None,
+) -> ProfileQuery:
     """Validate and normalise the lookup before any source is contacted.
 
     A malformed iD is rejected here rather than inside ProfileQuery, so the
@@ -351,9 +391,14 @@ def build_query(orcid: str | None, name: str | None, affiliation: str | None) ->
     cleaned = normalise_orcid(orcid) if orcid else None
     if orcid and cleaned is None:
         raise InvalidOrcidError
-    if cleaned is None and not name:
+    if cleaned is None and not name and not openalex_author_id:
         raise InvalidOrcidError
-    return ProfileQuery(orcid=cleaned, name=name, affiliation=affiliation)
+    return ProfileQuery(
+        orcid=cleaned,
+        name=name,
+        affiliation=affiliation,
+        openalex_author_id=openalex_author_id,
+    )
 
 
 def preview(db: Session, user: User, query: ProfileQuery) -> ImportPreview:
@@ -454,6 +499,17 @@ def apply(
             db.rollback()
             failed += 1
 
+    # An import puts externally-sourced claims on a profile somebody already
+    # signed off. Nobody here has checked those claims, so a verified profile
+    # goes back in the queue rather than keeping a tick it no longer earned.
+    # An unverified profile is left exactly where it is.
+    verification_reset = False
+    if (applied or imported) and profile.verification_status is VerificationStatus.VERIFIED:
+        profile.verification_status = VerificationStatus.PENDING
+        profile.verified_by = None
+        profile.verified_at = None
+        verification_reset = True
+
     record = ProfileImport(
         user_id=user.id,
         orcid_id=query.orcid,
@@ -476,6 +532,7 @@ def apply(
         works_skipped=skipped,
         works_failed=failed,
         source_errors=errors,
+        verification_reset=verification_reset,
     )
 
 

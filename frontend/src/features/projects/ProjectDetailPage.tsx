@@ -10,6 +10,7 @@ import { RequestCollaborationButton } from "@/features/collaborations/RequestCol
 import { ReportButton } from "@/features/reports/ReportButton";
 import { TeamThreadButton } from "@/features/messages/TeamThreadButton";
 import { MilestoneSection } from "@/features/milestones/MilestoneList";
+import { NudgeButton } from "@/features/nudges/NudgeButton";
 import { SaveButton } from "@/features/saved/SaveButton";
 import { PublicationsSection } from "@/features/publications/PublicationList";
 import { toApiError } from "@/lib/api/errors";
@@ -153,6 +154,13 @@ export function ProjectDetailPage() {
       {error ? (
         <p role="alert" className="mt-4 text-sm text-red-700">
           {error}
+        </p>
+      ) : null}
+
+      {isOwner && project.status === "pending_review" ? (
+        <p className="mt-4 flex flex-wrap items-center gap-3 rounded-card border border-line bg-surface px-4 py-3 text-sm text-ink-muted">
+          Waiting on your department coordinator to review this.
+          <NudgeButton kind="project_review" entityId={project.id} />
         </p>
       ) : null}
 

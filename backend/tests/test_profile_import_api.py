@@ -286,8 +286,89 @@ def test_nobody_can_import_into_another_researchers_profile(client: TestClient) 
     """There is deliberately no route for it -- assert it stays that way."""
     paths = client.get("/openapi.json").json()["paths"]
     importing = [p for p in paths if "import" in p]
-    assert importing == [
-        "/api/v1/me/profile/import/preview",
+    # Every one is scoped to /me. Adding a route here should be a decision,
+    # which is what this assertion forces.
+    assert sorted(importing) == [
         "/api/v1/me/profile/import",
+        "/api/v1/me/profile/import/candidates",
         "/api/v1/me/profile/import/history",
+        "/api/v1/me/profile/import/preview",
     ]
+
+
+# --- choosing between namesakes --------------------------------------------
+
+
+def test_an_import_sends_a_verified_profile_back_for_review(
+    client: TestClient, world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The reason this exists: an import puts claims nobody here has checked
+    onto a profile somebody already signed off."""
+    before = client.get("/api/v1/me/profile", headers=auth(world.faculty)).json()
+    assert before["verification_status"] == "verified"
+
+    monkeypatch.setattr(service, "_gather", fake_sources(paper("A paper", doi="10.1234/x")))
+    preview = client.post(
+        "/api/v1/me/profile/import/preview",
+        headers=auth(world.faculty),
+        json={"orcid": ORCID},
+    ).json()
+    result = client.post(
+        "/api/v1/me/profile/import",
+        headers=auth(world.faculty),
+        json={"orcid": ORCID, "fields": ["bio"], "work_keys": [preview["works"][0]["key"]]},
+    ).json()
+
+    assert result["verification_reset"] is True
+    after = client.get("/api/v1/me/profile", headers=auth(world.faculty)).json()
+    assert after["verification_status"] == "pending"
+    assert after["verified_at"] is None
+
+
+def test_an_import_that_changes_nothing_leaves_verification_alone(
+    client: TestClient, world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(service, "_gather", fake_sources(paper("Untouched", doi="10.1234/y")))
+    result = client.post(
+        "/api/v1/me/profile/import",
+        headers=auth(world.faculty),
+        json={"orcid": ORCID, "fields": [], "work_keys": []},
+    ).json()
+
+    assert result["verification_reset"] is False
+    after = client.get("/api/v1/me/profile", headers=auth(world.faculty)).json()
+    assert after["verification_status"] == "verified"
+
+
+def test_every_work_carries_a_link_so_it_can_be_checked(
+    client: TestClient, world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        service, "_gather", fake_sources(paper("Checkable", doi="10.1234/checkable"))
+    )
+    body = client.post(
+        "/api/v1/me/profile/import/preview",
+        headers=auth(world.faculty),
+        json={"orcid": ORCID},
+    ).json()
+    work = body["works"][0]
+    # A DOI is enough to build a link; `url` is the fallback for works
+    # without one, and the field must exist either way.
+    assert "url" in work
+    assert work["doi"] == "10.1234/checkable"
+
+
+def test_candidate_search_needs_a_real_name(client: TestClient, world: World) -> None:
+    response = client.post(
+        "/api/v1/me/profile/import/candidates", headers=auth(world.faculty), json={"name": "a"}
+    )
+    assert response.status_code == 422
+
+
+def test_a_student_cannot_search_for_candidates(client: TestClient, world: World) -> None:
+    response = client.post(
+        "/api/v1/me/profile/import/candidates",
+        headers=auth(world.student),
+        json={"name": "Someone Plausible"},
+    )
+    assert response.status_code == 409

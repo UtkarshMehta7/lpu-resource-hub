@@ -94,6 +94,20 @@ export function describeNotification(notification: AppNotification): Notificatio
         to: `/projects/${str(payload, "project_id")}`,
         detail: str(payload, "project_title") || undefined,
       };
+    case "nudge_received": {
+      const kind = str(payload, "kind");
+      const destination: Record<string, string> = {
+        profile_verification: "/coordinator/verification-queue",
+        project_review: "/coordinator/review-queue",
+        booking_approval: "/coordinator/booking-queue",
+        application_decision: `/opportunities/${str(payload, "entity_id")}/applicants`,
+      };
+      return {
+        text: `${str(payload, "from_name")} is waiting on ${str(payload, "subject")}`,
+        to: destination[kind] ?? null,
+        detail: str(payload, "from_registration_number") || undefined,
+      };
+    }
     case "admin_promotion_code":
       // The whole point of the ceremony is that this code is readable here
       // and nowhere else, so it goes in the line itself, not behind a link.

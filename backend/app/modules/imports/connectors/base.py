@@ -76,16 +76,41 @@ class ExternalProfile:
 
 
 @dataclass(frozen=True, slots=True)
+class AuthorCandidate:
+    """One possible person, offered when a name search is ambiguous.
+
+    Enough to tell yourself apart from a namesake without another round trip:
+    where they work, how much they have published, and a link to the record
+    itself so the choice can be checked rather than guessed at.
+    """
+
+    source: str
+    source_id: str
+    source_url: str | None
+    full_name: str
+    affiliation: str | None = None
+    other_affiliations: tuple[str, ...] = ()
+    orcid: str | None = None
+    works_count: int | None = None
+    cited_by_count: int | None = None
+    h_index: int | None = None
+    topics: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class ProfileQuery:
     """What the researcher gave us to look themselves up with."""
 
     orcid: str | None = None
     name: str | None = None
     affiliation: str | None = None
+    #: A candidate the researcher picked from a list. When set it wins over a
+    #: name search: a person choosing themselves beats any fuzzy matching.
+    openalex_author_id: str | None = None
 
     def __post_init__(self) -> None:
-        if not self.orcid and not self.name:
-            raise ValueError("a profile query needs either an ORCID iD or a name")
+        if not self.orcid and not self.name and not self.openalex_author_id:
+            raise ValueError("a profile query needs an ORCID iD, a name, or a chosen author")
 
 
 class ConnectorError(RuntimeError):

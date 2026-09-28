@@ -13,7 +13,8 @@ export type NotificationType =
   | "admin_promotion_code"
   | "message_received"
   | "milestone_due"
-  | "milestone_overdue";
+  | "milestone_overdue"
+  | "nudge_received";
 
 export interface AppNotification {
   id: string;

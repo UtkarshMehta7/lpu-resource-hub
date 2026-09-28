@@ -5,8 +5,15 @@ import { Button } from "@/components/ui/Button";
 import { StatusPill, type PillTone } from "@/components/ui/StatusPill";
 import { toApiError } from "@/lib/api/errors";
 
-import { applyProfileImport, previewProfileImport } from "./api";
-import type { ImportPreview, ImportResult, ImportWorkCandidate, ImportWorkStatus } from "./types";
+import { applyProfileImport, previewProfileImport, searchImportCandidates } from "./api";
+import { ImportHistory } from "./ImportHistory";
+import type {
+  AuthorCandidate,
+  ImportPreview,
+  ImportResult,
+  ImportWorkCandidate,
+  ImportWorkStatus,
+} from "./types";
 
 /**
  * Pull a researcher's profile and publication list in from the public
@@ -62,8 +69,25 @@ export function ImportProfilePanel({
   const [error, setError] = useState<string | null>(null);
   const [chosenWorks, setChosenWorks] = useState<Set<string>>(new Set());
   const [chosenFields, setChosenFields] = useState<Set<string>>(new Set());
+  const [candidates, setCandidates] = useState<AuthorCandidate[] | null>(null);
+  const [chosenAuthor, setChosenAuthor] = useState<AuthorCandidate | null>(null);
 
-  const lookup = { orcid: orcid.trim() || null, name: name.trim() || null };
+  const lookup = {
+    orcid: orcid.trim() || null,
+    name: chosenAuthor?.full_name ?? name.trim() ?? null,
+    openalex_author_id: chosenAuthor?.source_id ?? null,
+  };
+
+  const candidateMutation = useMutation({
+    mutationFn: () => searchImportCandidates(name.trim()),
+    onSuccess: (found) => {
+      setError(null);
+      setPreview(null);
+      setResult(null);
+      setCandidates(found);
+    },
+    onError: (err: unknown) => setError(toApiError(err).message),
+  });
 
   const previewMutation = useMutation({
     mutationFn: () => previewProfileImport(lookup),
@@ -105,8 +129,24 @@ export function ImportProfilePanel({
     update(next);
   }
 
-  const busy = previewMutation.isPending || applyMutation.isPending;
+  const busy = previewMutation.isPending || applyMutation.isPending || candidateMutation.isPending;
   const canLookUp = (orcid.trim() || name.trim()) !== "" && !busy;
+
+  // With an ORCID iD the lookup is exact, so go straight to the preview. With
+  // only a name it is a guess, so offer the candidates and let them choose --
+  // this is what stops somebody importing a namesake's publication list.
+  function lookUp() {
+    setChosenAuthor(null);
+    setCandidates(null);
+    if (orcid.trim() !== "") previewMutation.mutate();
+    else candidateMutation.mutate();
+  }
+
+  function choose(candidate: AuthorCandidate) {
+    setChosenAuthor(candidate);
+    setCandidates(null);
+    previewMutation.mutate();
+  }
 
   return (
     <section className="mt-8 rounded-lg border border-line bg-surface p-4">
@@ -158,8 +198,8 @@ export function ImportProfilePanel({
       </div>
 
       <div className="mt-3 flex items-center gap-3">
-        <Button onClick={() => previewMutation.mutate()} disabled={!canLookUp}>
-          {previewMutation.isPending ? "Looking you up…" : "Look me up"}
+        <Button onClick={lookUp} disabled={!canLookUp}>
+          {busy ? "Looking you up…" : "Look me up"}
         </Button>
         {busy ? (
           <span className="text-xs text-ink-muted">Reading the sources, this takes a moment…</span>
@@ -177,6 +217,35 @@ export function ImportProfilePanel({
 
       {result ? <ImportSummary result={result} /> : null}
 
+      {candidates ? (
+        <CandidatePicker
+          candidates={candidates}
+          searched={name.trim()}
+          onChoose={choose}
+          onCancel={() => setCandidates(null)}
+        />
+      ) : null}
+
+      {chosenAuthor ? (
+        <p className="mt-3 text-xs text-ink-muted">
+          Showing results for <span className="font-medium text-ink">{chosenAuthor.full_name}</span>
+          {chosenAuthor.affiliation ? ` · ${chosenAuthor.affiliation}` : ""}.{" "}
+          <button
+            type="button"
+            className="underline hover:text-ink"
+            onClick={() => {
+              setChosenAuthor(null);
+              setPreview(null);
+              candidateMutation.mutate();
+            }}
+          >
+            Not you? Pick someone else
+          </button>
+        </p>
+      ) : null}
+
+      <ImportHistory />
+
       {preview ? (
         <PreviewPanel
           preview={preview}
@@ -189,6 +258,95 @@ export function ImportProfilePanel({
         />
       ) : null}
     </section>
+  );
+}
+
+function CandidatePicker({
+  candidates,
+  searched,
+  onChoose,
+  onCancel,
+}: {
+  candidates: AuthorCandidate[];
+  searched: string;
+  onChoose: (candidate: AuthorCandidate) => void;
+  onCancel: () => void;
+}) {
+  if (candidates.length === 0) {
+    return (
+      <p className="mt-3 rounded-md border border-line bg-canvas p-3 text-sm text-ink-muted">
+        No researcher on OpenAlex matches “{searched}”. Try the name exactly as it appears on your
+        papers, or register an ORCID iD — it is free and makes this exact.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-4 border-t border-line pt-4">
+      <h3 className="text-sm font-medium">Which of these is you?</h3>
+      <p className="mt-1 text-xs text-ink-muted">
+        {candidates.length} researchers match “{searched}”. Names are shared, so check the
+        institution and open the record before choosing — importing the wrong person&apos;s work is
+        hard to undo.
+      </p>
+      <ul className="mt-3 space-y-2">
+        {candidates.map((candidate) => (
+          <li key={candidate.source_id} className="rounded-md border border-line p-2.5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="font-medium">{candidate.full_name}</span>
+              <span className="text-xs text-ink-muted">
+                {[
+                  candidate.works_count != null ? `${candidate.works_count} works` : null,
+                  candidate.cited_by_count != null ? `${candidate.cited_by_count} citations` : null,
+                  candidate.h_index != null ? `h-index ${candidate.h_index}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              {candidate.affiliation ?? "No institution on record"}
+              {candidate.other_affiliations.length > 1
+                ? ` · also ${candidate.other_affiliations.slice(1, 3).join(", ")}`
+                : ""}
+            </p>
+            {candidate.orcid ? (
+              <p className="mt-0.5 text-xs text-ink-muted">ORCID {candidate.orcid}</p>
+            ) : null}
+            {candidate.topics.length > 0 ? (
+              <ul className="mt-1.5 flex flex-wrap gap-1">
+                {candidate.topics.map((topic) => (
+                  <li key={topic}>
+                    <StatusPill tone="info">{topic}</StatusPill>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <Button size="sm" onClick={() => onChoose(candidate)}>
+                This is me
+              </Button>
+              {candidate.source_url ? (
+                <a
+                  href={candidate.source_url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-xs font-medium text-brand-700 underline hover:text-brand-800"
+                >
+                  Open the record to check ↗
+                </a>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="mt-3 text-xs text-ink-muted underline hover:text-ink"
+      >
+        None of these are me
+      </button>
+    </div>
   );
 }
 
@@ -209,6 +367,12 @@ function ImportSummary({ result }: { result: ImportResult }) {
           <li>{result.works_failed} could not be saved. You can add those by hand.</li>
         ) : null}
       </ul>
+      {result.verification_reset ? (
+        <p className="mt-2 border-t border-green-200 pt-2 text-xs">
+          Your profile has gone back to your department coordinator for verification, because it now
+          carries details nobody here has checked yet. Your work stays visible in the meantime.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -354,6 +518,9 @@ function WorkRow({
   onToggle: () => void;
 }) {
   const view = STATUS_VIEW[work.status];
+  // Prefer the DOI: it resolves to the publisher's record of the work, which
+  // is the thing worth checking. The source URL is the fallback.
+  const link = work.doi ? `https://doi.org/${work.doi}` : work.url;
   return (
     <li className="rounded-md border border-line p-2">
       <label className="flex items-start gap-2 text-sm">
@@ -367,12 +534,37 @@ function WorkRow({
         />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-baseline gap-2">
-            <span className="font-medium">{work.title}</span>
+            {/* The title links out so every claim can be checked at source
+                before it is imported, not only afterwards. */}
+            {link ? (
+              <a
+                href={link}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="font-medium text-brand-700 underline hover:text-brand-800"
+              >
+                {work.title}
+              </a>
+            ) : (
+              <span className="font-medium">{work.title}</span>
+            )}
             <StatusPill tone={view.tone}>{view.label}</StatusPill>
           </span>
           <span className="mt-0.5 block text-xs text-ink-muted">
             {[work.year, work.venue].filter(Boolean).join(" · ")}
-            {work.doi ? ` · doi:${work.doi}` : ""}
+            {work.doi ? (
+              <>
+                {" · "}
+                <a
+                  href={`https://doi.org/${work.doi}`}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="underline hover:text-ink"
+                >
+                  doi:{work.doi}
+                </a>
+              </>
+            ) : null}
           </span>
           {work.authors.length > 0 ? (
             <span className="mt-0.5 block truncate text-xs text-ink-muted">

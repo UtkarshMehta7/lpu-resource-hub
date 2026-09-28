@@ -1,6 +1,8 @@
 import { apiClient } from "@/lib/api/client";
 
 import type {
+  AuthorCandidate,
+  ImportHistoryEntry,
   ImportLookup,
   ImportPreview,
   ImportResult,
@@ -60,6 +62,22 @@ export async function fetchMyDepartment(): Promise<DepartmentCoordinator | null>
 }
 
 /* ---------------------------------------------------------------- import */
+
+export async function searchImportCandidates(
+  name: string,
+  affiliation?: string | null,
+): Promise<AuthorCandidate[]> {
+  const response = await apiClient.post<AuthorCandidate[]>("/api/v1/me/profile/import/candidates", {
+    name,
+    affiliation: affiliation ?? null,
+  });
+  return response.data;
+}
+
+export async function fetchImportHistory(): Promise<ImportHistoryEntry[]> {
+  const response = await apiClient.get<ImportHistoryEntry[]>("/api/v1/me/profile/import/history");
+  return response.data;
+}
 
 export async function previewProfileImport(lookup: ImportLookup): Promise<ImportPreview> {
   const response = await apiClient.post<ImportPreview>("/api/v1/me/profile/import/preview", lookup);

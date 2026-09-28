@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 149 API operations over 118 paths, 43 tables, 23 migrations,
-26 ADRs, 25 backend modules, 931 backend tests, 212 frontend tests,
+Current shape: 151 API operations over 120 paths, 44 tables, 24 migrations,
+27 ADRs, 26 backend modules, 947 backend tests, 218 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -96,6 +96,21 @@ Current shape: 149 API operations over 118 paths, 43 tables, 23 migrations,
   door. A non-participant always gets 404, never 403 -- admins included.
   New messages arrive by polling, not sockets (ADR 0022): the cursor is a
   keyset over (created_at, id), never an offset.
+- **A name search NEVER picks a person** (ADR 0027). It offers candidates
+  with their institution, metrics and a link to the record, and the
+  researcher chooses; the choice comes back as `openalex_author_id` and beats
+  any matching. Taking `results[0]` is how a live user imported Nitish
+  Srivastava of Google as themselves.
+- **Importing sends a verified profile back to PENDING.** A tick means
+  somebody here checked the record; after an import it holds claims nobody
+  here has seen. Never let an import preserve verification.
+- **Every imported work links to its DOI** so it can be checked before it is
+  accepted, not audited afterwards. `WorkCandidate.url` is the fallback.
+- **Nudges never name their recipient.** `POST /nudges` takes a kind and an
+  entity; the service resolves who hears about it from the thing being
+  chased. A recipient field would make it a way to message anyone in the
+  institution, and a test asserts the schema has exactly two fields. One
+  nudge per thing per day, enforced in the service, not the interface.
 - **A milestone's risk is DERIVED on every read, never stored** (ADR 0026).
   `milestones/risk.py` is a pure function of status, due date, today and what
   it waits on; the analytics view calls that same function rather than
