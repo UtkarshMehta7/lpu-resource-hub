@@ -33,6 +33,27 @@ However similar the titles. An erratum, a preprint and its version of record,
 and a reprint all share a title and are genuinely separate records. This rule
 is the reason `Erratum: Deep learning for graphs` stays out of the group.
 
+### 2b. A replaced word means a different study
+
+Token-set ratio is deliberately forgiving about omissions — it scores
+"Forecasting wheat yield" against "Forecasting wheat yield from open satellite
+data" at 100, which is right: one source dropped the subtitle.
+
+But it scores "Forecasting **wheat** yield…" against "Forecasting **maize**
+yield…" above the merge threshold too, and those are different studies.
+
+The distinction is whether *each* side has a word the other lacks. A subset is
+an omission; a two-way difference is a substitution. Spelling variants are
+exempted by comparing the differing words to each other — "schrodinger s"
+against "schrodingers" is one word written two ways, scoring 96, while "wheat"
+against "maize" scores 20. The threshold is 80.
+
+### 2c. With no DOI, a different year is a different work
+
+Two records with no DOI, matching titles and different publication years are
+treated as separate. Without this, a study repeated the following year folds
+into its predecessor and one of them disappears from the register.
+
 ### 3. Without a DOI, compare normalised titles
 
 `normalise_title` folds accents, strips punctuation, collapses whitespace and
@@ -65,6 +86,84 @@ the same ratio. Candidates are capped at five per title.
 Crossref wins the bibliographic fields because it returns what the publisher
 registered. ORCID wins the personal fields because the researcher curates
 that record themselves.
+
+## Measured accuracy
+
+Measured by `tests/test_deduplication_accuracy.py` against the labelled
+fixture in `tests/fixtures/deduplication.py`. Run it with `-s` to print the
+table below.
+
+### What "accuracy" means here
+
+A **pair** of records either is or is not the same publication; the fixture
+labels every pair through its clusters. The algorithm groups records, and
+every pair inside a group is a predicted duplicate.
+
+```
+precision = TP / (TP + FP)    of the merges made, how many were right
+recall    = TP / (TP + FN)    of the merges needed, how many were made
+F1        = harmonic mean     <- the figure reported as "accuracy"
+```
+
+Plain pairwise accuracy — `(TP + TN) / all pairs` — is **not** the headline.
+With 32 records there are 496 pairs of which only 11 are duplicates, so an
+algorithm that merged nothing at all would score 97.8%. It is reported
+alongside so that inflation is visible rather than hidden.
+
+The two errors do not cost the same. A false positive silently folds a real
+publication into another and it is gone; a false negative leaves a visible
+duplicate somebody can remove. Precision is therefore guarded by its own
+assertion, separate from the F1 target.
+
+### Fixture composition
+
+32 records in 22 clusters — 9 genuine duplicate groups and 13 singletons,
+giving 11 true duplicate pairs and 485 distinct ones.
+
+Roughly a third of the fixture is **near misses** designed to be merged by a
+careless rule: an erratum sharing a title with its original, a preprint and
+its version of record, a sequel paper differing only by "II", two crops in
+otherwise identical phrasing, and generic titles ("Editorial",
+"Introduction") repeated across years. A fixture of only obvious duplicates
+would score well and prove nothing.
+
+It also covers exact duplicates across sources, DOIs in bare/URL/percent-
+encoded form, differing capitalisation, em dashes and hyphens, accented
+characters, dropped subtitles, initialised author names, missing authors and
+venues, unusable DOIs, and whitespace noise.
+
+### Measured result
+
+| Measure | Value |
+|---|---|
+| Fixture size | 32 records |
+| Ground-truth pairs | 11 duplicate, 485 distinct |
+| True positives | 11 |
+| False positives | **0** |
+| False negatives | **0** |
+| Precision | **100.0%** |
+| Recall | **100.0%** |
+| **F1 (reported accuracy)** | **100.0%** |
+| Pairwise accuracy | 100.0% (inflated; not the headline) |
+| Acceptance target | ≥95% |
+| **Status** | **PASS** |
+
+### An honest caveat about that number
+
+The first run of this measurement scored **F1 66.7%** (precision 61.5%, recall
+72.7%). Three of the rules above — case-insensitive DOI comparison, the
+substitution test, and the year discriminator — were added *in response* to
+the failures it exposed.
+
+That is the measurement doing its job, but it means the fixture and the
+algorithm are no longer independent. 100% is the score on **this** fixture,
+not a claim about all publication data. The rules added are general
+(a DOI genuinely is case-insensitive; a substituted word genuinely indicates a
+different study), not special cases keyed to fixture rows — but a new fixture
+drawn from different sources should be expected to find new failures.
+
+The number to trust is the *method*: a labelled corpus, a pairwise F1, and
+precision guarded separately.
 
 ## Known failure cases
 

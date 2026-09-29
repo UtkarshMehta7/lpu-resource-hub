@@ -40,6 +40,11 @@ TITLE_MATCH_THRESHOLD: Final = 92.0
 # Below this, two titles are not even shown as a possible duplicate.
 TITLE_SUGGEST_THRESHOLD: Final = 84.0
 
+# How alike the *differing* words of two titles must be before the difference
+# reads as a spelling variant rather than a substituted word. "Schrodinger s"
+# against "schrodingers" is the same word; "wheat" against "maize" is not.
+WORD_VARIANT_THRESHOLD: Final = 80.0
+
 # Which source to believe for each field, best first.
 _METADATA_ORDER: Final = ("crossref", "openalex", "semantic_scholar", "orcid")
 _ABSTRACT_ORDER: Final = ("semantic_scholar", "crossref", "openalex", "orcid")
@@ -67,6 +72,30 @@ def title_similarity(left: str, right: str) -> float:
     return float(fuzz.token_set_ratio(normalise_title(left), normalise_title(right)))
 
 
+def substitutes_a_word(left: str, right: str) -> bool:
+    """Whether the titles differ by a *replaced* word rather than a missing one.
+
+    Token-set ratio is deliberately forgiving: it scores "Forecasting wheat
+    yield" against "Forecasting wheat yield from open satellite data" at 100,
+    which is right -- one source dropped the subtitle. But it also scores
+    "Forecasting wheat yield..." against "Forecasting maize yield..." above
+    the merge threshold, and those are different studies.
+
+    The distinction is whether *each* side has a word the other lacks. A
+    subset is an omission; a two-way difference is a substitution. Spelling
+    variants are exempted by comparing the differing words to each other --
+    "schrodinger s" against "schrodingers" is one word written two ways.
+    """
+    left_words = set(normalise_title(left).split())
+    right_words = set(normalise_title(right).split())
+    only_left = left_words - right_words
+    only_right = right_words - left_words
+    if not only_left or not only_right:
+        return False
+    variance = fuzz.ratio(" ".join(sorted(only_left)), " ".join(sorted(only_right)))
+    return variance < WORD_VARIANT_THRESHOLD
+
+
 @dataclass(frozen=True, slots=True)
 class MergedWork:
     """One work, assembled from every source that described it."""
@@ -86,22 +115,36 @@ class MergedWork:
         return f"doi:{self.doi}" if self.doi else f"title:{normalise_title(self.title)}"
 
 
-def merge_works(works: Iterable[ExternalWork]) -> list[MergedWork]:
-    """Group records describing the same work and fold each group into one."""
-    groups: list[list[ExternalWork]] = []
+def group_works(works: Sequence[ExternalWork]) -> list[list[int]]:
+    """Which input records describe the same work, as lists of indices.
+
+    Exposed separately from `merge_works` because the grouping itself is the
+    interesting output for anything that has to *justify* a merge -- the
+    accuracy measurement and the review queue both need to know which records
+    were joined, not just the record they were folded into.
+    """
+    groups: list[list[int]] = []
+    members: list[list[ExternalWork]] = []
     by_doi: dict[str, int] = {}
 
-    for work in works:
-        index = _find_group(work, groups, by_doi)
+    for position, work in enumerate(works):
+        index = _find_group(work, members, by_doi)
         if index is None:
-            groups.append([work])
-            index = len(groups) - 1
+            members.append([work])
+            groups.append([position])
+            index = len(members) - 1
         else:
-            groups[index].append(work)
+            members[index].append(work)
+            groups[index].append(position)
         if work.doi:
-            by_doi.setdefault(work.doi, index)
+            by_doi.setdefault(work.doi.lower(), index)
+    return groups
 
-    merged = [_fold(group) for group in groups]
+
+def merge_works(works: Iterable[ExternalWork]) -> list[MergedWork]:
+    """Group records describing the same work and fold each group into one."""
+    ordered = list(works)
+    merged = [_fold([ordered[i] for i in group]) for group in group_works(ordered)]
     # Newest first, untitled/undated last -- the order a researcher expects.
     merged.sort(key=lambda w: (-(w.year or 0), w.title.casefold()))
     return merged
@@ -110,21 +153,38 @@ def merge_works(works: Iterable[ExternalWork]) -> list[MergedWork]:
 def _find_group(
     work: ExternalWork, groups: Sequence[Sequence[ExternalWork]], by_doi: Mapping[str, int]
 ) -> int | None:
-    # Rule 1: a shared DOI is decisive.
+    # Rule 1: a shared DOI is decisive, whatever case it arrived in.
     if work.doi is not None:
-        existing = by_doi.get(work.doi)
+        existing = by_doi.get(work.doi.lower())
         if existing is not None:
             return existing
-    # Rule 2: fall back to the title, but never merge across two records that
-    # both carry a DOI and disagree -- different DOIs mean different works,
-    # however similar the titles (an erratum, a preprint and its version of
-    # record, a reprint).
+    # Rule 2: fall back to the title, under three guards.
     for index, group in enumerate(groups):
         for candidate in group:
-            if work.doi and candidate.doi and work.doi != candidate.doi:
+            # Different DOIs mean different works however similar the titles
+            # -- an erratum, a preprint and its version of record, a reprint.
+            # Compared case-insensitively: a DOI is case-insensitive, and the
+            # same identifier arrives capitalised differently by source.
+            if work.doi and candidate.doi and work.doi.lower() != candidate.doi.lower():
                 continue
-            if title_similarity(work.title, candidate.title) >= TITLE_MATCH_THRESHOLD:
-                return index
+            if title_similarity(work.title, candidate.title) < TITLE_MATCH_THRESHOLD:
+                continue
+            # A replaced word means a different study, not a variant spelling.
+            if substitutes_a_word(work.title, candidate.title):
+                continue
+            # With no DOI to separate them, two records claiming different
+            # publication years are different works. Without this, a study
+            # repeated the next year folds into its predecessor and one of
+            # them disappears.
+            sharing_doi = bool(work.doi and candidate.doi)
+            if (
+                not sharing_doi
+                and work.year is not None
+                and candidate.year is not None
+                and work.year != candidate.year
+            ):
+                continue
+            return index
     return None
 
 
@@ -248,7 +308,9 @@ __all__ = [
     "TITLE_MATCH_THRESHOLD",
     "TITLE_SUGGEST_THRESHOLD",
     "merge_profiles",
+    "group_works",
     "merge_works",
     "normalise_title",
+    "substitutes_a_word",
     "title_similarity",
 ]
