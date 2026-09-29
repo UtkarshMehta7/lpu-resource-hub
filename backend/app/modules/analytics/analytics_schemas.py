@@ -30,6 +30,38 @@ class VerificationBacklog(BaseModel):
     oldest_waiting_since: str | None
 
 
+class ReportTableRead(BaseModel):
+    title: str
+    columns: list[str]
+    rows: list[list[str]]
+    #: The rule the figures were produced under, carried with them.
+    definition: str | None = None
+
+
+class ReportSectionRead(BaseModel):
+    title: str
+    summary: list[tuple[str, str]]
+    tables: list[ReportTableRead]
+
+
+class InstitutionalReportRead(BaseModel):
+    academic_year: str
+    period_start: str
+    period_end: str
+    generated_at: str
+    scope: str
+    sections: list[ReportSectionRead]
+
+
+class AcademicYearOption(BaseModel):
+    """A real year to choose, rather than a free-text box inviting typos."""
+
+    label: str
+    start: str
+    end: str
+    is_current: bool
+
+
 class MilestoneAdherence(BaseModel):
     """Outstanding milestones by risk, and how much of what finished was late."""
 

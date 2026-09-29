@@ -35,6 +35,9 @@ dependencies = [
     # Publication de-duplication: token-set ratio over normalised titles, to
     # score the shortlist that pg_trgm generates. Pure wheels, no native build.
     "rapidfuzz>=3.10,<4.0",
+    # The institutional research report exports to PDF. Pure Python wheels, no
+    # system libraries, so it installs on a slim container the same as locally.
+    "reportlab>=4.2,<5.0",
 ]
 
 [project.optional-dependencies]
@@ -97,7 +100,7 @@ plugins = ["pydantic.mypy"]
 # the code already handles its absence). Scoped to these imports, not a
 # blanket relaxation.
 [[tool.mypy.overrides]]
-module = ["sklearn.*", "apscheduler.*", "sentence_transformers.*"]
+module = ["sklearn.*", "apscheduler.*", "sentence_transformers.*", "reportlab.*"]
 ignore_missing_imports = true
 
 [tool.pydantic-mypy]

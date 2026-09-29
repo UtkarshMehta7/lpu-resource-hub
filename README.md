@@ -58,6 +58,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Researchers pull their whole profile and publication list in from ORCID, OpenAlex, Crossref and Semantic Scholar — preview first, nothing written until it is ticked ([ADR 0025](docs/adr/0025-profile-import-from-public-research-sites.md)) | Done |
 | Project milestones with dependencies, at-risk states derived on every read, a Gantt timeline beside the list, reminders before and after the date, and an at-risk board for coordinators ([ADR 0026](docs/adr/0026-milestones-and-at-risk.md)) | Done |
 | Name searches offer candidates to choose between instead of guessing, every imported work links to its source, importing returns a profile for re-verification, and anyone waiting can nudge whoever must act ([ADR 0027](docs/adr/0027-choosing-yourself-and-nudging.md)) | Done |
+| Institutional research report for a full academic year, on screen and exportable to PDF and CSV, with six new analytics metrics and every figure carrying its definition ([reporting](docs/reporting.md), [analytics](docs/analytics.md)) | Done |
 
 ## Technology stack
 
@@ -354,6 +355,9 @@ learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 | `POST /api/v1/milestones/{id}/status` | owner **or** team member | Members may start and complete; cancelling and reopening are the owner's. |
 | `POST/DELETE /api/v1/milestones/{id}/dependencies` | project owner | Same-project only; cycles are refused. |
 | `POST /api/v1/me/profile/import/candidates` | researchers | Researchers who might be you, with institution, metrics and a link to each record. Offered instead of guessing — a name is not an identifier. |
+| `GET /api/v1/analytics/institutional-report?academic_year=2025-26` | coordinator, admin | A full academic year of research activity, scoped to the viewer. Every figure counted from real rows at request time. |
+| `GET /api/v1/analytics/institutional-report/export?format=pdf\|csv` | coordinator, admin | The same aggregation as a file, so the numbers cannot differ from the screen. |
+| `GET /api/v1/analytics/academic-years` | coordinator, admin | Real years to choose from, rather than a free-text box inviting typos. |
 | `POST /api/v1/nudges` | any signed-in user | Remind whoever must act that something of **yours** is still waiting. The sender never names the recipient; one nudge per thing per day. |
 | `GET /api/v1/me/milestones` | any signed-in user | What the caller owes, across projects, soonest first. |
 | `GET /api/v1/coordinator/at-risk-projects` | coordinator, admin | Projects with slipping milestones, most overdue first. |
