@@ -14,6 +14,7 @@ from app.modules.profiles.models import ResearcherProfile, VerificationStatus
 from app.modules.researchers.policies import (
     assert_in_coordinator_scope,
     assert_not_self_verification,
+    assert_target_is_verifiable,
 )
 from app.modules.researchers.schemas import VerificationQueueItem
 from app.modules.users.models import CoordinatorScopeType, User, UserRole
@@ -40,7 +41,13 @@ def list_verification_queue(db: Session, reviewer: User) -> list[tuple[User, Res
     query = (
         select(User, ResearcherProfile)
         .join(ResearcherProfile, ResearcherProfile.user_id == User.id)
-        .where(ResearcherProfile.verification_status == VerificationStatus.PENDING)
+        .where(
+            ResearcherProfile.verification_status == VerificationStatus.PENDING,
+            # Nobody vouches for an administrator. Excluded here as well as
+            # being auto-verified on save, so a row left PENDING by an older
+            # version never surfaces asking a coordinator to approve them.
+            User.role != UserRole.ADMIN,
+        )
     )
     if reviewer.role is UserRole.RESEARCH_COORDINATOR:
         if (
@@ -77,6 +84,7 @@ def verify_researcher(
     target_user, profile = _load_researcher(db, target_user_id)
 
     assert_not_self_verification(reviewer, target_user)
+    assert_target_is_verifiable(target_user)
     assert_in_coordinator_scope(reviewer, target_user)
 
     before = {"verification_status": profile.verification_status.value}

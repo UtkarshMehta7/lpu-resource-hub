@@ -68,8 +68,13 @@ def department_is_locked(db: Session, user: User) -> bool:
     A verified researcher's department has been confirmed by a coordinator,
     so from then on it is the institution's record and only an admin changes
     it. Everyone else may still say where they belong.
+
+    An administrator is never locked. The lock exists to stop a researcher
+    editing a record somebody vouched for, and its message tells them to ask
+    an administrator -- which is circular advice to give an administrator.
+    They can change anyone's department, so theirs is simply not locked.
     """
-    if user.role is UserRole.STUDENT:
+    if user.role in (UserRole.STUDENT, UserRole.ADMIN):
         return False
     profile = db.get(ResearcherProfile, user.id)
     return profile is not None and profile.verification_status is VerificationStatus.VERIFIED
@@ -110,13 +115,26 @@ def upsert_researcher_profile(
     this is what moves a profile into PENDING and puts it on the
     verification queue. An already-VERIFIED profile keeps its status:
     editing a bio should not silently revoke verification.
+
+    An administrator is the exception. Verification exists so somebody senior
+    vouches for a researcher's record, and there is nobody senior to an
+    administrator -- sending them to a coordinator's queue asks a junior to
+    vouch for their own senior, which is backwards. Their profile is verified
+    the moment they save it.
     """
     _apply_department(db, user, data.department_id)
     links = [item.model_dump() for item in data.links] if data.links is not None else None
+    # Recomputed on every save, so an account promoted to admin stops needing
+    # verification from then on without anybody re-saving on its behalf.
+    status = (
+        VerificationStatus.VERIFIED if user.role is UserRole.ADMIN else VerificationStatus.PENDING
+    )
     profile = db.get(ResearcherProfile, user.id)
     if profile is None:
-        profile = ResearcherProfile(user_id=user.id, verification_status=VerificationStatus.PENDING)
+        profile = ResearcherProfile(user_id=user.id, verification_status=status)
         db.add(profile)
+    elif user.role is UserRole.ADMIN:
+        profile.verification_status = VerificationStatus.VERIFIED
     elif profile.verification_status is not VerificationStatus.VERIFIED:
         profile.verification_status = VerificationStatus.PENDING
     profile.designation = data.designation
