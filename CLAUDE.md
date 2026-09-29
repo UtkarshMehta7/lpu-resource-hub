@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 151 API operations over 120 paths, 44 tables, 25 migrations,
-27 ADRs, 26 backend modules, 957 backend tests, 218 frontend tests,
+Current shape: 154 API operations over 123 paths, 44 tables, 25 migrations,
+27 ADRs, 26 backend modules, 991 backend tests, 226 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -104,6 +104,17 @@ Current shape: 151 API operations over 120 paths, 44 tables, 25 migrations,
   door. A non-participant always gets 404, never 403 -- admins included.
   New messages arrive by polling, not sockets (ADR 0022): the cursor is a
   keyset over (created_at, id), never an offset.
+- **An academic year is not a calendar year.** July to June by default,
+  `ACADEMIC_YEAR_START_MONTH` configurable. "2025-27" is refused as a typo
+  rather than reinterpreted -- a wrong period on a signed report is worse
+  than an error message. See app/modules/analytics/academic_year.py.
+- **The institutional report has ONE aggregation, three renderings** (JSON,
+  CSV, PDF from the same `InstitutionalReport`). Never add a second
+  aggregation for a format; the numbers would drift.
+- **A metric that cannot be computed reads "not applicable", never 0.** No
+  decided applications is not a 0% success rate. Every rate returns None
+  rather than dividing by zero, and every table carries its definition --
+  see docs/analytics.md for the formulas.
 - **An administrator needs no verification, ever.** Verification means
   somebody senior vouched for a record, and nobody is senior to an admin --
   a PENDING admin was asking a coordinator to vouch for their own senior, and

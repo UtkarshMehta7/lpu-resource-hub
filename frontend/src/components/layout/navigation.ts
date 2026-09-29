@@ -117,6 +117,13 @@ export const NAV: NavItem[] = [
     keywords: "milestones overdue slipping late deadlines",
   },
   {
+    to: "/analytics/report",
+    label: "Research report",
+    group: "Review",
+    roles: ["research_coordinator", "admin"],
+    keywords: "institutional annual academic year export pdf csv statistics",
+  },
+  {
     to: "/admin/reports",
     label: "Reports",
     group: "Review",

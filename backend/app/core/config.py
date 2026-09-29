@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     # reported as at risk. Read at request time, so risk is never stale --
     # see app/modules/milestones/risk.py for why it is derived, not stored.
     milestone_at_risk_days: int = Field(default=7, ge=1, le=90)
+    # Which month an academic year starts in. July here, and configuration
+    # rather than a constant because it is the one thing that genuinely
+    # differs between institutions.
+    academic_year_start_month: int = Field(default=7, ge=1, le=12)
     #: Apply outstanding migrations at startup, under an advisory lock.
     #: Defaults to ON in production and off everywhere else -- see
     #: `run_migrations_at_boot` below. Set it explicitly to override.

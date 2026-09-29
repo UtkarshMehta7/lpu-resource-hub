@@ -93,3 +93,76 @@ export function statusCounts(byStatus: Record<string, number>): LabelledCount[] 
     .filter(([, count]) => count > 0)
     .map(([key, count]) => ({ label: key.replace(/_/g, " "), count }));
 }
+
+/* ------------------------------------------- institutional research report */
+
+export interface ReportTable {
+  title: string;
+  columns: string[];
+  rows: string[][];
+  /** The rule these figures were produced under. */
+  definition: string | null;
+}
+
+export interface ReportSection {
+  title: string;
+  summary: [string, string][];
+  tables: ReportTable[];
+}
+
+export interface InstitutionalReport {
+  academic_year: string;
+  period_start: string;
+  period_end: string;
+  generated_at: string;
+  scope: string;
+  sections: ReportSection[];
+}
+
+export interface AcademicYearOption {
+  label: string;
+  start: string;
+  end: string;
+  is_current: boolean;
+}
+
+export async function fetchAcademicYears(): Promise<AcademicYearOption[]> {
+  const response = await apiClient.get<AcademicYearOption[]>("/api/v1/analytics/academic-years");
+  return response.data;
+}
+
+export async function fetchInstitutionalReport(academicYear: string): Promise<InstitutionalReport> {
+  const response = await apiClient.get<InstitutionalReport>(
+    "/api/v1/analytics/institutional-report",
+    { params: { academic_year: academicYear } },
+  );
+  return response.data;
+}
+
+/**
+ * Downloads the report as a file.
+ *
+ * Fetched as a blob through the same authenticated client rather than opening
+ * a bare URL: the API needs the Authorization header, which a plain anchor
+ * cannot send.
+ */
+export async function downloadInstitutionalReport(
+  academicYear: string,
+  format: "csv" | "pdf",
+): Promise<void> {
+  const response = await apiClient.get<Blob>("/api/v1/analytics/institutional-report/export", {
+    params: { academic_year: academicYear, format },
+    responseType: "blob",
+  });
+  const url = URL.createObjectURL(response.data);
+  try {
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `institutional-research-report-${academicYear}.${format}`;
+    anchor.click();
+  } finally {
+    // Revoking immediately can cancel the download in some browsers; a tick
+    // is enough for the click to have been handled.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+}
