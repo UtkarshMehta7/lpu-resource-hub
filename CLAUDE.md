@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 151 API operations over 120 paths, 44 tables, 24 migrations,
-27 ADRs, 26 backend modules, 947 backend tests, 218 frontend tests,
+Current shape: 151 API operations over 120 paths, 44 tables, 25 migrations,
+27 ADRs, 26 backend modules, 957 backend tests, 218 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -104,6 +104,14 @@ Current shape: 151 API operations over 120 paths, 44 tables, 24 migrations,
   door. A non-participant always gets 404, never 403 -- admins included.
   New messages arrive by polling, not sockets (ADR 0022): the cursor is a
   keyset over (created_at, id), never an offset.
+- **An administrator needs no verification, ever.** Verification means
+  somebody senior vouched for a record, and nobody is senior to an admin --
+  a PENDING admin was asking a coordinator to vouch for their own senior, and
+  the queue had no role filter so they really appeared there. Four guards,
+  because any one alone leaves a gap: the profile verifies itself on save,
+  the queue excludes admins whatever their stored status, `/verify` refuses
+  them (409, and rejecting is the dangerous half), and an import does not
+  reset them. Migration 0025 fixed the rows already deployed.
 - **A name search NEVER picks a person** (ADR 0027). It offers candidates
   with their institution, metrics and a link to the record, and the
   researcher chooses; the choice comes back as `openalex_author_id` and beats

@@ -110,13 +110,26 @@ def upsert_researcher_profile(
     this is what moves a profile into PENDING and puts it on the
     verification queue. An already-VERIFIED profile keeps its status:
     editing a bio should not silently revoke verification.
+
+    An administrator is the exception. Verification exists so somebody senior
+    vouches for a researcher's record, and there is nobody senior to an
+    administrator -- sending them to a coordinator's queue asks a junior to
+    vouch for their own senior, which is backwards. Their profile is verified
+    the moment they save it.
     """
     _apply_department(db, user, data.department_id)
     links = [item.model_dump() for item in data.links] if data.links is not None else None
+    # Recomputed on every save, so an account promoted to admin stops needing
+    # verification from then on without anybody re-saving on its behalf.
+    status = (
+        VerificationStatus.VERIFIED if user.role is UserRole.ADMIN else VerificationStatus.PENDING
+    )
     profile = db.get(ResearcherProfile, user.id)
     if profile is None:
-        profile = ResearcherProfile(user_id=user.id, verification_status=VerificationStatus.PENDING)
+        profile = ResearcherProfile(user_id=user.id, verification_status=status)
         db.add(profile)
+    elif user.role is UserRole.ADMIN:
+        profile.verification_status = VerificationStatus.VERIFIED
     elif profile.verification_status is not VerificationStatus.VERIFIED:
         profile.verification_status = VerificationStatus.PENDING
     profile.designation = data.designation
