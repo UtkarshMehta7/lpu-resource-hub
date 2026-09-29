@@ -57,7 +57,9 @@ export function ProfilePage() {
     <div className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-semibold tracking-tight">My profile</h1>
 
-      <DepartmentCoordinatorCard />
+      {/* Nobody oversees an administrator. Showing them a coordinator who
+          "oversees" them states a reporting line that does not exist. */}
+      {user.role === "admin" ? null : <DepartmentCoordinatorCard />}
 
       {profile === null ? (
         <p className="mt-2 text-sm text-ink-muted">
@@ -69,7 +71,10 @@ export function ProfilePage() {
         </p>
       ) : null}
 
-      {profile?.profile_type === "researcher" ? (
+      {/* An administrator needs no verification, so a verification state is
+          not a fact about them worth showing -- "Verified" would imply
+          somebody signed them off, and nobody did or could. */}
+      {profile?.profile_type === "researcher" && user.role !== "admin" ? (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-card border border-line bg-surface px-4 py-3">
           <span className="text-sm text-ink-muted">Verification</span>
           <StatusIndicator

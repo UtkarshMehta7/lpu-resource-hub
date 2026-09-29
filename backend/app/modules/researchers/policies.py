@@ -18,9 +18,24 @@ class OutOfScopeError(Exception):
     """Raised when a coordinator tries to verify a researcher outside their department."""
 
 
+class AdministratorNotVerifiableError(Exception):
+    """Raised when anyone tries to verify an administrator's profile."""
+
+
 def assert_not_self_verification(reviewer: User, target: User) -> None:
     if reviewer.id == target.id:
         raise SelfVerificationError
+
+
+def assert_target_is_verifiable(target: User) -> None:
+    """An administrator's record is not something anyone here signs off.
+
+    Verification means somebody senior vouched for a researcher. There is
+    nobody senior to an administrator, so the action has no meaning -- and
+    allowing it would let a coordinator mark their own senior as *rejected*.
+    """
+    if target.role is UserRole.ADMIN:
+        raise AdministratorNotVerifiableError
 
 
 def assert_in_coordinator_scope(reviewer: User, target: User) -> None:

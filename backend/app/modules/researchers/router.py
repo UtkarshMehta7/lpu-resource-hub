@@ -33,7 +33,11 @@ from app.modules.researchers.directory import (
     list_discoverable_students,
     list_researchers,
 )
-from app.modules.researchers.policies import OutOfScopeError, SelfVerificationError
+from app.modules.researchers.policies import (
+    AdministratorNotVerifiableError,
+    OutOfScopeError,
+    SelfVerificationError,
+)
 from app.modules.researchers.schemas import VerificationQueueItem, VerifyDecisionRequest
 from app.modules.researchers.search_schemas import (
     ResearcherCard,
@@ -89,6 +93,11 @@ def verify_researcher_route(
     except SelfVerificationError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="You cannot verify your own profile."
+        ) from exc
+    except AdministratorNotVerifiableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An administrator's profile does not need verifying.",
         ) from exc
 
     return to_queue_item(target_user, profile)

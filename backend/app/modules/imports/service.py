@@ -53,7 +53,7 @@ from app.modules.profiles.models import ResearcherProfile, VerificationStatus
 from app.modules.publications.models import MAX_YEAR, MIN_YEAR, Publication, PublicationType
 from app.modules.publications.schemas import AuthorInput, PublicationCreate
 from app.modules.publications.service import DuplicateDoiError, create_publication
-from app.modules.users.models import User
+from app.modules.users.models import User, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -504,7 +504,14 @@ def apply(
     # goes back in the queue rather than keeping a tick it no longer earned.
     # An unverified profile is left exactly where it is.
     verification_reset = False
-    if (applied or imported) and profile.verification_status is VerificationStatus.VERIFIED:
+    if (
+        (applied or imported)
+        # An administrator needs no verification, so there is none to revoke;
+        # resetting them would put them in a queue nobody should be able to
+        # act on.
+        and user.role is not UserRole.ADMIN
+        and profile.verification_status is VerificationStatus.VERIFIED
+    ):
         profile.verification_status = VerificationStatus.PENDING
         profile.verified_by = None
         profile.verified_at = None
