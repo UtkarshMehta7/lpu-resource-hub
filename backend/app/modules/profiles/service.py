@@ -68,8 +68,13 @@ def department_is_locked(db: Session, user: User) -> bool:
     A verified researcher's department has been confirmed by a coordinator,
     so from then on it is the institution's record and only an admin changes
     it. Everyone else may still say where they belong.
+
+    An administrator is never locked. The lock exists to stop a researcher
+    editing a record somebody vouched for, and its message tells them to ask
+    an administrator -- which is circular advice to give an administrator.
+    They can change anyone's department, so theirs is simply not locked.
     """
-    if user.role is UserRole.STUDENT:
+    if user.role in (UserRole.STUDENT, UserRole.ADMIN):
         return False
     profile = db.get(ResearcherProfile, user.id)
     return profile is not None and profile.verification_status is VerificationStatus.VERIFIED

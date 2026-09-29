@@ -205,3 +205,39 @@ def test_an_import_does_not_send_an_administrator_back_for_review(
     assert result["verification_reset"] is False
     after = client.get("/api/v1/me/profile", headers=auth(world.admin)).json()
     assert after["verification_status"] == "verified"
+
+
+# --- department ------------------------------------------------------------
+
+
+def test_an_administrators_department_is_never_locked(client: TestClient, world: World) -> None:
+    """The lock exists to stop a researcher editing a record somebody vouched
+    for, and its message says to ask an administrator -- which is circular
+    advice to give one. Auto-verifying them would otherwise lock them out of
+    their own department field."""
+    body = save_admin_profile(client, world)
+    assert body["department_locked"] is False
+
+
+def test_an_administrator_can_change_their_own_department(client: TestClient, world: World) -> None:
+    save_admin_profile(client, world)
+    response = client.put(
+        "/api/v1/me/profile",
+        headers=auth(world.admin),
+        json={
+            "designation": "Registrar",
+            "bio": "Moved.",
+            "department_id": world.department_id,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["department_id"] == world.department_id
+
+
+def test_a_verified_researchers_department_is_still_locked(
+    client: TestClient, world: World
+) -> None:
+    """The exemption is for administrators, not a hole in the lock itself."""
+    profile = client.get("/api/v1/me/profile", headers=auth(world.faculty)).json()
+    assert profile["verification_status"] == "verified"
+    assert profile["department_locked"] is True

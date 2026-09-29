@@ -58,7 +58,8 @@ function DepartmentField({
   if (locked) {
     return (
       <p className="text-xs text-ink-muted">
-        Your department was confirmed when your profile was verified. Ask an admin to change it.
+        Your department was confirmed when your profile was verified. Ask an administrator to change
+        it.
       </p>
     );
   }
@@ -95,7 +96,14 @@ export function ProfileForm({ role, profile, submitLabel, onSubmit }: ProfileFor
   if (role === "student") {
     return <StudentForm profile={profile} submitLabel={submitLabel} onSubmit={onSubmit} />;
   }
-  return <ResearcherForm profile={profile} submitLabel={submitLabel} onSubmit={onSubmit} />;
+  return (
+    <ResearcherForm
+      profile={profile}
+      submitLabel={submitLabel}
+      onSubmit={onSubmit}
+      isAdmin={role === "admin"}
+    />
+  );
 }
 
 function StudentForm({ profile, submitLabel, onSubmit }: Omit<ProfileFormProps, "role">) {
@@ -195,7 +203,12 @@ function StudentForm({ profile, submitLabel, onSubmit }: Omit<ProfileFormProps, 
   );
 }
 
-function ResearcherForm({ profile, submitLabel, onSubmit }: Omit<ProfileFormProps, "role">) {
+function ResearcherForm({
+  profile,
+  submitLabel,
+  onSubmit,
+  isAdmin,
+}: Omit<ProfileFormProps, "role"> & { isAdmin: boolean }) {
   const existing = profile?.profile_type === "researcher" ? profile : null;
   const {
     register,
@@ -271,8 +284,13 @@ function ResearcherForm({ profile, submitLabel, onSubmit }: Omit<ProfileFormProp
         {errors.link ? <p className="mt-1 text-xs text-red-700">{errors.link.message}</p> : null}
       </div>
 
+      {/* Verification means somebody senior vouched for the record, and
+          nobody is senior to an administrator -- so saying their profile goes
+          to a coordinator would be untrue as well as confusing. */}
       <p className="text-xs text-ink-muted">
-        Saving submits your profile to your department&apos;s research coordinator for verification.
+        {isAdmin
+          ? "Saving publishes your changes straight away. An administrator's profile needs no verification."
+          : "Saving submits your profile to your department's research coordinator for verification."}
       </p>
 
       <button type="submit" disabled={isSubmitting} className={SUBMIT_CLASS}>
