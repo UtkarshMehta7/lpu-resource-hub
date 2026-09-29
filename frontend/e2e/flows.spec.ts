@@ -6,11 +6,11 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
  */
 
 const PASSWORD = process.env.E2E_PASSWORD ?? "demoseedpassword1";
-const FACULTY = "DEMOFACULTY01";
-// The coordinator whose department scope covers DEMOFACULTY01.
-const COORDINATOR = "DEMOCOORDINATOR02";
-const STUDENT = "DEMOSTUDENT01";
-const ADMIN = "DEMOADMIN";
+const FACULTY = "12500201";
+// The coordinator whose department scope covers the faculty above.
+const COORDINATOR = "12500102";
+const STUDENT = "12500301";
+const ADMIN = "12500001";
 
 const RUN = Date.now().toString().slice(-6);
 const PROJECT = `E2E soil sensors ${RUN}`;
