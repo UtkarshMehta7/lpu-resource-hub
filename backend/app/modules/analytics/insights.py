@@ -15,15 +15,20 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, TypedDict
 
-from sqlalchemy import ColumnElement, Row, Select, func, or_, select
-from sqlalchemy.orm import InstrumentedAttribute, Session
+from sqlalchemy import ColumnElement, Row, Select, func, or_, select, true
+from sqlalchemy.orm import InstrumentedAttribute, Session, aliased
 
+from app.modules.admin.models import Department
 from app.modules.applications.models import Application, ApplicationStatus
 from app.modules.bookings.models import Booking, BookingStatus
-from app.modules.collaborations.models import CollaborationRequest, CollaborationStatus
+from app.modules.collaborations.models import (
+    Collaboration,
+    CollaborationRequest,
+    CollaborationStatus,
+)
 from app.modules.facilities.models import Equipment, Facility
 from app.modules.funding.models import FundingOpportunity
 from app.modules.milestones.models import (
@@ -35,6 +40,7 @@ from app.modules.milestones.risk import Risk, RiskInput, assess
 from app.modules.opportunities.models import Opportunity, OpportunityStatus
 from app.modules.profiles.models import ResearcherProfile, SavedItem, VerificationStatus
 from app.modules.projects.models import Project, ProjectResearchArea, ProjectStatus
+from app.modules.publications.models import Publication, PublicationAuthor
 from app.modules.reports.models import ContentReport, ReportStatus
 from app.modules.taxonomy.models import ResearchArea
 from app.modules.users.models import CoordinatorScopeType, User, UserRole
@@ -43,6 +49,28 @@ from app.modules.users.models import CoordinatorScopeType, User, UserRole
 class LabelledCountRow(TypedDict):
     label: str
     count: int
+
+
+class CollaborationRateRow(TypedDict):
+    """Collaboration split by whether it crossed a departmental boundary."""
+
+    cross_department: int
+    same_department: int
+    #: Pairs where at least one person has no department, so the question
+    #: cannot be answered for them. Excluded from the rate, never hidden.
+    unknown_department: int
+    #: None when nothing qualifies -- no collaborations is not a zero rate.
+    rate: float | None
+
+
+class ApplicationOutcomeRow(TypedDict):
+    total: int
+    accepted: int
+    rejected: int
+    pending: int
+    withdrawn: int
+    decided: int
+    rate: float | None
 
 
 class MilestoneAdherenceRow(TypedDict):
@@ -359,4 +387,211 @@ def milestone_adherence(db: Session, scope: Scope) -> MilestoneAdherenceRow:
         blocked=counts["blocked"],
         completed=counts["completed"],
         completed_on_time=counts["completed_on_time"],
+    )
+
+
+# --- publications ----------------------------------------------------------
+#
+# A publication belongs to a department through its *linked* authors -- the
+# ones matched to an account. External co-authors are plain text and have no
+# department, which is why every figure below also reports what it could not
+# attribute rather than quietly dropping it.
+
+
+def _publication_window(
+    scope: Scope, start: date | None, end: date | None
+) -> list[ColumnElement[bool]]:
+    filters: list[ColumnElement[bool]] = []
+    if start is not None and end is not None:
+        # `year` is the publication year, which is the only date a
+        # bibliographic record reliably carries.
+        filters.append(Publication.year.between(start.year, end.year))
+    if not scope.is_platform:
+        filters.append(
+            Publication.id.in_(
+                select(PublicationAuthor.publication_id)
+                .join(User, User.id == PublicationAuthor.user_id)
+                .where(User.department_id == scope.department_id)
+            )
+        )
+    return filters
+
+
+def publications_by_department(
+    db: Session, scope: Scope, *, start: date | None = None, end: date | None = None
+) -> list[LabelledCountRow]:
+    """Distinct publications credited to each department.
+
+    A publication with authors in two departments counts once in each, so
+    these figures sum to more than the total. That is the intended reading:
+    the question is "how much did this department produce", not "how do we
+    slice a fixed total".
+    """
+    rows = db.execute(
+        select(Department.name, func.count(func.distinct(Publication.id)))
+        .select_from(Publication)
+        .join(PublicationAuthor, PublicationAuthor.publication_id == Publication.id)
+        .join(User, User.id == PublicationAuthor.user_id)
+        .join(Department, Department.id == User.department_id)
+        .where(*_publication_window(scope, start, end))
+        .group_by(Department.name)
+        .order_by(func.count(func.distinct(Publication.id)).desc(), Department.name)
+    ).all()
+    return [LabelledCountRow(label=row[0], count=row[1]) for row in rows]
+
+
+def publications_by_year(
+    db: Session, scope: Scope, *, start: date | None = None, end: date | None = None
+) -> list[LabelledCountRow]:
+    rows = db.execute(
+        select(Publication.year, func.count())
+        .where(*_publication_window(scope, start, end))
+        .group_by(Publication.year)
+        .order_by(Publication.year.desc())
+    ).all()
+    return [LabelledCountRow(label=str(row[0]), count=row[1]) for row in rows]
+
+
+def publications_by_venue(
+    db: Session,
+    scope: Scope,
+    *,
+    start: date | None = None,
+    end: date | None = None,
+    limit: int = 20,
+) -> list[LabelledCountRow]:
+    """Busiest venues first. Records with no venue are excluded, not bucketed
+    as "Unknown" -- a made-up venue name in a report is worse than a shorter
+    list, and the total publication count is reported separately anyway."""
+    rows = db.execute(
+        select(Publication.venue, func.count())
+        .where(Publication.venue.is_not(None), *_publication_window(scope, start, end))
+        .group_by(Publication.venue)
+        .order_by(func.count().desc(), Publication.venue)
+        .limit(limit)
+    ).all()
+    return [LabelledCountRow(label=row[0], count=row[1]) for row in rows]
+
+
+def publications_by_type(
+    db: Session, scope: Scope, *, start: date | None = None, end: date | None = None
+) -> list[LabelledCountRow]:
+    rows = db.execute(
+        select(Publication.pub_type, func.count())
+        .where(*_publication_window(scope, start, end))
+        .group_by(Publication.pub_type)
+        .order_by(func.count().desc())
+    ).all()
+    return [
+        LabelledCountRow(label=row[0].value.replace("_", " ").title(), count=row[1]) for row in rows
+    ]
+
+
+# --- collaboration ---------------------------------------------------------
+
+
+def cross_department_collaboration(db: Session, scope: Scope) -> CollaborationRateRow:
+    """How much collaboration crosses a departmental boundary.
+
+        rate = cross_department / (cross_department + same_department)
+
+    Only pairs where *both* people have a department can answer the question,
+    so pairs with one missing are excluded from both halves and counted
+    separately as `unknown_department`. Rolling them into the denominator
+    would depress the rate for a reason that has nothing to do with
+    collaboration.
+
+    Reported as a fraction 0-1; the interface formats it.
+    """
+    a = aliased(User)
+    b = aliased(User)
+    rows = db.execute(
+        select(a.department_id, b.department_id)
+        .select_from(Collaboration)
+        .join(a, a.id == Collaboration.user_a_id)
+        .join(b, b.id == Collaboration.user_b_id)
+        .where(
+            true()
+            if scope.is_platform
+            else or_(
+                a.department_id == scope.department_id,
+                b.department_id == scope.department_id,
+            )
+        )
+    ).all()
+
+    same = cross = unknown = 0
+    for left, right in rows:
+        if left is None or right is None:
+            unknown += 1
+        elif left == right:
+            same += 1
+        else:
+            cross += 1
+    qualifying = same + cross
+    return CollaborationRateRow(
+        cross_department=cross,
+        same_department=same,
+        unknown_department=unknown,
+        # Zero collaborations is not a zero rate, it is no rate at all.
+        rate=(cross / qualifying) if qualifying else None,
+    )
+
+
+# --- applications ----------------------------------------------------------
+
+
+def application_success_rate(
+    db: Session, scope: Scope, *, start: date | None = None, end: date | None = None
+) -> ApplicationOutcomeRow:
+    """Outcomes of applications to research opportunities.
+
+        success rate = accepted / (accepted + rejected)
+
+    Only *decided* applications are in the denominator. Pending ones
+    (submitted, under review, shortlisted) have no outcome yet, and counting
+    them as failures would make the rate fall simply because a reviewer is
+    slow. Withdrawn applications are excluded from both halves: the applicant
+    stopped, which is not a decision anyone made about them.
+
+    The specification calls this "funding application success rate". This
+    platform's funding module is a register of calls with deadlines and
+    saved interest -- it has no application workflow, and neither does the
+    specification's own M6 -- so the applications measured here are those to
+    research opportunities (M4). Stated plainly rather than relabelled.
+    """
+    filters: list[ColumnElement[bool]] = []
+    if start is not None and end is not None:
+        filters.append(Application.created_at >= start)
+        filters.append(Application.created_at <= end)
+    if not scope.is_platform:
+        filters.append(Application.opportunity_id.in_(_scoped_opportunities(scope)))
+
+    counts = _counts(
+        db.execute(
+            select(Application.status, func.count()).where(*filters).group_by(Application.status)
+        ).all()
+    )
+    accepted = counts.get(ApplicationStatus.ACCEPTED.value, 0)
+    rejected = counts.get(ApplicationStatus.REJECTED.value, 0)
+    withdrawn = counts.get(ApplicationStatus.WITHDRAWN.value, 0)
+    decided = accepted + rejected
+    pending = sum(
+        count
+        for status, count in counts.items()
+        if status
+        not in (
+            ApplicationStatus.ACCEPTED.value,
+            ApplicationStatus.REJECTED.value,
+            ApplicationStatus.WITHDRAWN.value,
+        )
+    )
+    return ApplicationOutcomeRow(
+        total=sum(counts.values()),
+        accepted=accepted,
+        rejected=rejected,
+        pending=pending,
+        withdrawn=withdrawn,
+        decided=decided,
+        rate=(accepted / decided) if decided else None,
     )
