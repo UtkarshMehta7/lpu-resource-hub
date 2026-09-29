@@ -289,7 +289,7 @@ cross-site HTML form cannot set custom headers.
 ```bash
 curl -s -c cookies.txt -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"registration_number":"DEMOFACULTY01","password":"<the seed password>"}'
+  -d '{"registration_number":"12500201","password":"<the seed password>"}'
 
 curl -s -b cookies.txt -c cookies.txt -X POST http://localhost:8000/api/v1/auth/refresh \
   -H "X-Requested-With: XMLHttpRequest"
@@ -562,8 +562,8 @@ cd backend && python -m scripts.seed_demo_data      # once, if not already seede
 cd frontend && E2E_PASSWORD='<seed password>' npx playwright test
 ```
 
-The flows sign in with the seeded demo **registration numbers** (`DEMOSTUDENT01`,
-`DEMOFACULTY01`, `DEMOCOORDINATOR02`, `DEMOADMIN`), which the seed script
+The flows sign in with the seeded demo **registration numbers** (`12500301`,
+`12500201`, `12500102`, `12500001`), which the seed script
 derives from each demo account's address — they are deliberately unmistakable
 for real LPU numbers.
 

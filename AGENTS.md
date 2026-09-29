@@ -63,6 +63,14 @@ Current shape: 151 API operations over 120 paths, 44 tables, 24 migrations,
   ("admin" | "main"): administrators only at /admin/login, everyone else only
   at /login. The check runs *after* the password, so the admin page can never
   become an oracle for which numbers are administrators.
+- **Demo accounts carry LPU-shaped registration numbers** in the 125xxxxx
+  block (`demo.faculty07@example.com` -> `12500207`), derived from the email
+  by `_demo_registration_number` so the seed stays idempotent and the rebrand
+  script agrees with it. They used to be `DEMOFACULTY07`, which was obviously
+  fake on purpose; `users.is_demo` carries that meaning now. Hand-made
+  accounts live in 124xxxxx, so the blocks never collide. **The E2E flows sign
+  in with these numbers** -- change the scheme and `frontend/e2e/flows.spec.ts`
+  changes with it, or CI goes red at sign-in.
 - **The registration number is the UID and is shown wherever a person is
   named** -- via `components/ui/Uid`, never a hand-rolled span. Every
   person-bearing response schema carries `registration_number`; search matches
@@ -185,10 +193,11 @@ Current shape: 151 API operations over 120 paths, 44 tables, 24 migrations,
   `frontend/src/features/*/types.ts` in the same change.
 - E2E runs against the *development* database, so its state matters. A
   local run needs `scripts/seed_demo_data.py` first, or every flow fails
-  at sign-in for want of DEMOADMIN -- CI seeds it, a dev box may not.
+  at sign-in for want of the seeded admin (12500001) -- CI seeds it, a dev
+  box may not.
 - **The E2E sign-in helper has to use the right entrance.** Administrators
-  are refused at /login (ADR 0020), so `sessionFor` sends DEMOADMIN to
-  /admin/login. This is what turned CI red for six commits, unnoticed
+  are refused at /login (ADR 0020), so `sessionFor` sends the seeded admin
+  (12500001) to /admin/login. This is what turned CI red for six commits, unnoticed
   because the other five jobs stayed green. Anchor the URL assertion
   (`/\/admin$/`): an unanchored `/\/admin/` also matches /admin/login, so
   a failed sign-in passes and the test dies later, somewhere confusing.

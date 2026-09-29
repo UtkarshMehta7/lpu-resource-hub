@@ -21,6 +21,7 @@ from scripts.seed_demo_data import (
     COORDINATOR_COUNT,
     FACULTY_COUNT,
     STUDENT_COUNT,
+    _demo_registration_number,
     seed,
 )
 
@@ -107,18 +108,23 @@ def test_seed_leaves_some_researchers_pending_for_the_queue(db: Session) -> None
 
 
 def test_the_documented_demo_faculty_account_is_verified(db: Session) -> None:
-    """DEMOFACULTY01 is the faculty login in the README and the browser flows.
+    """The faculty login in the README and the browser flows.
 
     An unverified researcher can't submit a project or post an opening, so if
     this account seeds as PENDING the whole faculty journey is closed on a
     fresh install -- which is exactly how the end-to-end suite failed.
+
+    The number is derived rather than written out, so renumbering the demo
+    accounts cannot leave this test asserting against an identifier that no
+    longer exists -- which is how it broke when they became LPU-shaped.
     """
     seed(db, PLACEHOLDER_HASH)
 
+    registration_number = _demo_registration_number("demo.faculty01@example.com")
     profile = db.execute(
         select(ResearcherProfile)
         .join(User, User.id == ResearcherProfile.user_id)
-        .where(User.registration_number == "DEMOFACULTY01")
+        .where(User.registration_number == registration_number)
     ).scalar_one()
 
     assert profile.verification_status is VerificationStatus.VERIFIED
