@@ -42,6 +42,33 @@ describe("navigationFor", () => {
     expect(labels).not.toContain("My people");
   });
 
+  it("lets an administrator reach the only page that creates a custodian", () => {
+    // /admin/accounts/new is the sole route that names a role, so it is the
+    // only way to make a facility custodian or a dean. It was reachable from
+    // one tile on /admin and nowhere else -- so it was absent from the top
+    // bar, the full menu and the command palette, and people could not find
+    // it. That is the failure this file exists to prevent.
+    const admin = navigationFor("admin");
+
+    expect(admin.map((item) => item.to)).toContain("/admin/accounts/new");
+    // And findable by what somebody would actually type.
+    for (const query of ["custodian", "dean"]) {
+      expect(searchNavigation(admin, query).map((item) => item.to)).toContain(
+        "/admin/accounts/new",
+      );
+    }
+  });
+
+  it("every route a role can reach is in this list", () => {
+    // The list drives three different ways around the app; a destination
+    // missing here is reachable through none of them.
+    for (const role of ["admin", "research_coordinator", "faculty"] as const) {
+      for (const item of navigationFor(role)) {
+        expect(item.to.startsWith("/")).toBe(true);
+      }
+    }
+  });
+
   it("gives a signed-out visitor nothing", () => {
     expect(navigationFor(undefined)).toEqual([]);
   });

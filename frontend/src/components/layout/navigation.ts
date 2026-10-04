@@ -157,6 +157,18 @@ export const NAV: NavItem[] = [
     keywords: "users roles deactivate delete",
   },
   {
+    // The admin override: the only route that names a role, and so the only
+    // way to create a facility custodian or a dean of research. It was
+    // reachable from one tile on /admin and from nowhere else -- not the top
+    // bar, not the full menu, not the command palette -- which is exactly
+    // what this file exists to prevent.
+    to: "/admin/accounts/new",
+    label: "Add any account",
+    group: "Administration",
+    roles: ["admin"],
+    keywords: "new custodian dean create provision override facility role",
+  },
+  {
     to: "/admin/coordinators",
     label: "Coordinators",
     group: "Administration",
