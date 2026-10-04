@@ -43,7 +43,7 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 161 API operations over 130 paths, 44 tables, 28 migrations,
-29 ADRs, 27 backend modules, 1074 backend tests, 257 frontend tests,
+29 ADRs, 27 backend modules, 1074 backend tests, 259 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -272,6 +272,12 @@ Current shape: 161 API operations over 130 paths, 44 tables, 28 migrations,
   Never hand-write `rounded-md bg-brand-700 px-3 py-2 ...` again.
 - **One page top:** `components/ui/PageHeader` (title, one-sentence
   description, actions). 50 pages had rolled their own.
+- **A page reachable from one tile is still missing.**
+  `/admin/accounts/new` -- the override, and the ONLY way to create a facility
+  custodian or a dean -- was linked from a tile on `/admin` and listed
+  nowhere, so it was absent from the top bar, the full menu and the command
+  palette, and people reported the feature as missing. A link on a page is
+  not a substitute for an entry here.
 - **`components/layout/navigation.ts` is the single list of destinations.** It
   drives the top bar, the grouped "All pages" menu and the command palette, so
   a role can never reach a page through one and not another. Add a page there
