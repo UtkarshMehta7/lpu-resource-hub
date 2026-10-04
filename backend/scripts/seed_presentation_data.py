@@ -468,12 +468,21 @@ def _get_or_create_user(
         user.is_active = True
         user.must_change_password = False
         user.password_hash = hash_password(password_for(person.name))
-    if role is UserRole.RESEARCH_COORDINATOR and (scope or department) is not None:
+    if role is UserRole.RESEARCH_COORDINATOR:
         # A coordinator with no scope oversees nothing: empty queues and 403s.
-        user.coordinator_scope_type = CoordinatorScopeType.DEPARTMENT
         scoped = scope or department
-        assert scoped is not None
-        user.coordinator_scope_id = scoped.id
+        if scoped is not None:
+            user.coordinator_scope_type = CoordinatorScopeType.DEPARTMENT
+            user.coordinator_scope_id = scoped.id
+    else:
+        # And the other way round, which this script got wrong against the
+        # deployed database: it matched a registration number that already
+        # belonged to a coordinator, changed the role, and left the old scope
+        # on the row. A non-coordinator carrying a coordinator scope is the
+        # inconsistency `_sync_coordinator_scope` exists to prevent in the
+        # application; a seed must not reintroduce it from the side.
+        user.coordinator_scope_type = None
+        user.coordinator_scope_id = None
     db.flush()
     return user
 
