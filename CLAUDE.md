@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 161 API operations over 130 paths, 44 tables, 27 migrations,
-29 ADRs, 27 backend modules, 1059 backend tests, 252 frontend tests,
+Current shape: 161 API operations over 130 paths, 44 tables, 28 migrations,
+29 ADRs, 27 backend modules, 1067 backend tests, 257 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -133,6 +133,13 @@ Current shape: 161 API operations over 130 paths, 44 tables, 27 migrations,
   here has seen. Never let an import preserve verification.
 - **Every imported work links to its DOI** so it can be checked before it is
   accepted, not audited afterwards. `WorkCandidate.url` is the fallback.
+- **A collaboration suggestion is about the GAP.** `_collaborator_candidates`
+  excludes anyone with an open or accepted request *and* anyone the viewer has
+  already co-authored a publication with -- suggesting a long-standing
+  co-author is the one recommendation a researcher is certain they did not
+  need. The notification rides the same scoring as the page, so the two can
+  never disagree, and its dedupe key is the ordered pair, so two people are
+  introduced once ever.
 - **Nudges never name their recipient.** `POST /nudges` takes a kind and an
   entity; the service resolves who hears about it from the thing being
   chased. A recipient field would make it a way to message anyone in the
@@ -181,6 +188,13 @@ Current shape: 161 API operations over 130 paths, 44 tables, 27 migrations,
   the queue *suggests* from `TITLE_SUGGEST_THRESHOLD` (84). It reuses
   `merge.py`'s rules rather than growing a second opinion, so the DOI veto
   holds in both places.
+- **The scan shortlists in the DATABASE, then scores in Python.** Postgres
+  generates candidate pairs with the trigram index on `publications.title`
+  (`a.title % b.title`, `a.id < b.id`), and rapidfuzz scores only what comes
+  back -- the same division the import path has always used. Comparing
+  everything with everything in Python gets the same answer and stops being
+  free as the register grows; a test asserts the shortlist loses no pair the
+  exhaustive comparison finds.
 - **A merge DELETES the losing publication; it does not hide it.**
   Publications are read in fifteen places across eight modules, and a
   hidden-row flag would have to be honoured by every one -- one missed query

@@ -54,6 +54,30 @@ describe("describeNotification", () => {
     });
   });
 
+  it("renders a collaboration suggestion and links to the person", () => {
+    // Same reason as the message case below: a notification type with no
+    // case here is delivered and invisible, and every other test still
+    // passes. The UID is in the detail because names collide.
+    expect(
+      describeNotification(
+        notification({
+          notification_type: "collaboration_suggestion",
+          payload: {
+            user_id: "u9",
+            full_name: "Neha Gupta",
+            registration_number: "12400112",
+            score: 0.72,
+            reasons: ["Shares 3 skills with you", "Both work on remote sensing"],
+          },
+        }),
+      ),
+    ).toEqual({
+      text: "Neha Gupta works on similar things, and you have not published together",
+      to: "/researchers/u9",
+      detail: "12400112 · Shares 3 skills with you",
+    });
+  });
+
   it("renders a message notification and links to the thread", () => {
     // The admin OTP once shipped invisible because this switch had no case
     // for it, and every test still passed. This is that test, for chat.

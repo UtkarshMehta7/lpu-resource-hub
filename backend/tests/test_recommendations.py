@@ -327,6 +327,64 @@ def test_researcher_and_collaborator_filters(client: TestClient, world: World) -
     assert _ids(_recommend(client, world.admin, "collaborators")) == []
 
 
+def test_an_existing_co_author_is_not_suggested_as_a_collaborator(
+    client: TestClient, world: World
+) -> None:
+    """M5 is the co-authorship *gap*, not expertise adjacency alone.
+
+    Two people already named on the same paper have demonstrably found each
+    other. Suggesting them to one another is the single recommendation a
+    researcher can be sure they did not need, and it crowds out the ones they
+    did -- someone whose expertise says they should be working together and
+    whose publication record says they are not.
+    """
+    assert str(world.other_faculty.id) in _ids(_recommend(client, world.owner, "collaborators"))
+
+    published = client.post(
+        "/api/v1/publications",
+        headers=_auth(world.owner),
+        json={
+            "title": "Joint field trials of soil moisture sensors",
+            "year": 2025,
+            "pub_type": "journal_article",
+            "authors": [
+                {"user_id": str(world.owner.id)},
+                {"user_id": str(world.other_faculty.id)},
+            ],
+        },
+    )
+    assert published.status_code == 201, published.text
+
+    # Gone for both of them: the gap closed in each direction.
+    assert str(world.other_faculty.id) not in _ids(_recommend(client, world.owner, "collaborators"))
+    assert str(world.owner.id) not in _ids(_recommend(client, world.other_faculty, "collaborators"))
+
+
+def test_an_external_co_author_does_not_exclude_anybody(client: TestClient, world: World) -> None:
+    """A publication whose other authors are plain names, not accounts.
+
+    The co-author filter reads publication_authors.user_id, which is null for
+    an external name, so a paper written with somebody outside the platform
+    must not quietly remove every suggestion.
+    """
+    before = _ids(_recommend(client, world.owner, "collaborators"))
+    client.post(
+        "/api/v1/publications",
+        headers=_auth(world.owner),
+        json={
+            "title": "Sensor calibration with an outside collaborator",
+            "year": 2025,
+            "pub_type": "journal_article",
+            "authors": [
+                {"user_id": str(world.owner.id)},
+                {"external_name": "Someone Elsewhere"},
+            ],
+        },
+    )
+
+    assert _ids(_recommend(client, world.owner, "collaborators")) == before
+
+
 def test_private_students_are_not_recommended_as_collaborators(
     client: TestClient, world: World, seed_user: Callable[..., SeededUser]
 ) -> None:

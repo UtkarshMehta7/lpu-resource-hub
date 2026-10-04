@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Collection
 from datetime import UTC, datetime
 from typing import Any, cast
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.core.pagination import Page, PageParams
 from app.modules.audit import service as audit_service
@@ -52,13 +53,23 @@ class NothingToUndoError(Exception):
 # --- scanning ---------------------------------------------------------------
 
 
-def _records(db: Session) -> list[detect.Record]:
+def _records(db: Session, only: Collection[uuid.UUID] | None = None) -> list[detect.Record]:
+    """The little each publication needs to expose to be compared.
+
+    `only` restricts the load to the shortlist the database produced, so a
+    scan reads the rows it will actually score rather than the whole register.
+    """
+    if only is not None and not only:
+        return []
     authors: dict[uuid.UUID, set[str]] = {}
-    rows = db.execute(
+    author_query = (
         select(PublicationAuthor.publication_id, PublicationAuthor.external_name, User.full_name)
         .outerjoin(User, User.id == PublicationAuthor.user_id)
         .order_by(PublicationAuthor.author_order)
-    ).all()
+    )
+    if only is not None:
+        author_query = author_query.where(PublicationAuthor.publication_id.in_(only))
+    rows = db.execute(author_query).all()
     for publication_id, external_name, full_name in rows:
         name = (full_name or external_name or "").strip().casefold()
         if name:
@@ -73,8 +84,41 @@ def _records(db: Session) -> list[detect.Record]:
             venue=publication.venue,
             author_names=frozenset(authors.get(publication.id, set())),
         )
-        for publication in db.execute(select(Publication)).scalars()
+        for publication in db.execute(
+            select(Publication).where(Publication.id.in_(only))
+            if only is not None
+            else select(Publication)
+        ).scalars()
     ]
+
+
+#: An upper bound on the pairs one scan will consider, so a register that has
+#: grown unexpectedly cannot turn a button into a long transaction. The
+#: trigram shortlist is already narrow; this is the guard behind it.
+PAIR_LIMIT: int = 5000
+
+
+def _candidate_pairs(db: Session) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """Pairs the database thinks are worth scoring.
+
+    Postgres generates the candidates using the trigram index on
+    `publications.title` (`ix_publications_title_trgm`, migration 0022), and
+    rapidfuzz then scores only what comes back. That division is what the
+    brief asks for and what the import path has always done; the review
+    queue compared everything with everything in Python until this.
+
+    `a.id < b.id` yields each pair once and in the order the unique
+    constraint expects, so the same pair cannot arrive twice in one scan.
+    """
+    left = aliased(Publication, name="a")
+    right = aliased(Publication, name="b")
+    rows = db.execute(
+        select(left.id, right.id)
+        .join(right, left.id < right.id)
+        .where(left.title.op("%")(right.title))
+        .limit(PAIR_LIMIT)
+    ).all()
+    return [(a, b) for a, b in rows]
 
 
 def scan(db: Session, actor: User, *, ip: str | None = None) -> ScanResult:
@@ -85,8 +129,12 @@ def scan(db: Session, actor: User, *, ip: str | None = None) -> ScanResult:
     though nobody had looked. The unique constraint on the ordered pair is
     what makes that true in the database rather than in this function.
     """
-    records = _records(db)
-    candidates = detect.find_candidates(records)
+    pairs = _candidate_pairs(db)
+    wanted = {publication_id for pair in pairs for publication_id in pair}
+    records = {record.id: record for record in _records(db, wanted)}
+    candidates = detect.score_pairs(
+        (records[a], records[b]) for a, b in pairs if a in records and b in records
+    )
 
     known: dict[tuple[uuid.UUID, uuid.UUID], PublicationDuplicate] = {
         (row.publication_a_id, row.publication_b_id): row
@@ -119,6 +167,7 @@ def scan(db: Session, actor: User, *, ip: str | None = None) -> ScanResult:
         )
         new_rows += 1
 
+    examined = int(db.execute(select(func.count()).select_from(Publication)).scalar_one())
     audit_service.record(
         db,
         actor_id=actor.id,
@@ -126,7 +175,8 @@ def scan(db: Session, actor: User, *, ip: str | None = None) -> ScanResult:
         entity_type="publication_duplicate",
         entity_id=actor.id,
         after={
-            "examined": len(records),
+            "examined": examined,
+            "shortlisted_pairs": len(pairs),
             "pairs_found": len(candidates),
             "pairs_new": new_rows,
         },
@@ -134,7 +184,7 @@ def scan(db: Session, actor: User, *, ip: str | None = None) -> ScanResult:
     )
     db.commit()
     return ScanResult(
-        examined=len(records),
+        examined=examined,
         pairs_found=len(candidates),
         pairs_new=new_rows,
         pairs_already_decided=already_decided,
