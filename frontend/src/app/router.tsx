@@ -43,6 +43,7 @@ import { ConversationsPage } from "@/features/messages/ConversationsPage";
 import { ThreadPage } from "@/features/messages/ThreadPage";
 import { PeoplePage } from "@/features/admin/PeoplePage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { DuplicateQueuePage } from "@/features/deduplication/DuplicateQueuePage";
 import { ModerationQueuePage } from "@/features/reports/ModerationQueuePage";
 import { SavedPage } from "@/features/saved/SavedPage";
 import { SearchPage } from "@/features/search/SearchPage";
@@ -126,6 +127,7 @@ export const router = createBrowserRouter([
               { path: "coordinator/verification-queue", element: <VerificationQueuePage /> },
               { path: "coordinator/review-queue", element: <ReviewQueuePage /> },
               { path: "admin/reports", element: <ModerationQueuePage /> },
+              { path: "coordinator/duplicates", element: <DuplicateQueuePage /> },
               // Creating a facility is department-level, so a custodian --
               // who holds a set of facilities, not a department -- is not here.
               { path: "facilities/new", element: <FacilityFormPage /> },

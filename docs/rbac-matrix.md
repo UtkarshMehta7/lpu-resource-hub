@@ -86,6 +86,7 @@ refused on self and audited.
 | `booking:approve` | | | ✅ (own dept) | ✅ (any) | 11 |
 | `funding:manage` | | | ✅ (university-wide) | ✅ | 12 |
 | `analytics:read` | | | ✅ (own dept figures) | ✅ (platform) | 14 |
+| `publication:deduplicate` | | | ✅ | ✅ | 29 |
 
 Every authenticated, active user (any role) can read their own profile via
 `GET /api/v1/me`, read their own `GET/PUT /me/profile`, set their own
@@ -154,6 +155,23 @@ admin. They reach `/analytics`, `/analytics/report` and the at-risk board
 (whose gate moved from `project:review` to `analytics:read`, since looking at
 the board is reading, not reviewing) — and no other queue, because every
 other one is an action on somebody's work.
+
+## Curating publication records (ADR 0029)
+
+`publication:deduplicate` is the duplicate review queue: scanning for
+suspected duplicate publications and deciding each pair. Held by
+`RESEARCH_COORDINATOR` and `ADMIN`.
+
+Separate from `publication:create` because writing your own record and merging
+somebody else's are different powers. A **dean is excluded deliberately** —
+they read the institution's figures and change nothing, and a merge changes
+the records behind the figures.
+
+A merge deletes the losing record rather than hiding it, because publications
+are read in fifteen places across eight modules and one query that forgot to
+exclude a hidden row would be a ghost publication still answering searches.
+The deleted record is snapshotted on the review row, so the merge is
+reversible; an undo recreates it with a new id.
 
 ## Status codes
 

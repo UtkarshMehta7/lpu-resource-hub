@@ -133,6 +133,13 @@ export const NAV: NavItem[] = [
     keywords: "moderation flagged",
   },
   {
+    to: "/coordinator/duplicates",
+    label: "Duplicates",
+    group: "Review",
+    roles: ["research_coordinator", "admin"],
+    keywords: "deduplicate merge publications same paper curation",
+  },
+  {
     to: "/analytics",
     label: "Analytics",
     group: "Review",

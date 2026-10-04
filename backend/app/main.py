@@ -42,6 +42,7 @@ from app.modules.audit.router import router as audit_router
 from app.modules.auth.router import router as auth_router
 from app.modules.bookings.router import router as bookings_router
 from app.modules.collaborations.router import router as collaborations_router
+from app.modules.deduplication.router import router as deduplication_router
 from app.modules.facilities.router import router as facilities_router
 from app.modules.funding.router import router as funding_router
 from app.modules.health.router import router as health_router
@@ -195,5 +196,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(search_router, prefix=API_V1_PREFIX)
     app.include_router(imports_router, prefix=API_V1_PREFIX)
     app.include_router(milestones_router, prefix=API_V1_PREFIX)
+    app.include_router(deduplication_router, prefix=API_V1_PREFIX)
     app.include_router(nudges_router, prefix=API_V1_PREFIX)
     return app
