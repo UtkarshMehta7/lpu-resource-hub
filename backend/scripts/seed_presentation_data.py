@@ -1029,33 +1029,84 @@ def _seed_custodians_and_dean(db: Session, summary: Summary) -> None:
 
 # --- milestones, so the timeline and the at-risk board have content --------
 
-#: (title, days from today, status). Deliberately spans every risk state the
-#: board can show: one overdue, one due inside the at-risk window, one still
-#: comfortable, one finished. Risk is derived on every read (ADR 0026), so
-#: these dates ARE the demonstration -- there is no flag to set.
-MILESTONE_PLAN: list[tuple[str, int, MilestoneStatus]] = [
-    ("Literature review and protocol", -120, MilestoneStatus.DONE),
-    ("Instrument calibration and pilot run", -45, MilestoneStatus.DONE),
-    ("Field data collection, first season", -6, MilestoneStatus.IN_PROGRESS),
-    ("Analysis and interim report", 4, MilestoneStatus.PENDING),
-    ("Manuscript submission", 95, MilestoneStatus.PENDING),
+#: Milestone chains, one shape per project, rotated.
+#:
+#: One shape is not enough, and the first version of this got it wrong: every
+#: project had an overdue milestone with the rest of the chain behind it, and
+#: `blocked` beats `at_risk` (ADR 0026), so the live instance showed
+#: `at_risk: 0` and `on_track: 0`. The at-risk board demonstrated the one
+#: state it is named after not at all.
+#:
+#: A dependency only blocks when it is itself OVERDUE or AT_RISK -- a done or
+#: on-track predecessor is ordinary sequencing -- so the shapes differ in what
+#: sits in front of the outstanding work:
+#:
+#:   slipping : an overdue milestone, with the rest blocked behind it
+#:   due soon : everything before it done, so the next one reads AT RISK
+#:   healthy  : everything before it done and the next dates comfortable
+#:   finished : nothing outstanding
+MILESTONE_SHAPES: list[tuple[str, list[tuple[str, int, MilestoneStatus]]]] = [
+    (
+        "slipping",
+        [
+            ("Literature review and protocol", -120, MilestoneStatus.DONE),
+            ("Instrument calibration and pilot run", -60, MilestoneStatus.DONE),
+            ("Field data collection, first season", -6, MilestoneStatus.IN_PROGRESS),
+            ("Analysis and interim report", 4, MilestoneStatus.PENDING),
+            ("Manuscript submission", 95, MilestoneStatus.PENDING),
+        ],
+    ),
+    (
+        "due soon",
+        [
+            ("Literature review and protocol", -150, MilestoneStatus.DONE),
+            ("Instrument calibration and pilot run", -90, MilestoneStatus.DONE),
+            ("Field data collection, first season", -30, MilestoneStatus.DONE),
+            # Inside MILESTONE_AT_RISK_DAYS, and nothing late in front of it.
+            ("Analysis and interim report", 3, MilestoneStatus.IN_PROGRESS),
+            ("Manuscript submission", 40, MilestoneStatus.PENDING),
+        ],
+    ),
+    (
+        "healthy",
+        [
+            ("Literature review and protocol", -140, MilestoneStatus.DONE),
+            ("Instrument calibration and pilot run", -80, MilestoneStatus.DONE),
+            ("Field data collection, first season", -20, MilestoneStatus.DONE),
+            # Comfortably beyond the threshold, so this reads ON TRACK, and so
+            # does the one after it -- an on-track dependency does not block.
+            ("Analysis and interim report", 45, MilestoneStatus.IN_PROGRESS),
+            ("Manuscript submission", 120, MilestoneStatus.PENDING),
+        ],
+    ),
+    (
+        "finished",
+        [
+            ("Literature review and protocol", -200, MilestoneStatus.DONE),
+            ("Instrument calibration and pilot run", -150, MilestoneStatus.DONE),
+            ("Field data collection, first season", -90, MilestoneStatus.DONE),
+            ("Analysis and interim report", -40, MilestoneStatus.DONE),
+            ("Manuscript submission", -10, MilestoneStatus.DONE),
+        ],
+    ),
 ]
 
 
 def _seed_milestones(db: Session, summary: Summary) -> None:
     """Dated work on every active project, with a dependency chain.
 
-    The third milestone is already past its date and still in progress, so it
-    reads as overdue; the fourth falls inside MILESTONE_AT_RISK_DAYS and reads
-    as at risk; the fifth is comfortable. Each waits on the one before it, so
-    the Gantt view has arrows to draw and "blocked" has something to mean.
+    Shapes are rotated across projects so the board shows every state it can:
+    overdue and blocked from the slipping shape, at risk from the one whose
+    predecessors are all done, on track from the comfortable one, and nothing
+    outstanding from the finished one. Each milestone waits on the one before
+    it, so the Gantt view has arrows to draw.
     """
     projects = list(
         db.execute(
             select(Project).where(Project.status == ProjectStatus.ACTIVE).order_by(Project.title)
         ).scalars()
     )
-    for project in projects:
+    for index, project in enumerate(projects):
         already = (
             db.execute(select(Milestone).where(Milestone.project_id == project.id))
             .scalars()
@@ -1063,8 +1114,9 @@ def _seed_milestones(db: Session, summary: Summary) -> None:
         )
         if already is not None:
             continue
+        _, plan = MILESTONE_SHAPES[index % len(MILESTONE_SHAPES)]
         previous: Milestone | None = None
-        for position, (title, offset, status) in enumerate(MILESTONE_PLAN, start=1):
+        for position, (title, offset, status) in enumerate(plan, start=1):
             milestone = Milestone(
                 project_id=project.id,
                 title=title,

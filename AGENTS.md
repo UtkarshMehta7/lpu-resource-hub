@@ -43,7 +43,7 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 161 API operations over 130 paths, 44 tables, 28 migrations,
-29 ADRs, 27 backend modules, 1072 backend tests, 257 frontend tests,
+29 ADRs, 27 backend modules, 1074 backend tests, 257 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -250,6 +250,14 @@ Current shape: 161 API operations over 130 paths, 44 tables, 28 migrations,
   the side. A script writing directly to the database carries the invariants
   the services carry. Check **roles**, not just names, before running a seed
   against a populated database.
+- **Demo milestones need more than one SHAPE.** Give every project the same
+  chain with an overdue milestone in front and `blocked` beats `at_risk`
+  (ADR 0026), so the deployed board showed `at_risk: 0` and `on_track: 0` --
+  the at-risk board demonstrating the state it is named after not at all, and
+  P08 acceptance criterion 4 unshowable. `MILESTONE_SHAPES` rotates four:
+  slipping, due soon, healthy, finished. A dependency only blocks when it is
+  itself overdue or at risk, so what sits *in front* of the outstanding work
+  is what decides.
 - **The demo seed creates facilities and equipment now**, and assigns the
   first to `demo.custodian01` (12500401); `demo.dean01` (12500501) has no
   department, as a dean must not. Before this the catalogue, the booking queue
