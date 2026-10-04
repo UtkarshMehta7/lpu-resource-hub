@@ -32,7 +32,7 @@ from app.modules.admin.schemas import (
     StepDownRequest,
 )
 from app.modules.admin.service import UserNotFoundError, get_user_or_raise
-from app.modules.users.models import User
+from app.modules.users.models import User, UserRole
 
 router = APIRouter(tags=["accounts"])
 # Admin-only operations that sit outside the ordinary hierarchy.
@@ -115,6 +115,48 @@ def create_account(
             department_id=data.department_id,
             email=data.email,
             ip=client_ip(request),
+        )
+    return CreatedAccountRead(
+        user=AdminUserRead.model_validate(created.user),
+        temporary_password=created.temporary_password,
+    )
+
+
+@router.post(
+    "/facility-custodians",
+    response_model=CreatedAccountRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def appoint_facility_custodian(
+    data: AccountCreateRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    creator: Creator,
+) -> CreatedAccountRead:
+    """Appoint a facility custodian.
+
+    Its own route because the role is a **constant of the path**, not a field
+    in the body. `CREATABLE_ROLE` maps each role to exactly one successor, and
+    that is what lets an ordinary appointment derive its role from the caller
+    rather than read it from the request (ADR 0019). Giving a coordinator a
+    second successor would have forced a `role` field back in; a dedicated
+    route gives the same ability while the caller still names nothing.
+
+    A coordinator appoints only within the department they oversee -- the same
+    scope rule as when they appoint faculty -- and an administrator anywhere.
+    A custodian cannot appoint another: somebody who looks after rooms must
+    not be able to mint peers who look after others.
+    """
+    with _domain_errors():
+        created = accounts.create_account(
+            db,
+            creator,
+            registration_number=data.registration_number,
+            full_name=data.full_name,
+            department_id=data.department_id,
+            email=data.email,
+            ip=client_ip(request),
+            override_role=UserRole.FACILITY_CUSTODIAN,
         )
     return CreatedAccountRead(
         user=AdminUserRead.model_validate(created.user),

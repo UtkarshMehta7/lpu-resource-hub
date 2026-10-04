@@ -383,6 +383,138 @@ def test_a_custodian_with_no_facility_has_an_empty_booking_queue(
     assert queue.json() == []
 
 
+# --- who may appoint a custodian (ADR 0030) --------------------------------
+
+
+def custodian_body(number: str, department_id: str | None = None) -> dict[str, object]:
+    body: dict[str, object] = {"registration_number": number, "full_name": "New Custodian"}
+    if department_id is not None:
+        body["department_id"] = department_id
+    return body
+
+
+def test_a_coordinator_appoints_a_custodian_for_their_own_department(
+    client: TestClient, world: World
+) -> None:
+    """The gap this closes: a coordinator could assign a custodian to a
+    facility but could not create one, so the picker's empty state was a dead
+    end that ended in an administrator's inbox."""
+    response = client.post(
+        "/api/v1/facility-custodians",
+        headers=auth(world.coordinator),
+        json=custodian_body("12499001"),
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["user"]["role"] == "facility_custodian"
+    # Their own department, not one they named.
+    assert body["user"]["department_id"] == world.department_id
+    assert body["temporary_password"]
+
+
+def test_the_request_cannot_name_a_role(client: TestClient, world: World) -> None:
+    """The role is a constant of the route, not a field.
+
+    CREATABLE_ROLE maps each role to exactly one successor, which is what lets
+    an ordinary appointment derive the role from the caller. A `role` in the
+    body would undo that, so one sent anyway must be ignored rather than
+    honoured.
+    """
+    response = client.post(
+        "/api/v1/facility-custodians",
+        headers=auth(world.coordinator),
+        json={**custodian_body("12499002"), "role": "admin"},
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["user"]["role"] == "facility_custodian"
+
+
+def test_a_coordinator_cannot_appoint_into_another_department(
+    client: TestClient, world: World
+) -> None:
+    other_school = client.post(
+        "/api/v1/admin/schools", headers=auth(world.admin), json={"name": "Elsewhere School"}
+    ).json()["id"]
+    other_department = client.post(
+        "/api/v1/admin/departments",
+        headers=auth(world.admin),
+        json={"school_id": other_school, "name": "Elsewhere"},
+    ).json()["id"]
+
+    response = client.post(
+        "/api/v1/facility-custodians",
+        headers=auth(world.coordinator),
+        json=custodian_body("12499003", other_department),
+    )
+
+    assert response.status_code == 403, response.text
+
+
+def test_an_administrator_may_appoint_a_custodian_anywhere(
+    client: TestClient, world: World
+) -> None:
+    response = client.post(
+        "/api/v1/facility-custodians",
+        headers=auth(world.admin),
+        json=custodian_body("12499004", world.department_id),
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["user"]["role"] == "facility_custodian"
+
+
+@pytest.mark.parametrize("role", [UserRole.FACULTY, UserRole.STUDENT])
+def test_nobody_below_a_coordinator_may_appoint_one(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser], role: UserRole
+) -> None:
+    person = seed_user(role, department_id=world.department_id)
+
+    response = client.post(
+        "/api/v1/facility-custodians",
+        headers=auth(person),
+        json=custodian_body("12499005"),
+    )
+
+    assert response.status_code in (403, 422), response.text
+
+
+def test_a_custodian_cannot_appoint_another_custodian(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """Somebody who looks after rooms must not be able to mint peers who look
+    after others."""
+    custodian = seed_user(UserRole.FACILITY_CUSTODIAN, department_id=world.department_id)
+
+    response = client.post(
+        "/api/v1/facility-custodians",
+        headers=auth(custodian),
+        json=custodian_body("12499006"),
+    )
+
+    assert response.status_code == 403, response.text
+
+
+def test_a_coordinator_can_remove_a_custodian_they_appointed(
+    client: TestClient, world: World
+) -> None:
+    """Creating without removing is the dead end in the other direction."""
+    created = client.post(
+        "/api/v1/facility-custodians",
+        headers=auth(world.coordinator),
+        json=custodian_body("12499007"),
+    )
+    assert created.status_code == 201, created.text
+    user_id = created.json()["user"]["id"]
+
+    impact = client.get(f"/api/v1/users/{user_id}/deletion-impact", headers=auth(world.coordinator))
+    removed = client.delete(f"/api/v1/users/{user_id}", headers=auth(world.coordinator))
+
+    assert impact.status_code == 200, impact.text
+    assert removed.status_code == 204, removed.text
+
+
 # --- putting a facility in somebody's care ---------------------------------
 
 
