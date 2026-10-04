@@ -130,7 +130,9 @@ export function FacilitiesPage() {
               <p className="mt-1 text-sm text-ink-muted">{facility.description}</p>
             ) : null}
             <p className="mt-1 text-xs text-ink-muted">
-              {[facility.location, facility.contact].filter(Boolean).join(" · ")}
+              {[facility.department_name ?? "University-wide", facility.location, facility.contact]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           </li>
         ))}

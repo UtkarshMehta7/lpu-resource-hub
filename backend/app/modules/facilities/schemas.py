@@ -58,6 +58,10 @@ class FacilityRead(BaseModel):
     name: str
     description: str | None
     department_id: uuid.UUID | None
+    #: Named as well as referenced, so a page can say which department runs
+    #: this facility -- and show plainly when none does, which means only an
+    #: administrator can manage it.
+    department_name: str | None = None
     location: str | None
     contact: str | None
     #: Who looks after it. Named, not just referenced: a page that shows only
