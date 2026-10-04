@@ -43,7 +43,7 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 162 API operations over 131 paths, 44 tables, 28 migrations,
-30 ADRs, 27 backend modules, 1086 backend tests, 263 frontend tests,
+30 ADRs, 27 backend modules, 1089 backend tests, 269 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -283,6 +283,12 @@ Current shape: 162 API operations over 131 paths, 44 tables, 28 migrations,
   scope so a missing one is visible instead of silent.
 
 ## UI conventions (white + LPU orange, tokens in frontend/src/index.css)
+- **A `<select>` whose value is not among its options shows the FIRST one.**
+  `ROLE_OPTIONS` on the accounts page was a second hand-written list beside
+  `ROLE_LABELS`, and it fell behind when the custodian and dean arrived: every
+  dean and custodian row read "Student", and saving that row would have
+  demoted them. Derive such a list from the `Record<Role, …>` map so the
+  compiler refuses a missing case; never maintain two lists of the same thing.
 - **One button recipe:** `components/ui/buttonClass` + `Button`/`ButtonLink`.
   Never hand-write `rounded-md bg-brand-700 px-3 py-2 ...` again.
 - **One page top:** `components/ui/PageHeader` (title, one-sentence

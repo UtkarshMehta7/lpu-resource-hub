@@ -15,6 +15,8 @@ export interface ListUsersParams {
   page_size?: number;
   role?: Role;
   is_active?: boolean;
+  /** Name or email anywhere; registration number as a prefix. */
+  q?: string;
 }
 
 export async function fetchUsers(params: ListUsersParams = {}): Promise<Page<AdminUserRead>> {

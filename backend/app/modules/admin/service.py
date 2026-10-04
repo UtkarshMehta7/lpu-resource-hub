@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -69,12 +69,29 @@ def list_users(
     *,
     role: UserRole | None = None,
     is_active: bool | None = None,
+    q: str | None = None,
 ) -> Page[AdminUserRead]:
+    """The account list, optionally filtered and searched.
+
+    `q` matches a name or an email anywhere, and a registration number as a
+    **prefix** -- an identifier is not prose, so "124" should find everyone in
+    that block rather than every name containing those characters. Same rule
+    the researcher directory follows.
+    """
     query = select(User)
     if role is not None:
         query = query.where(User.role == role)
     if is_active is not None:
         query = query.where(User.is_active == is_active)
+    if q and (needle := q.strip()):
+        pattern = f"%{needle}%"
+        query = query.where(
+            or_(
+                User.full_name.ilike(pattern),
+                User.email.ilike(pattern),
+                User.registration_number.ilike(f"{needle}%"),
+            )
+        )
 
     total = db.execute(select(func.count()).select_from(query.subquery())).scalar_one()
     rows = (
