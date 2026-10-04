@@ -22,8 +22,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import Settings
 from app.modules.admin.models import Department, School
 from app.modules.facilities.models import Facility
+from app.modules.milestones.risk import Risk, RiskInput, assess
 from app.modules.users.models import CoordinatorScopeType, User, UserRole
-from scripts.seed_presentation_data import Person, Summary, _get_or_create_user, seed
+from scripts.seed_presentation_data import (
+    MILESTONE_SHAPES,
+    Person,
+    Summary,
+    _get_or_create_user,
+    seed,
+)
 
 pytestmark = pytest.mark.db
 
@@ -147,3 +154,61 @@ def test_a_full_seed_puts_every_facility_in_somebody_s_care(db: Session) -> None
         .where(User.department_id != Facility.department_id)
     ).scalar_one()
     assert wrong == 0
+
+
+def test_the_milestone_shapes_between_them_show_every_risk_state() -> None:
+    """The board must be able to show the state it is named after.
+
+    The first version of this seed gave every project the same chain, with an
+    overdue milestone in front of the rest. `blocked` beats `at_risk`
+    (ADR 0026), so the deployed instance reported at_risk: 0 and on_track: 0 --
+    the at-risk board demonstrating neither.
+
+    Asserted against the real `assess`, not against reasoning about it.
+    """
+    from datetime import date, timedelta
+
+    today = date.today()
+    threshold = 7
+    seen: set[Risk] = set()
+
+    for _name, plan in MILESTONE_SHAPES:
+        inputs = [
+            RiskInput(status=status, due_date=today + timedelta(days=offset))
+            for _title, offset, status in plan
+        ]
+        for position, milestone in enumerate(inputs):
+            # Each milestone waits on the one before it, as the seed wires it.
+            depends_on = [inputs[position - 1]] if position else []
+            seen.add(
+                assess(milestone, today=today, threshold_days=threshold, depends_on=depends_on)
+            )
+
+    assert Risk.AT_RISK in seen, "no shape produces an at-risk milestone"
+    assert Risk.ON_TRACK in seen, "no shape produces an on-track milestone"
+    assert Risk.OVERDUE in seen
+    assert Risk.BLOCKED in seen
+    assert Risk.NONE in seen
+
+
+def test_a_full_seed_leaves_milestones_in_more_than_one_risk_state(db: Session) -> None:
+    """The property over real rows: an adherence panel of a single state is
+    not a demonstration of anything."""
+    from datetime import date
+
+    from app.modules.milestones.models import Milestone
+
+    seed(db)
+    milestones = list(db.execute(select(Milestone)).scalars())
+    assert milestones
+
+    today = date.today()
+    states = {
+        assess(RiskInput(status=m.status, due_date=m.due_date), today=today, threshold_days=7)
+        for m in milestones
+    }
+    # Ignoring dependencies here: this is about the dates themselves spanning
+    # the range, which is what the shapes are for.
+    assert Risk.AT_RISK in states
+    assert Risk.ON_TRACK in states
+    assert Risk.OVERDUE in states
