@@ -22,9 +22,16 @@ TITLE_MATCH_THRESHOLD   = 92.0   # the importer merges, unattended
 TITLE_SUGGEST_THRESHOLD = 84.0   # written for this, never wired up
 ```
 
-The band between them is the whole feature. Below 84, nothing is worth
-raising. Above 92, a machine already merged it on the way in. Between the
-two is where a machine should not decide alone.
+84 is the floor: below it nothing is worth raising. There is deliberately **no
+ceiling**, and the first draft of this ADR got that wrong — it said anything
+above 92 had "already been merged on the way in". That is only true of records
+the importer saw in the *same* pass. A paper typed in by hand and the same
+paper imported a month later are two stored rows that no import-time merge
+could have caught, and they score 100. The demo data proves it: both seeded
+pairs score exactly 100 and belong in the queue.
+
+So 92 governs the importer's licence to act unattended; 84 governs when to ask
+a person. They are answers to different questions, not two edges of one band.
 
 ## Decisions
 

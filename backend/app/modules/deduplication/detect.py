@@ -7,10 +7,16 @@ differ, and that difference is the whole point:
 * `TITLE_MATCH_THRESHOLD` (92) is what the importer merges on, unattended.
 * `TITLE_SUGGEST_THRESHOLD` (84) is what this *suggests* to a person.
 
-The band between them is where a machine should not decide alone -- close
-enough to be worth a look, not close enough to act on. Anything the importer
-would merge outright never reaches the queue, because it was merged on the way
-in.
+84 is the floor because below it nothing is worth a person's attention. There
+is deliberately **no ceiling**: two records can be character-identical and
+both stored, because the importer only de-duplicates records it sees in the
+same pass. A paper typed in by hand and the same paper imported a month later
+are two rows that no import-time merge could ever have caught, and they score
+100.
+
+So the threshold here is not "the band between 84 and 92" -- it is everything
+from 84 upwards among *stored* records. What 92 governs is the importer's
+licence to act unattended; what 84 governs is when to ask.
 
 The hard rule from `docs/publication-deduplication.md` holds here too: two
 different DOIs are never the same work, however alike the titles. An erratum,
