@@ -112,7 +112,7 @@ def _assert_project_editable(project: Project) -> None:
 # --- assembling the read shape ---------------------------------------------
 
 
-def _dependency_map(
+def dependency_map(
     db: Session, milestone_ids: Sequence[uuid.UUID]
 ) -> dict[uuid.UUID, list[uuid.UUID]]:
     if not milestone_ids:
@@ -134,7 +134,7 @@ def _to_reads(db: Session, milestones: Sequence[Milestone]) -> list[MilestoneRea
         return []
     today, threshold = _today(), _threshold()
     by_id = {m.id: m for m in milestones}
-    edges = _dependency_map(db, list(by_id))
+    edges = dependency_map(db, list(by_id))
 
     # A dependency may point at a milestone outside this set (another page,
     # or one the caller cannot see); fetch what is missing so `blocked` is

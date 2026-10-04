@@ -78,6 +78,30 @@ describe("describeNotification", () => {
     });
   });
 
+  it("reads an escalation as somebody pointing at YOUR work", () => {
+    // Every other nudge is somebody chasing their own thing. If an escalation
+    // used the same wording, the coordinator would read "is waiting on" and
+    // misunderstand who is waiting for whom.
+    expect(
+      describeNotification(
+        notification({
+          notification_type: "nudge_received",
+          payload: {
+            kind: "project_at_risk",
+            entity_id: "p1",
+            from_name: "Vikram Chopra",
+            from_registration_number: "12400501",
+            subject: "“Soil moisture sensing”, which is slipping",
+          },
+        }),
+      ),
+    ).toEqual({
+      text: "Vikram Chopra asked you to look at “Soil moisture sensing”, which is slipping",
+      to: "/projects/p1",
+      detail: "12400501",
+    });
+  });
+
   it("renders a message notification and links to the thread", () => {
     // The admin OTP once shipped invisible because this switch had no case
     // for it, and every test still passed. This is that test, for chat.

@@ -178,3 +178,106 @@ def test_the_sender_never_chooses_the_recipient(client: TestClient) -> None:
     message anybody in the institution."""
     schema = client.get("/openapi.json").json()["components"]["schemas"]["NudgeRequest"]
     assert set(schema["properties"]) == {"kind", "entity_id"}
+
+
+# --- a dean escalating, which is the only nudge that travels downward ------
+
+
+def _slipping_project(client: TestClient, world: World) -> str:
+    """A project with a milestone already past its date."""
+    project_id = world.project_id
+    created = client.post(
+        f"/api/v1/projects/{project_id}/milestones",
+        headers=auth(world.faculty),
+        json={
+            "title": "Field work",
+            "due_date": (datetime.now(UTC).date() - timedelta(days=5)).isoformat(),
+        },
+    )
+    assert created.status_code in (200, 201), created.text
+    return project_id
+
+
+def test_a_dean_asks_the_coordinator_to_look_at_a_slipping_project(
+    client: TestClient,
+    world: World,
+    db_settings: Settings,
+    seed_user: Callable[..., SeededUser],
+) -> None:
+    """The dean can act on what they see without editing any of it.
+
+    Every other nudge is "my own thing is stuck"; this one is an institutional
+    reader saying "somebody else's is slipping". It reaches the department's
+    coordinator, which is who can actually do something.
+    """
+    dean = seed_user(UserRole.DEAN_OF_RESEARCH)
+    project_id = _slipping_project(client, world)
+
+    response = nudge(client, dean, "project_at_risk", project_id)
+
+    assert response.status_code == 201, response.text
+    assert response.json()["recipients"] >= 1
+    told = notifications_of(db_settings, NotificationType.NUDGE_RECEIVED)
+    assert {n.user_id for n in told} == {world.coordinator.id}
+
+
+def test_a_healthy_project_cannot_be_escalated(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """ "Please look at this" about a project that is perfectly on track is
+    noise, and somebody who gets one such nudge discounts the next."""
+    dean = seed_user(UserRole.DEAN_OF_RESEARCH)
+    healthy = client.post(
+        f"/api/v1/projects/{world.project_id}/milestones",
+        headers=auth(world.faculty),
+        json={
+            "title": "Comfortably ahead",
+            "due_date": (datetime.now(UTC).date() + timedelta(days=200)).isoformat(),
+        },
+    )
+    assert healthy.status_code in (200, 201), healthy.text
+
+    response = nudge(client, dean, "project_at_risk", world.project_id)
+
+    assert response.status_code == 404, response.text
+
+
+def test_a_project_with_no_milestones_cannot_be_escalated(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    dean = seed_user(UserRole.DEAN_OF_RESEARCH)
+
+    response = nudge(client, dean, "project_at_risk", world.project_id)
+
+    assert response.status_code == 404, response.text
+
+
+@pytest.mark.parametrize(
+    "role", [UserRole.FACULTY, UserRole.STUDENT, UserRole.RESEARCH_COORDINATOR]
+)
+def test_only_an_institution_wide_reader_may_escalate(
+    client: TestClient,
+    world: World,
+    seed_user: Callable[..., SeededUser],
+    role: UserRole,
+) -> None:
+    """A coordinator escalating would be nudging themselves, and an owner
+    already has PROJECT_REVIEW for their own work."""
+    person = seed_user(role, department_id=world.department_id)
+    project_id = _slipping_project(client, world)
+
+    response = nudge(client, person, "project_at_risk", project_id)
+
+    assert response.status_code == 404, response.text
+
+
+def test_the_escalation_still_names_no_recipient(client: TestClient, world: World) -> None:
+    """The request is a kind and an entity, exactly as for every other nudge.
+
+    A recipient field would turn this into a way to message anybody in the
+    institution, which is the whole reason the service resolves recipients
+    from the thing being chased.
+    """
+    from app.modules.nudges.schemas import NudgeRequest
+
+    assert set(NudgeRequest.model_fields) == {"kind", "entity_id"}

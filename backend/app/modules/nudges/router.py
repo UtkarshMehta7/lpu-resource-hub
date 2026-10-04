@@ -39,9 +39,14 @@ def send_nudge(
     except service.NothingToNudgeAboutError as exc:
         # 404 rather than 403: the caller should not learn whether somebody
         # else's project exists by nudging about it.
+        #
+        # Worded without "yours" since PROJECT_AT_RISK arrived: that kind is
+        # an institutional reader escalating somebody else's project, so
+        # "nothing of yours is waiting" would be a confusing answer to a
+        # perfectly sensible request.
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="There is nothing of yours waiting on anyone here.",
+            detail="There is nothing here to nudge anyone about.",
         ) from exc
     except service.NudgeTooSoonError as exc:
         raise HTTPException(

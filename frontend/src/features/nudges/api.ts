@@ -2,7 +2,16 @@ import { apiClient } from "@/lib/api/client";
 
 /** Matches NudgeKind in backend/app/modules/nudges/models.py. */
 export type NudgeKind =
-  "profile_verification" | "project_review" | "booking_approval" | "application_decision";
+  | "profile_verification"
+  | "project_review"
+  | "booking_approval"
+  | "application_decision"
+  /**
+   * The only kind that travels downward. Every other is "my own thing is
+   * stuck"; this is an institutional reader asking the people who can act to
+   * look at somebody else's slipping project.
+   */
+  | "project_at_risk";
 
 export interface NudgeResult {
   kind: NudgeKind;
