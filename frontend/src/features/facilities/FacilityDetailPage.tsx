@@ -268,7 +268,11 @@ function CustodianPicker({
       </select>
       {candidates && candidates.length === 0 ? (
         <p className="mt-1 text-xs text-ink-muted">
-          No facility custodian accounts exist for this department yet.
+          No facility custodian accounts exist for this department yet.{" "}
+          <Link to="/people/custodians/new" className="font-medium text-brand-700 hover:underline">
+            Appoint one
+          </Link>
+          .
         </p>
       ) : null}
     </div>

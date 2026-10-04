@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.core.permissions import (
     APPOINTABLE_BY_ADMIN,
+    CUSTODIAN_APPOINTERS,
     INSTITUTION_WIDE_ROLES,
     creatable_role,
 )
@@ -123,12 +124,20 @@ def create_account(
     under its own action so it never reads as an ordinary appointment.
     """
     if override_role is not None:
-        if creator.role is not UserRole.ADMIN:
-            raise NotAllowedRoleError
-        # An administrator may appoint any role except another administrator.
-        # Promotion to admin is the two-person ceremony (ADR 0019); allowing
-        # it here would be a one-click route around it.
-        if override_role not in APPOINTABLE_BY_ADMIN:
+        if override_role is UserRole.FACILITY_CUSTODIAN:
+            # The one role somebody other than an administrator may be given
+            # directly, and it does not come from the request: the dedicated
+            # route fixes it, so the caller still names no role (ADR 0030).
+            # A coordinator is confined to their own department by the scope
+            # branch below, exactly as when they appoint faculty.
+            permitted = creator.role in CUSTODIAN_APPOINTERS
+        else:
+            # Everything else is the administrator's override, and it may name
+            # any role except another administrator: promotion to admin is the
+            # two-person ceremony (ADR 0019), and allowing it here would be a
+            # one-click route around it.
+            permitted = creator.role is UserRole.ADMIN and override_role in APPOINTABLE_BY_ADMIN
+        if not permitted:
             raise NotAllowedRoleError
         role: UserRole | None = override_role
     else:

@@ -80,6 +80,13 @@ export const NAV: NavItem[] = [
     keywords: "new account provision",
   },
   {
+    to: "/people/custodians/new",
+    label: "Add custodian",
+    group: "My work",
+    roles: ["research_coordinator", "admin"],
+    keywords: "facility custodian appoint rooms labs equipment",
+  },
+  {
     to: "/people/new",
     label: "Add student",
     group: "My work",

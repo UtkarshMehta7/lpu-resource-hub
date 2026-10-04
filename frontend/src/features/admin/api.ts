@@ -86,6 +86,28 @@ export async function createDepartment(schoolId: string, name: string): Promise<
 }
 
 /** Admin-only: create an account of any role, outside the hierarchy. */
+/**
+ * Appoint a facility custodian.
+ *
+ * Its own endpoint because the role is a constant of the path, never a field
+ * in the body -- `CREATABLE_ROLE` maps each role to one successor, and that
+ * is what lets an ordinary appointment derive its role from the caller.
+ * A coordinator may call it for their own department; an administrator
+ * anywhere.
+ */
+export async function appointFacilityCustodian(payload: {
+  registration_number: string;
+  full_name: string;
+  department_id: string | null;
+  email: string | null;
+}): Promise<{ user: AdminUserRead; temporary_password: string }> {
+  const response = await apiClient.post<{ user: AdminUserRead; temporary_password: string }>(
+    "/api/v1/facility-custodians",
+    payload,
+  );
+  return response.data;
+}
+
 export async function createAccountAsAdmin(payload: {
   registration_number: string;
   full_name: string;

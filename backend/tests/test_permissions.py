@@ -9,7 +9,14 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from app.core.deps import get_current_user
-from app.core.permissions import ROLE_HIERARCHY, ROLE_PERMISSIONS, Permission, require_permission
+from app.core.permissions import (
+    CREATABLE_ROLE,
+    CUSTODIAN_APPOINTERS,
+    ROLE_HIERARCHY,
+    ROLE_PERMISSIONS,
+    Permission,
+    require_permission,
+)
 from app.modules.users.models import User, UserRole
 
 
@@ -152,3 +159,22 @@ def test_require_permission_403_vs_200_by_role(role: UserRole, expected_status: 
     response = TestClient(app).get("/protected")
 
     assert response.status_code == expected_status
+
+
+def test_every_role_still_has_at_most_one_successor() -> None:
+    """The invariant ADR 0030 had to work around rather than break.
+
+    CREATABLE_ROLE maps each role to exactly one successor, and that is what
+    lets a new account's role be derived from its creator instead of read from
+    the request. A second successor anywhere means the role has to be named in
+    the body -- the thing AccountCreateRequest exists without.
+    """
+    for role, successor in CREATABLE_ROLE.items():
+        assert successor is None or isinstance(successor, UserRole), role
+
+
+def test_a_custodian_cannot_appoint_custodians() -> None:
+    """Looking after rooms must not confer the power to mint peers."""
+    assert UserRole.FACILITY_CUSTODIAN not in CUSTODIAN_APPOINTERS
+    assert UserRole.DEAN_OF_RESEARCH not in CUSTODIAN_APPOINTERS
+    assert frozenset({UserRole.RESEARCH_COORDINATOR, UserRole.ADMIN}) == CUSTODIAN_APPOINTERS

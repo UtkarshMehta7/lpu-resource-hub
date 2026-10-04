@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 161 API operations over 130 paths, 44 tables, 28 migrations,
-29 ADRs, 27 backend modules, 1074 backend tests, 259 frontend tests,
+Current shape: 162 API operations over 131 paths, 44 tables, 28 migrations,
+29 ADRs, 27 backend modules, 1084 backend tests, 263 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -54,7 +54,15 @@ Current shape: 161 API operations over 130 paths, 44 tables, 28 migrations,
 - The create-account request has **no `role` field**. The role is derived
   from the caller. Never add one back "to validate it".
 - `POST /api/v1/admin/users` is the admin override, audited under its own
-  action. That is the only place a role may be named.
+  action. That is the only place a role may be named **in a request**.
+- **A coordinator appoints facility custodians** (ADR 0030), through
+  `POST /api/v1/facility-custodians` -- a route whose role is a CONSTANT, not
+  a field. `CREATABLE_ROLE` still maps every role to exactly one successor,
+  which is what lets an ordinary appointment derive its role from the caller;
+  a second successor would have forced a `role` field back into the body.
+  `CUSTODIAN_APPOINTERS` says who may call it, and a custodian is absent from
+  it on purpose -- looking after rooms must not confer the power to mint
+  peers. Scope is the coordinator's own department, same as for faculty.
 - Promoting to admin takes two people: a code goes to the *target's* inbox.
 - **A coordinator's scope IS their department.** `_sync_coordinator_scope`
   keeps them in step whenever the role or department changes; they must never
