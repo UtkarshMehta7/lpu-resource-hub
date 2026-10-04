@@ -74,7 +74,13 @@ from app.modules.profiles.models import (
     UserSkill,
     VerificationStatus,
 )
-from app.modules.projects.models import Project, ProjectMember, ProjectStatus
+from app.modules.projects.models import (
+    Project,
+    ProjectMember,
+    ProjectResearchArea,
+    ProjectSkill,
+    ProjectStatus,
+)
 from app.modules.publications.models import (
     Publication,
     PublicationAuthor,
@@ -624,6 +630,41 @@ def _ensure_student_profile(db: Session, user: User, programme: str, discoverabl
     db.flush()
 
 
+def _tag_project(
+    db: Session,
+    project: Project,
+    index: int,
+    skills: list[Skill],
+    areas: list[ResearchArea],
+) -> None:
+    """Give a project its research areas and skills.
+
+    Separate from creating it, and run for projects that already exist,
+    because an untagged project is invisible twice over: the dean's "projects
+    by area" panel counts through `project_research_areas` and rendered blank
+    on the deployed instance, and search and the recommender both match on
+    skills. The seeder used to tag nothing at all -- it was handed the lists
+    and never used them.
+
+    Idempotent on the composite primary key, so re-running adds nothing.
+    """
+    for offset in range(2):
+        if not areas:
+            break
+        area = areas[(index + offset) % len(areas)]
+        key = {"project_id": project.id, "research_area_id": area.id}
+        if db.get(ProjectResearchArea, key) is None:
+            db.add(ProjectResearchArea(**key))
+    for offset in range(3):
+        if not skills:
+            break
+        skill = skills[(index * 2 + offset) % len(skills)]
+        key = {"project_id": project.id, "skill_id": skill.id}
+        if db.get(ProjectSkill, key) is None:
+            db.add(ProjectSkill(**key))
+    db.flush()
+
+
 def _seed_projects(
     db: Session,
     plan: SchoolPlan,
@@ -638,6 +679,9 @@ def _seed_projects(
     for index, (title, blurb, status) in enumerate(plan.projects):
         existing = db.execute(select(Project).where(Project.title == title)).scalar_one_or_none()
         if existing is not None:
+            # Already here, but it may predate the tagging. Catching up costs
+            # nothing when there is nothing to catch up on.
+            _tag_project(db, existing, index, skills, areas)
             continue
         owner = faculty[index % len(faculty)]
         reviewed = status in {ProjectStatus.ACTIVE, ProjectStatus.COMPLETED, ProjectStatus.ARCHIVED}
@@ -661,6 +705,8 @@ def _seed_projects(
         db.add(project)
         db.flush()
         summary.projects += 1
+
+        _tag_project(db, project, index, skills, areas)
 
         # A team, so the project page is not one name and an empty list.
         for offset in range(2):
