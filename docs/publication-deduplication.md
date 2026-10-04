@@ -211,12 +211,16 @@ merges unattended at `TITLE_MATCH_THRESHOLD` (92). Duplicates still get into
 the database by routes it cannot intercept: two researchers each adding the
 same paper, or a hand-typed record later matched by an import carrying a DOI.
 
-`TITLE_SUGGEST_THRESHOLD` (84) is the other half. The band between the two is
-where a machine should not decide alone:
+`TITLE_SUGGEST_THRESHOLD` (84) is the other half, and it has **no upper
+bound**. Two stored records can be character-identical and score 100: the
+importer only de-duplicates what it sees in one pass, so a paper typed in by
+hand and the same paper imported a month later are two rows it never had the
+chance to merge.
 
 ```
-    84 -------------- suggest to a person -------------- 92 -------- merge
-  nothing below                                      already merged on import
+    84 ------------------- ask a person -------------------> 100
+  nothing below            (92 is where the IMPORTER may act alone,
+                            which is a different question)
 ```
 
 `POST /api/v1/publication-duplicates/scan` compares every stored publication

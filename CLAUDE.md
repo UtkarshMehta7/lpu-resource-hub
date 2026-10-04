@@ -176,9 +176,14 @@ Current shape: 161 API operations over 130 paths, 44 tables, 27 migrations,
   erratum, a preprint and its version of record are separate works. The
   de-duplication rules and their known failure cases are written up in
   `docs/publication-deduplication.md`.
-- **The duplicate review queue is the band between the two thresholds**
-  (ADR 0029). The importer merges unattended at `TITLE_MATCH_THRESHOLD` (92);
-  the queue *suggests* from `TITLE_SUGGEST_THRESHOLD` (84). It reuses
+- **The duplicate review queue has a floor, not a band** (ADR 0029). It asks
+  a person about everything from `TITLE_SUGGEST_THRESHOLD` (84) **upwards**,
+  including identical records scoring 100 -- the importer only de-duplicates
+  what it sees in one pass, so a hand-typed paper and the same paper imported
+  a month later are two stored rows it never had the chance to merge.
+  `TITLE_MATCH_THRESHOLD` (92) governs the *importer's* licence to act
+  unattended, which is a different question. Don't restate them as two edges
+  of one band -- the first ADR draft did, and it was wrong. It reuses
   `merge.py`'s rules rather than growing a second opinion, so the DOI veto
   holds in both places.
 - **A merge DELETES the losing publication; it does not hide it.**

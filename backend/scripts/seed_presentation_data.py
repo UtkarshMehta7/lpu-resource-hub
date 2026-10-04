@@ -56,6 +56,11 @@ from app.modules.collaborations.models import (
 from app.modules.facilities.models import Equipment, Facility
 from app.modules.funding.models import FundingOpportunity
 from app.modules.messages.models import Conversation, ConversationParticipant, Message
+from app.modules.milestones.models import (
+    Milestone,
+    MilestoneDependency,
+    MilestoneStatus,
+)
 from app.modules.opportunities.models import (
     Opportunity,
     OpportunityStatus,
@@ -390,6 +395,10 @@ class Summary:
     saved_items: int = 0
     notifications: int = 0
     reports: int = 0
+    milestones: int = 0
+    custodians: int = 0
+    deans: int = 0
+    duplicate_pairs: int = 0
     notes: list[str] = field(default_factory=list)
 
 
@@ -426,7 +435,9 @@ def _get_or_create_user(
     db: Session,
     person: Person,
     role: UserRole,
-    department: Department,
+    # None only for a dean of research, who belongs to no department --
+    # INSTITUTION_WIDE_ROLES is what lets them exist without one.
+    department: Department | None,
     summary: Summary,
     *,
     scope: Department | None = None,
@@ -440,7 +451,7 @@ def _get_or_create_user(
             full_name=person.name,
             email=f"{person.name.split()[0].lower()}.{person.number}@example.edu",
             role=role,
-            department_id=department.id,
+            department_id=department.id if department is not None else None,
             password_hash=hash_password(password_for(person.name)),
             # Presentable means usable: nobody wants to change eight passwords
             # in front of an audience.
@@ -453,14 +464,16 @@ def _get_or_create_user(
     else:
         user.full_name = person.name
         user.role = role
-        user.department_id = department.id
+        user.department_id = department.id if department is not None else None
         user.is_active = True
         user.must_change_password = False
         user.password_hash = hash_password(password_for(person.name))
-    if role is UserRole.RESEARCH_COORDINATOR:
+    if role is UserRole.RESEARCH_COORDINATOR and (scope or department) is not None:
         # A coordinator with no scope oversees nothing: empty queues and 403s.
         user.coordinator_scope_type = CoordinatorScopeType.DEPARTMENT
-        user.coordinator_scope_id = (scope or department).id
+        scoped = scope or department
+        assert scoped is not None
+        user.coordinator_scope_id = scoped.id
     db.flush()
     return user
 
@@ -923,6 +936,221 @@ def _seed_funding(db: Session, owner: User, summary: Summary) -> None:
     db.flush()
 
 
+# --- the roles outside the provisioning chain (ADR 0028) -------------------
+
+#: A custodian is created for every department that actually holds facilities,
+#: not one per school. A custodian must belong to the department that runs the
+#: facility -- the rule the API enforces on assignment -- so a per-school
+#: custodian can only hold one department's rooms and every other facility
+#: ends up unattended. Names are drawn in order, so re-running assigns the
+#: same person to the same department.
+#:
+#: Numbers continue the hand-made 124xxxxx block at ...4xx, which never
+#: collides with seed_demo_data.py's 125xxxxx accounts.
+CUSTODIAN_NAMES: list[str] = [
+    "Gurpreet Dhillon",
+    "Manpreet Sodhi",
+    "Kiran Bedi",
+    "Jaspal Grewal",
+    "Harjit Sandhu",
+    "Baljeet Randhawa",
+    "Davinder Sekhon",
+    "Parminder Ahluwalia",
+    "Tejinder Bajwa",
+    "Sukhwinder Virk",
+]
+
+DEAN = Person("Vikram Chopra", "12400501")
+
+
+def _seed_custodians_and_dean(db: Session, summary: Summary) -> None:
+    """A custodian for every department with facilities, and one dean.
+
+    Without these two roles seeded, three screens demonstrate nothing: the
+    booking queue scoped to assigned facilities, the institutional report as a
+    dean sees it, and the at-risk board from a dean's sign-in.
+
+    Every facility gets a custodian, because one that reads "nobody looks
+    after this facility yet" in a demonstration looks like a gap rather than a
+    deliberate state.
+    """
+    departments_with_facilities = list(
+        db.execute(
+            select(Department)
+            .join(Facility, Facility.department_id == Department.id)
+            .group_by(Department.id)
+            .order_by(Department.name)
+        ).scalars()
+    )
+    if not departments_with_facilities:
+        summary.notes.append("No department holds a facility; custodians skipped.")
+
+    for index, department in enumerate(departments_with_facilities):
+        if index >= len(CUSTODIAN_NAMES):
+            summary.notes.append(
+                f"More departments hold facilities than there are custodian names "
+                f"({len(departments_with_facilities)} > {len(CUSTODIAN_NAMES)}); "
+                f"{department.name} has none."
+            )
+            break
+        custodian = _get_or_create_user(
+            db,
+            person=Person(CUSTODIAN_NAMES[index], f"124004{index + 1:02d}"),
+            role=UserRole.FACILITY_CUSTODIAN,
+            department=department,
+            summary=summary,
+        )
+        summary.custodians += 1
+        for facility in db.execute(
+            select(Facility).where(Facility.department_id == department.id)
+        ).scalars():
+            if facility.custodian_id is None:
+                facility.custodian_id = custodian.id
+    db.flush()
+
+    # A dean belongs to no department: INSTITUTION_WIDE_ROLES is what lets
+    # them exist without one, and giving them a department would quietly
+    # contradict the role.
+    _get_or_create_user(
+        db, person=DEAN, role=UserRole.DEAN_OF_RESEARCH, department=None, summary=summary
+    )
+    summary.deans += 1
+    db.flush()
+
+
+# --- milestones, so the timeline and the at-risk board have content --------
+
+#: (title, days from today, status). Deliberately spans every risk state the
+#: board can show: one overdue, one due inside the at-risk window, one still
+#: comfortable, one finished. Risk is derived on every read (ADR 0026), so
+#: these dates ARE the demonstration -- there is no flag to set.
+MILESTONE_PLAN: list[tuple[str, int, MilestoneStatus]] = [
+    ("Literature review and protocol", -120, MilestoneStatus.DONE),
+    ("Instrument calibration and pilot run", -45, MilestoneStatus.DONE),
+    ("Field data collection, first season", -6, MilestoneStatus.IN_PROGRESS),
+    ("Analysis and interim report", 4, MilestoneStatus.PENDING),
+    ("Manuscript submission", 95, MilestoneStatus.PENDING),
+]
+
+
+def _seed_milestones(db: Session, summary: Summary) -> None:
+    """Dated work on every active project, with a dependency chain.
+
+    The third milestone is already past its date and still in progress, so it
+    reads as overdue; the fourth falls inside MILESTONE_AT_RISK_DAYS and reads
+    as at risk; the fifth is comfortable. Each waits on the one before it, so
+    the Gantt view has arrows to draw and "blocked" has something to mean.
+    """
+    projects = list(
+        db.execute(
+            select(Project).where(Project.status == ProjectStatus.ACTIVE).order_by(Project.title)
+        ).scalars()
+    )
+    for project in projects:
+        already = (
+            db.execute(select(Milestone).where(Milestone.project_id == project.id))
+            .scalars()
+            .first()
+        )
+        if already is not None:
+            continue
+        previous: Milestone | None = None
+        for position, (title, offset, status) in enumerate(MILESTONE_PLAN, start=1):
+            milestone = Milestone(
+                project_id=project.id,
+                title=title,
+                description=f"{title} for {project.title}.",
+                due_date=TODAY + timedelta(days=offset),
+                status=status,
+                position=position,
+                # The CHECK constraint refuses a done milestone with no date.
+                completed_at=NOW - timedelta(days=abs(offset))
+                if status is MilestoneStatus.DONE
+                else None,
+                completed_by=project.owner_id if status is MilestoneStatus.DONE else None,
+            )
+            db.add(milestone)
+            db.flush()
+            summary.milestones += 1
+            if previous is not None:
+                db.add(MilestoneDependency(milestone_id=milestone.id, depends_on_id=previous.id))
+            previous = milestone
+        db.flush()
+
+
+# --- duplicate publications, so the review queue has real pairs ------------
+
+#: (original title, duplicate title, doi on the duplicate).
+#:
+#: Each pair is a duplicate of the kind that actually happens, not a contrived
+#: one: the same paper typed in twice with different punctuation, and the same
+#: paper later arriving from an import carrying its DOI. Both sit in the band
+#: between TITLE_SUGGEST_THRESHOLD and TITLE_MATCH_THRESHOLD, which is where a
+#: person decides rather than the importer (ADR 0029).
+DUPLICATE_PLAN: list[tuple[str, str]] = [
+    (
+        "Deep learning for early detection of wheat rust",
+        "Deep learning for early detection of wheat rust.",
+    ),
+    (
+        "Groundwater depletion and cropping patterns in central Punjab",
+        "Groundwater depletion and cropping patterns in central Punjab: a district study",
+    ),
+]
+
+
+def _seed_duplicate_publications(db: Session, summary: Summary) -> None:
+    """Near-duplicate records for the de-duplication queue to find.
+
+    Deliberately does NOT run the scan. Clicking "Scan for duplicates" and
+    watching it report what it examined is the demonstration; a queue that is
+    already full shows the result without the act.
+    """
+    author = (
+        db.execute(
+            select(User).where(User.role == UserRole.FACULTY).order_by(User.registration_number)
+        )
+        .scalars()
+        .first()
+    )
+    if author is None:
+        summary.notes.append("No faculty found; duplicate publications skipped.")
+        return
+
+    for index, (original, duplicate) in enumerate(DUPLICATE_PLAN):
+        existing = db.execute(
+            select(Publication).where(Publication.title == duplicate)
+        ).scalar_one_or_none()
+        if existing is not None:
+            continue
+        year = TODAY.year - 1
+        for title, doi in ((original, None), (duplicate, f"10.5555/demo.{index + 1}")):
+            if db.execute(
+                select(Publication).where(Publication.title == title)
+            ).scalar_one_or_none():
+                continue
+            publication = Publication(
+                title=title,
+                pub_type=PublicationType.JOURNAL_ARTICLE,
+                venue="Indian Journal of Agricultural Informatics",
+                year=year,
+                abstract=(
+                    "Demonstration record. One of a deliberately duplicated pair, "
+                    "so the de-duplication review queue has something to find."
+                ),
+                doi=doi,
+                created_by=author.id,
+            )
+            db.add(publication)
+            db.flush()
+            db.add(
+                PublicationAuthor(publication_id=publication.id, user_id=author.id, author_order=1)
+            )
+            summary.publications += 1
+        summary.duplicate_pairs += 1
+    db.flush()
+
+
 def seed(db: Session) -> Summary:
     summary = Summary()
     admin = (
@@ -936,6 +1164,9 @@ def seed(db: Session) -> Summary:
 
     # The screens that would otherwise be empty. A feature that works and
     # shows nothing reads as unfinished.
+    _seed_custodians_and_dean(db, summary)
+    _seed_milestones(db, summary)
+    _seed_duplicate_publications(db, summary)
     _seed_applications(db, summary)
     _seed_saved_items(db, summary)
     _seed_moderation(db, summary)
@@ -986,10 +1217,20 @@ def main() -> int:
     print(f"  saved items:    {summary.saved_items}")
     print(f"  notifications:  {summary.notifications}")
     print(f"  open reports:   {summary.reports}")
+    print(f"  milestones:     {summary.milestones}")
+    print(f"  custodians:     {summary.custodians}")
+    print(f"  deans:          {summary.deans}")
+    print(f"  duplicate pairs:{summary.duplicate_pairs}")
     for note in summary.notes:
         print(f"  note: {note}")
     print("\nPasswords follow first-name + 123456 (Aryan Verma -> Aryan123456).")
     print("Demonstration convenience only. Fictional data throughout.")
+    if summary.duplicate_pairs:
+        print(
+            "\nThe duplicate pairs are NOT on the review queue yet, deliberately:\n"
+            "  sign in as a coordinator, open Review -> Duplicates and press\n"
+            '  "Scan for duplicates". Watching it find them is the demonstration.'
+        )
     return 0
 
 
