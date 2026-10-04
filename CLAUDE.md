@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 156 API operations over 125 paths, 44 tables, 26 migrations,
-28 ADRs, 26 backend modules, 1029 backend tests, 246 frontend tests,
+Current shape: 161 API operations over 130 paths, 44 tables, 27 migrations,
+29 ADRs, 27 backend modules, 1059 backend tests, 252 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -176,6 +176,21 @@ Current shape: 156 API operations over 125 paths, 44 tables, 26 migrations,
   erratum, a preprint and its version of record are separate works. The
   de-duplication rules and their known failure cases are written up in
   `docs/publication-deduplication.md`.
+- **The duplicate review queue is the band between the two thresholds**
+  (ADR 0029). The importer merges unattended at `TITLE_MATCH_THRESHOLD` (92);
+  the queue *suggests* from `TITLE_SUGGEST_THRESHOLD` (84). It reuses
+  `merge.py`'s rules rather than growing a second opinion, so the DOI veto
+  holds in both places.
+- **A merge DELETES the losing publication; it does not hide it.**
+  Publications are read in fifteen places across eight modules, and a
+  hidden-row flag would have to be honoured by every one -- one missed query
+  is a ghost publication that still answers a search. The deleted row is
+  snapshotted on the review row, which is what makes the merge reversible; an
+  undo recreates it with a **new id**. Never add a `merged_into_id` column to
+  `publications`.
+- **A decided duplicate pair is never raised again by a later scan.** If
+  "these are different works" came back next week, the queue would never empty
+  and people would stop reading it.
 - **Six roles, and two of them inherit nothing.** `FACILITY_CUSTODIAN` and
   `DEAN_OF_RESEARCH` (ADR 0028) sit outside `CREATABLE_ROLE` entirely: they are
   appointed only through the admin override, whose permitted set is
@@ -232,6 +247,23 @@ Current shape: 156 API operations over 125 paths, 44 tables, 26 migrations,
 - Loading shows `SkeletonList`, not the word "Loading".
 
 ## Gotchas that cost real time here
+- **A new module's models must go in `app/db/model_registry.py`** or
+  autogenerate produces an **empty migration** and says nothing is wrong. It
+  did exactly that for `publication_duplicates` the first time.
+- **A nested path loses to a path parameter registered before it.**
+  `/publications/duplicates` was swallowed by `/publications/{publication_id}`
+  and "duplicates" was parsed as a UUID, because FastAPI matches in
+  registration order. Give a new resource its own top-level path
+  (`/publication-duplicates`) rather than relying on include order in
+  `app/main.py`, which breaks silently when somebody reorders it.
+- **A mutation calls its `mutationFn` with more than one argument.** Passing
+  an api function by reference (`mutationFn: undoDuplicateMerge`) forwards all
+  of them; wrap it (`(id) => undoDuplicateMerge(id)`) or a
+  `toHaveBeenCalledWith` assertion fails for reasons that look like the click
+  never happened.
+- **Don't reuse a label for a filter and an action on the same screen.**
+  "Different works" was both a status chip and a button, so four tests matched
+  the wrong element -- and a reader would have had the same trouble.
 - **Autogenerate does not see enum values.** It compares tables, not enum
   members, so `ALTER TYPE ... ADD VALUE IF NOT EXISTS` is written by hand
   (migrations 0017, 0019). A test DB already stamped at that revision will
