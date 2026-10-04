@@ -23,6 +23,8 @@ export interface Facility {
   name: string;
   description: string | null;
   department_id: string | null;
+  /** Which department runs it. Null means university-wide: admins only. */
+  department_name: string | null;
   location: string | null;
   contact: string | null;
   /** Who looks after it, named as well as referenced. Null between custodians. */
@@ -159,6 +161,27 @@ export async function fetchMyBookings(status?: BookingStatus): Promise<Booking[]
   const response = await apiClient.get<Booking[]>("/api/v1/me/bookings", {
     params: status ? { status } : undefined,
   });
+  return response.data;
+}
+
+export interface FacilityCreate {
+  name: string;
+  description: string | null;
+  department_id: string | null;
+  location: string | null;
+  contact: string | null;
+}
+
+/**
+ * Create a facility.
+ *
+ * `department_id` decides who can manage it ever after: a coordinator reaches
+ * only their own department's facilities, so one created without a department
+ * can be managed by administrators alone. The API applies a coordinator's own
+ * scope regardless of what is sent.
+ */
+export async function createFacility(data: FacilityCreate): Promise<Facility> {
+  const response = await apiClient.post<Facility>("/api/v1/facilities", data);
   return response.data;
 }
 

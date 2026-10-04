@@ -43,7 +43,7 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 156 API operations over 125 paths, 44 tables, 26 migrations,
-28 ADRs, 26 backend modules, 1028 backend tests, 242 frontend tests,
+28 ADRs, 26 backend modules, 1029 backend tests, 246 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -201,6 +201,13 @@ Current shape: 156 API operations over 125 paths, 44 tables, 26 migrations,
   The candidate list (`/custodian-candidates`) is filtered by the same rules
   the assignment enforces, so the picker can never offer somebody the
   assignment would refuse. Both directions audited.
+- **A facility's department decides who can manage it ever after**, so the
+  create form makes it an explicit choice and refuses to submit without one.
+  It used to send `user.department_id` for an administrator -- which is null,
+  because an administrator belongs to no department -- so every facility an
+  admin created came out university-wide, reachable by no coordinator and
+  counted in no department's figures. "University-wide" is still offered, as a
+  deliberate option that says what it costs.
 - **The demo seed creates facilities and equipment now**, and assigns the
   first to `demo.custodian01` (12500401); `demo.dean01` (12500501) has no
   department, as a dean must not. Before this the catalogue, the booking queue

@@ -98,7 +98,9 @@ export function FacilityDetailPage() {
         label="Facility name"
       />
       <p className="mt-1 text-sm text-ink-muted">
-        {[facility.location, facility.contact].filter(Boolean).join(" · ")}
+        {[facility.department_name ?? "University-wide", facility.location, facility.contact]
+          .filter(Boolean)
+          .join(" · ")}
       </p>
       {facility.description ? <p className="mt-4 text-sm">{facility.description}</p> : null}
 
