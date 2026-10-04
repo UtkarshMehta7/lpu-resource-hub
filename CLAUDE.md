@@ -43,7 +43,7 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 161 API operations over 130 paths, 44 tables, 28 migrations,
-29 ADRs, 27 backend modules, 1067 backend tests, 257 frontend tests,
+29 ADRs, 27 backend modules, 1072 backend tests, 257 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -242,6 +242,14 @@ Current shape: 161 API operations over 130 paths, 44 tables, 28 migrations,
   admin created came out university-wide, reachable by no coordinator and
   counted in no department's figures. "University-wide" is still offered, as a
   deliberate option that says what it costs.
+- **A seed that matches on registration number also OVERWRITES the role.**
+  `seed_presentation_data.py` matched a number that already belonged to a
+  coordinator, changed them to a custodian and left the old
+  `coordinator_scope_id` behind -- the exact inconsistency
+  `_sync_coordinator_scope` prevents inside the application, reintroduced from
+  the side. A script writing directly to the database carries the invariants
+  the services carry. Check **roles**, not just names, before running a seed
+  against a populated database.
 - **The demo seed creates facilities and equipment now**, and assigns the
   first to `demo.custodian01` (12500401); `demo.dean01` (12500501) has no
   department, as a dean must not. Before this the catalogue, the booking queue
