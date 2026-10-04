@@ -9,14 +9,23 @@ import { FacilityDetailPage } from "./FacilityDetailPage";
 
 type ApiModule = typeof ApiModuleType;
 
-const { fetchFacility, fetchEquipmentList, updateFacility, deleteFacility, useAuthMock } =
-  vi.hoisted(() => ({
-    fetchFacility: vi.fn(),
-    fetchEquipmentList: vi.fn(),
-    updateFacility: vi.fn(),
-    deleteFacility: vi.fn(),
-    useAuthMock: vi.fn(),
-  }));
+const {
+  fetchFacility,
+  fetchEquipmentList,
+  updateFacility,
+  deleteFacility,
+  fetchCustodianCandidates,
+  assignFacilityCustodian,
+  useAuthMock,
+} = vi.hoisted(() => ({
+  fetchFacility: vi.fn(),
+  fetchEquipmentList: vi.fn(),
+  updateFacility: vi.fn(),
+  deleteFacility: vi.fn(),
+  fetchCustodianCandidates: vi.fn(),
+  assignFacilityCustodian: vi.fn(),
+  useAuthMock: vi.fn(),
+}));
 
 // Keep the real MAINTENANCE_LABEL and friends; replace only the requests.
 vi.mock("./api", async (importOriginal) => ({
@@ -25,6 +34,8 @@ vi.mock("./api", async (importOriginal) => ({
   fetchEquipmentList,
   updateFacility,
   deleteFacility,
+  fetchCustodianCandidates,
+  assignFacilityCustodian,
 }));
 vi.mock("@/features/auth/authContext", () => ({ useAuth: useAuthMock }));
 
@@ -35,8 +46,18 @@ const FACILITY = {
   department_id: "d1",
   location: "Block 32",
   contact: "ext 4102",
+  custodian_id: null,
+  custodian_name: null,
+  custodian_registration_number: null,
   equipment_count: 2,
   created_at: "2026-01-01T00:00:00Z",
+};
+
+const HELD = {
+  ...FACILITY,
+  custodian_id: "c1",
+  custodian_name: "Rohit Sharma",
+  custodian_registration_number: "12500401",
 };
 
 function renderPage() {
@@ -57,6 +78,10 @@ beforeEach(() => {
   useAuthMock.mockReturnValue({ user: { id: "a1", role: "admin" } });
   fetchFacility.mockResolvedValue(FACILITY);
   fetchEquipmentList.mockResolvedValue({ items: [], page: 1, page_size: 20, total: 0 });
+  fetchCustodianCandidates.mockResolvedValue([
+    { id: "c1", full_name: "Rohit Sharma", registration_number: "12500401" },
+  ]);
+  assignFacilityCustodian.mockResolvedValue(HELD);
   updateFacility.mockResolvedValue({ ...FACILITY, name: "Soil Science Lab" });
   deleteFacility.mockResolvedValue(undefined);
 });
@@ -129,5 +154,53 @@ describe("FacilityDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "Soil Lab" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Rename/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete facility" })).not.toBeInTheDocument();
+  });
+});
+
+describe("the custodian panel", () => {
+  it("names who looks after the facility, with their UID", async () => {
+    fetchFacility.mockResolvedValue(HELD);
+    renderPage();
+
+    expect(await screen.findByText("Rohit Sharma")).toBeInTheDocument();
+    expect(screen.getByText("12500401")).toBeInTheDocument();
+  });
+
+  it("says plainly when nobody does, and who covers until then", async () => {
+    renderPage();
+
+    expect(await screen.findByText(/Nobody looks after this facility yet/)).toBeInTheDocument();
+  });
+
+  it("lets a coordinator assign one from the server's own shortlist", async () => {
+    const user = userEvent.setup();
+    useAuthMock.mockReturnValue({ user: { id: "co1", role: "research_coordinator" } });
+    renderPage();
+
+    await screen.findByRole("option", { name: /Rohit Sharma/ });
+    await user.selectOptions(screen.getByLabelText("Assign a custodian", { exact: true }), "c1");
+
+    await waitFor(() => expect(assignFacilityCustodian).toHaveBeenCalledWith("f1", "c1"));
+  });
+
+  it("does not let a custodian hand their own facility to anybody", async () => {
+    fetchFacility.mockResolvedValue(HELD);
+    useAuthMock.mockReturnValue({ user: { id: "c1", role: "facility_custodian" } });
+    renderPage();
+
+    // They hold this room, so they get the management controls...
+    expect(await screen.findByRole("button", { name: "Delete facility" })).toBeInTheDocument();
+    // ...but never the power to decide who holds it.
+    expect(screen.queryByLabelText("Assign a custodian", { exact: true })).not.toBeInTheDocument();
+  });
+
+  it("gives a custodian nothing on a facility that is not theirs", async () => {
+    fetchFacility.mockResolvedValue(HELD);
+    useAuthMock.mockReturnValue({ user: { id: "someone-else", role: "facility_custodian" } });
+    renderPage();
+
+    await screen.findByText("Rohit Sharma");
+    expect(screen.queryByRole("button", { name: "Delete facility" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Assign a custodian", { exact: true })).not.toBeInTheDocument();
   });
 });
