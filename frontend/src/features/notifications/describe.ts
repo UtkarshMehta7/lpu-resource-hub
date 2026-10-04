@@ -94,6 +94,18 @@ export function describeNotification(notification: AppNotification): Notificatio
         to: `/projects/${str(payload, "project_id")}`,
         detail: str(payload, "project_title") || undefined,
       };
+    case "collaboration_suggestion": {
+      const why = payload.reasons;
+      const first = Array.isArray(why) && typeof why[0] === "string" ? why[0] : "";
+      return {
+        // The expertise overlaps and they have never published together --
+        // which is the whole reason this is worth an interruption.
+        text: `${str(payload, "full_name")} works on similar things, and you have not published together`,
+        to: `/researchers/${str(payload, "user_id")}`,
+        detail:
+          [str(payload, "registration_number"), first].filter(Boolean).join(" · ") || undefined,
+      };
+    }
     case "nudge_received": {
       const kind = str(payload, "kind");
       const destination: Record<string, string> = {

@@ -27,7 +27,7 @@ a pair is not even offered.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from app.modules.imports.merge import (
@@ -65,26 +65,35 @@ def _author_overlap(left: Record, right: Record) -> list[str]:
 
 
 def find_candidates(records: Sequence[Record]) -> list[Candidate]:
-    """Every pair worth a person's attention, strongest first.
+    """Compare every record with every other. Pure, and O(n^2).
 
-    O(n^2) on purpose. The alternative is blocking by normalised title prefix,
-    which is what you would reach for at a hundred thousand publications; at
-    this institution's scale it would be unmeasurable cleverness, and the scan
-    is an explicit action rather than something on a request path.
+    Kept because it is the readable statement of the rules and the thing the
+    rule tests exercise, but the scan does NOT use it: see
+    `score_pairs`, which scores a shortlist the database produced.
     """
-    candidates: list[Candidate] = []
-    for index, left in enumerate(records):
-        for right in records[index + 1 :]:
-            candidate = _compare(left, right)
-            if candidate is not None:
-                candidates.append(candidate)
+    pairs = [(left, right) for index, left in enumerate(records) for right in records[index + 1 :]]
+    return score_pairs(pairs)
+
+
+def score_pairs(pairs: Iterable[tuple[Record, Record]]) -> list[Candidate]:
+    """Score an already-shortlisted set of pairs, strongest first.
+
+    The split matters. Postgres generates the candidates with the trigram
+    index (`title % title`), and rapidfuzz scores only what comes back --
+    which is what the brief asks for, and what the import path has always
+    done. Comparing every publication with every other in Python gets the
+    same answer and stops being free the moment the register is large.
+    """
+    candidates = [
+        candidate for left, right in pairs if (candidate := compare(left, right)) is not None
+    ]
     # Strongest first: a reviewer working down the list meets the clearest
     # cases while their eye is still fresh.
     candidates.sort(key=lambda c: -c.score)
     return candidates
 
 
-def _compare(left: Record, right: Record) -> Candidate | None:
+def compare(left: Record, right: Record) -> Candidate | None:
     # Different DOIs are different works. Not a score, a veto.
     if left.doi and right.doi and left.doi.lower() != right.doi.lower():
         return None
@@ -126,4 +135,4 @@ def _same_venue(left: str | None, right: str | None) -> bool:
     return normalise_title(left) == normalise_title(right)
 
 
-__all__ = ["Candidate", "Record", "find_candidates"]
+__all__ = ["Candidate", "Record", "compare", "find_candidates", "score_pairs"]

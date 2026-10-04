@@ -223,8 +223,19 @@ chance to merge.
                             which is a different question)
 ```
 
-`POST /api/v1/publication-duplicates/scan` compares every stored publication
-against every other and queues the pairs in that band. The same rules apply as
+`POST /api/v1/publication-duplicates/scan` lets **Postgres** generate the
+candidate pairs, using the trigram index on `publications.title`
+(`ix_publications_title_trgm`, migration 0022):
+
+```sql
+SELECT a.id, b.id FROM publications a JOIN publications b ON a.id < b.id
+WHERE a.title % b.title
+```
+
+rapidfuzz then scores only that shortlist. It is the same division the import
+path has always used, and a test asserts the shortlist loses no pair the
+exhaustive comparison would have found. The scan queues the pairs that clear
+the threshold. The same rules apply as
 on import, reused rather than reimplemented:
 
 - **two different DOIs are never the same work** — a veto, not a score
