@@ -196,9 +196,18 @@ def _researcher_candidates(db: Session, viewer: User) -> Candidates:
 
 
 def _collaborator_candidates(db: Session, viewer: User) -> Candidates:
-    """People the viewer could actually send a collaboration request to
-    (Step 8 rules), minus anyone there's already an open or accepted request
-    with. Admins can't send, so they get nothing."""
+    """People the viewer could collaborate with and has not already.
+
+    Two exclusions, and they mean different things. Anyone with an open or
+    accepted request is removed because asking twice is noise. Anyone the
+    viewer has **already co-authored a publication with** is removed because
+    the point of the suggestion is the *gap*: a collaboration that the
+    expertise says should exist and the publication record says does not.
+    Suggesting a long-standing co-author is the one recommendation a
+    researcher can be certain they did not need.
+
+    Admins can't send requests, so they get nothing.
+    """
     if viewer.role is UserRole.ADMIN:
         return Candidates(features=[], newest_ids=[])
     engaged = (
@@ -218,6 +227,14 @@ def _collaborator_candidates(db: Session, viewer: User) -> Candidates:
             )
         )
     )
+    # Everyone named on a publication the viewer is also named on. The
+    # co-authorship gap is what is left once these are taken out.
+    mine = select(PublicationAuthor.publication_id).where(PublicationAuthor.user_id == viewer.id)
+    co_authors = select(PublicationAuthor.user_id).where(
+        PublicationAuthor.publication_id.in_(mine),
+        PublicationAuthor.user_id.is_not(None),
+        PublicationAuthor.user_id != viewer.id,
+    )
     contactable = or_(
         User.id.in_(select(ResearcherProfile.user_id)),
         User.id.in_(select(StudentProfile.user_id).where(StudentProfile.is_discoverable.is_(True))),
@@ -230,6 +247,7 @@ def _collaborator_candidates(db: Session, viewer: User) -> Candidates:
                 User.role != UserRole.ADMIN,
                 User.id != viewer.id,
                 User.id.not_in(engaged),
+                User.id.not_in(co_authors),
                 contactable,
             )
             .order_by(User.created_at.desc())

@@ -14,7 +14,8 @@ export type NotificationType =
   | "message_received"
   | "milestone_due"
   | "milestone_overdue"
-  | "nudge_received";
+  | "nudge_received"
+  | "collaboration_suggestion";
 
 export interface AppNotification {
   id: string;

@@ -13,10 +13,13 @@ merged never reaches the queue, because it was merged on the way in.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable, Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from app.core.config import Settings
 from app.main import create_app
@@ -178,6 +181,46 @@ def test_a_decided_pair_is_not_resurrected_by_a_later_scan(
     [still] = queue(client, curator, status="separate")
     assert still["decision_note"] == "Different cohorts."
     assert still["decided_by_name"]
+
+
+def test_the_database_shortlist_loses_nothing_the_full_comparison_finds(
+    client: TestClient, curator: SeededUser, author: SeededUser
+) -> None:
+    """The guard on making candidate generation the database's job.
+
+    Postgres shortlists with the trigram index and rapidfuzz scores only what
+    comes back. That is faster for the obvious reason, and wrong the moment
+    the shortlist drops a pair the scorer would have accepted -- a duplicate
+    nobody is ever shown. So the two paths are compared directly: the
+    shortlist may be narrower, never smaller in result.
+    """
+    from app.modules.deduplication import detect, service
+
+    make_publication(client, author, "Forecasting wheat yield from satellite data")
+    make_publication(client, author, "Forecasting wheat yield from satellite data.")
+    make_publication(client, author, "Nitrogen uptake in rice paddies")
+    make_publication(client, author, "Nitrogen uptake in rice paddies ")
+    make_publication(client, author, "A survey of quantum error correction codes")
+    make_publication(client, author, "Groundwater depletion in the Doab")
+
+    engine = create_engine(str(client.app.state.settings.database_url))
+    try:
+        with sessionmaker(bind=engine)() as db:
+            exhaustive = detect.find_candidates(service._records(db))
+            pairs = service._candidate_pairs(db)
+            wanted = {p for pair in pairs for p in pair}
+            records = {r.id: r for r in service._records(db, wanted)}
+            shortlisted = detect.score_pairs(
+                (records[a], records[b]) for a, b in pairs if a in records and b in records
+            )
+    finally:
+        engine.dispose()
+
+    def keys(candidates: list[detect.Candidate]) -> set[tuple[uuid.UUID, uuid.UUID]]:
+        return {(c.publication_a_id, c.publication_b_id) for c in candidates}
+
+    assert keys(exhaustive), "the fixture should contain duplicates to find"
+    assert keys(shortlisted) == keys(exhaustive)
 
 
 # --- merging ---------------------------------------------------------------

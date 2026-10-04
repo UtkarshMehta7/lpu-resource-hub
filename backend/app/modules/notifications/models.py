@@ -34,6 +34,9 @@ class NotificationType(StrEnum):
     MILESTONE_OVERDUE = "milestone_overdue"
     #: Somebody is waiting on the recipient to verify, review or decide.
     NUDGE_RECEIVED = "nudge_received"
+    #: Two people whose expertise overlaps and who have never co-authored.
+    #: Sent once per pairing, ever.
+    COLLABORATION_SUGGESTION = "collaboration_suggestion"
 
 
 class Notification(Base):

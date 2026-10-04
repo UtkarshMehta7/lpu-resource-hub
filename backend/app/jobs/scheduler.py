@@ -16,6 +16,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.jobs.reminders import send_deadline_reminders, send_milestone_reminders
+from app.modules.notifications.collaboration_suggestions import (
+    send_collaboration_suggestions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +28,12 @@ def run_reminders(session_factory: Callable[[], Session]) -> None:
     session = session_factory()
     try:
         sent = send_deadline_reminders(session) + send_milestone_reminders(session)
-        if sent:
-            logger.info("reminders sent: %d", sent)
+        # Suggestions are dated by nothing, so unlike the reminders this is
+        # not time-critical -- it rides along on the same pass because one
+        # scheduled job is easier to reason about than two.
+        suggested = send_collaboration_suggestions(session)
+        if sent or suggested:
+            logger.info("reminders sent: %d, collaborations suggested: %d", sent, suggested)
     except Exception:  # noqa: BLE001 - a scheduled job must not kill the thread
         session.rollback()
         logger.exception("deadline reminder job failed")
