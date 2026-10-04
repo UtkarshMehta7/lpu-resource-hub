@@ -1,0 +1,28 @@
+# Gitleaks configuration.
+#
+# The scheduled Security run scans the whole history (`fetch-depth: 0`), not
+# just a pull request's diff -- a secret committed and later removed is still
+# a leaked secret. That is the right setting, and it is why one allowlist
+# entry is needed: a finding in an old commit cannot be fixed by editing the
+# file today, so it has to be named here or the run stays red forever and
+# everyone learns to ignore it.
+#
+# Add an entry here ONLY for a string that is provably not a credential, and
+# allowlist that exact string rather than the file or the rule -- a `paths`
+# entry would hide a real leak in the same file for good.
+
+[extend]
+# Every default rule still applies; this file only subtracts one literal.
+useDefault = true
+
+[allowlist]
+description = "Invented passwords in frontend test fixtures, never real credentials"
+regexes = [
+  # frontend/src/features/admin/AdminUsersPage.test.tsx -- the string the
+  # admin accounts page is asserted to display once after issuing a
+  # replacement temporary password. Made up for the assertion; it has never
+  # been a password for anything. Flagged by `generic-api-key` on entropy
+  # alone (3.52), which is exactly what a convincing fake password looks
+  # like.
+  '''Xy7NewTempPass''',
+]
