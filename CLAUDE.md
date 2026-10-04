@@ -43,7 +43,7 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 162 API operations over 131 paths, 44 tables, 28 migrations,
-30 ADRs, 27 backend modules, 1084 backend tests, 263 frontend tests,
+30 ADRs, 27 backend modules, 1086 backend tests, 263 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -258,6 +258,13 @@ Current shape: 162 API operations over 131 paths, 44 tables, 28 migrations,
   the side. A script writing directly to the database carries the invariants
   the services carry. Check **roles**, not just names, before running a seed
   against a populated database.
+- **A seeded project needs TAGS, not just a team.** `_seed_projects` was
+  handed the school's skills and areas and used neither, so
+  `project_research_areas` was empty and the dean's "projects by area" panel
+  rendered blank on the deployed instance -- that panel counts through that
+  table. Tagging is its own idempotent step (`_tag_project`) that runs for
+  projects which already exist, because a seeder that skips what is already
+  there can never repair what it got wrong before.
 - **Demo milestones need more than one SHAPE.** Give every project the same
   chain with an overdue milestone in front and `blocked` beats `at_risk`
   (ADR 0026), so the deployed board showed `at_risk: 0` and `on_track: 0` --

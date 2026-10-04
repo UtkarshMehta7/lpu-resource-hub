@@ -212,3 +212,36 @@ def test_a_full_seed_leaves_milestones_in_more_than_one_risk_state(db: Session) 
     assert Risk.AT_RISK in states
     assert Risk.ON_TRACK in states
     assert Risk.OVERDUE in states
+
+
+def test_a_full_seed_tags_projects_with_research_areas(db: Session) -> None:
+    """The dean's "projects by area" panel counts through
+    project_research_areas, and the seed never wrote a row to it -- so one
+    panel on the dean's main screen rendered blank on the deployed instance.
+
+    Asserted through the same aggregation the API uses, not by counting rows,
+    so a change to either side keeps them honest.
+    """
+    from app.modules.analytics.insights import Scope, projects_by_area
+
+    seed(db)
+
+    breakdown = projects_by_area(db, Scope(department_id=None))
+
+    assert breakdown, "the panel would render empty"
+    # More than one bar, or a breakdown is just a total.
+    assert len(breakdown) > 1
+    assert all(row["count"] > 0 for row in breakdown)
+
+
+def test_a_full_seed_tags_projects_with_skills(db: Session) -> None:
+    """Skills are what the recommender and search match a project on; an
+    untagged project is invisible to both."""
+    from app.modules.projects.models import Project, ProjectSkill
+
+    seed(db)
+
+    tagged = db.execute(select(func.count(func.distinct(ProjectSkill.project_id)))).scalar_one()
+    total = db.execute(select(func.count()).select_from(Project)).scalar_one()
+    assert total > 0
+    assert tagged == total
