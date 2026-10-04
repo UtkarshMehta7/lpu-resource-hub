@@ -181,6 +181,22 @@ CREATABLE_ROLE: dict[UserRole, UserRole | None] = {
 # need no department of their own.
 INSTITUTION_WIDE_ROLES: frozenset[UserRole] = frozenset({UserRole.ADMIN, UserRole.DEAN_OF_RESEARCH})
 
+#: Who may appoint a facility custodian.
+#:
+#: Not expressed through `CREATABLE_ROLE`, which maps each role to exactly
+#: ONE successor -- that property is what lets a new account's role be derived
+#: from its creator and never read from the request. Giving a coordinator two
+#: successors would force a `role` field back into the create-account body,
+#: which is the thing the design exists to avoid (ADR 0019).
+#:
+#: Instead the role is a constant of a dedicated route: POST
+#: /api/v1/facility-custodians can only ever make a custodian, so the caller
+#: still names no role. A custodian is deliberately absent -- somebody who
+#: looks after rooms must not be able to mint peers who look after others.
+CUSTODIAN_APPOINTERS: frozenset[UserRole] = frozenset(
+    {UserRole.RESEARCH_COORDINATOR, UserRole.ADMIN}
+)
+
 APPOINTABLE_BY_ADMIN: frozenset[UserRole] = frozenset(
     {
         UserRole.STUDENT,
@@ -216,7 +232,12 @@ DELETABLE_ROLES: dict[UserRole, frozenset[UserRole]] = {
             UserRole.ADMIN,
         }
     ),
-    UserRole.RESEARCH_COORDINATOR: frozenset({UserRole.STUDENT, UserRole.FACULTY}),
+    # A coordinator appoints custodians for their own department, so they
+    # remove them too -- creating without removing is a dead end that ends in
+    # an administrator's inbox.
+    UserRole.RESEARCH_COORDINATOR: frozenset(
+        {UserRole.STUDENT, UserRole.FACULTY, UserRole.FACILITY_CUSTODIAN}
+    ),
     UserRole.FACULTY: frozenset({UserRole.STUDENT}),
     UserRole.STUDENT: frozenset(),
     # Neither removes anybody. A custodian looks after rooms, not people, and

@@ -4,6 +4,7 @@ import { AdminCreateAccountPage } from "@/features/admin/AdminCreateAccountPage"
 import { AdminHandoverPage } from "@/features/admin/AdminHandoverPage";
 import { AdministrationPage } from "@/features/admin/AdministrationPage";
 import { AdminUsersPage } from "@/features/admin/AdminUsersPage";
+import { AppointCustodianPage } from "@/features/admin/AppointCustodianPage";
 import { CoordinatorsPage } from "@/features/admin/CoordinatorsPage";
 import { OrganisationPage } from "@/features/admin/OrganisationPage";
 import { DirectoryPage } from "@/features/directory/DirectoryPage";
@@ -141,6 +142,12 @@ export const router = createBrowserRouter([
             element: <RoleRoute allow={["research_coordinator", "facility_custodian", "admin"]} />,
             children: [
               { path: "coordinator/booking-queue", element: <BookingQueuePage /> },
+              {
+                // Coordinator or admin: the custodian themselves must not
+                // be able to appoint peers, and the server agrees.
+                path: "people/custodians/new",
+                element: <AppointCustodianPage />,
+              },
               {
                 path: "facilities/:facilityId/equipment/new",
                 element: <EquipmentFormPage />,
