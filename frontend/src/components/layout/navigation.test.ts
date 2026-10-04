@@ -19,6 +19,29 @@ describe("navigationFor", () => {
     expect(labels).toContain("Administrators");
   });
 
+  it("gives a dean the figures and none of the queues they cannot act in", () => {
+    const labels = navigationFor("dean_of_research").map((item) => item.label);
+
+    expect(labels).toContain("Analytics");
+    expect(labels).toContain("Research report");
+    expect(labels).toContain("At-risk projects");
+    // Every other Review entry is an action on somebody's work.
+    expect(labels).not.toContain("Verification");
+    expect(labels).not.toContain("Reviews");
+    expect(labels).not.toContain("Bookings");
+    expect(labels).not.toContain("Accounts");
+  });
+
+  it("gives a custodian the booking queue and nothing else to review", () => {
+    const labels = navigationFor("facility_custodian").map((item) => item.label);
+
+    expect(labels).toContain("Facilities");
+    expect(labels).toContain("Bookings");
+    expect(labels).not.toContain("Verification");
+    expect(labels).not.toContain("Analytics");
+    expect(labels).not.toContain("My people");
+  });
+
   it("gives a signed-out visitor nothing", () => {
     expect(navigationFor(undefined)).toEqual([]);
   });

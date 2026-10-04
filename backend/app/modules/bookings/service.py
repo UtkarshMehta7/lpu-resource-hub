@@ -34,7 +34,10 @@ from app.modules.bookings.schemas import (
     BusySlot,
 )
 from app.modules.facilities.models import Equipment, Facility, MaintenanceStatus
-from app.modules.facilities.policies import coordinator_department
+from app.modules.facilities.policies import (
+    coordinator_department,
+    manageable_facility_filter,
+)
 from app.modules.facilities.service import EquipmentNotFoundError, load_equipment
 from app.modules.users.models import User, UserRole
 
@@ -180,12 +183,26 @@ def _approver_department(db: Session, booking: Booking) -> uuid.UUID | None:
     ).scalar_one_or_none()
 
 
+def _booking_custodian(db: Session, booking: Booking) -> uuid.UUID | None:
+    """Who looks after the facility this equipment lives in."""
+    return db.execute(
+        select(Facility.custodian_id)
+        .join(Equipment, Equipment.facility_id == Facility.id)
+        .where(Equipment.id == booking.equipment_id)
+    ).scalar_one_or_none()
+
+
 def _actor_for(db: Session, user: User, booking: Booking) -> Actor | None:
     """How this user relates to the booking, or None if they can't see it."""
     if booking.user_id == user.id:
         return "owner"
     if user.role is UserRole.ADMIN:
         return "approver"
+    # A custodian approves bookings for the facilities they look after, and
+    # is a stranger to every other booking -- the object check, not the
+    # permission, is what decides.
+    if user.role is UserRole.FACILITY_CUSTODIAN:
+        return "approver" if _booking_custodian(db, booking) == user.id else None
     scope = coordinator_department(user)
     if scope is not None and scope == _approver_department(db, booking):
         return "approver"
@@ -223,11 +240,11 @@ def approval_queue(db: Session, approver: User) -> list[BookingRead]:
         .join(Facility, Facility.id == Equipment.facility_id)
         .where(Booking.status == BookingStatus.PENDING)
     )
-    if approver.role is not UserRole.ADMIN:
-        scope = coordinator_department(approver)
-        if scope is None:
-            return []
-        query = query.where(Facility.department_id == scope)
+    # The same filter the facilities module manages by, so the queue can never
+    # show a request the approve call would then refuse: a department for a
+    # coordinator, the assigned facilities for a custodian, everything for an
+    # admin, nothing for anyone whose scope is empty.
+    query = query.where(manageable_facility_filter(approver))
     rows = db.execute(query.order_by(Booking.created_at)).scalars().all()
     return _to_reads(db, list(rows))
 

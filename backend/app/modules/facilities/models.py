@@ -49,6 +49,16 @@ class Facility(Base):
         nullable=True,
         index=True,
     )
+    #: The custodian who looks after this facility. Holding FACILITY_MANAGE
+    #: says a person may manage *a* facility; this says which. Nullable
+    #: because a facility may be between custodians, and SET NULL on delete
+    #: so removing a person never removes the room they looked after.
+    custodian_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     location: Mapped[str | None] = mapped_column(String(300), nullable=True)
     contact: Mapped[str | None] = mapped_column(String(300), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

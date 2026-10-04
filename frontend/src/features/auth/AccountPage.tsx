@@ -8,6 +8,8 @@ const ROLE_LABELS: Record<string, string> = {
   faculty: "Faculty / researcher",
   research_coordinator: "Research coordinator",
   admin: "Administrator",
+  facility_custodian: "Facility custodian",
+  dean_of_research: "Dean of Research",
 };
 
 export function AccountPage() {

@@ -21,6 +21,8 @@ const ROLE_LABELS: Record<Role, string> = {
   student: "Student",
   faculty: "Faculty",
   research_coordinator: "Coordinator",
+  facility_custodian: "Facility custodian",
+  dean_of_research: "Dean of Research",
   admin: "Administrator",
 };
 
@@ -32,6 +34,9 @@ const RESPONSIBILITY: Record<Role, string> = {
   faculty:
     "The students of your department. Removing an account is permanent — deactivate instead if the person has simply left.",
   student: "Nobody: students do not manage other accounts.",
+  facility_custodian: "Nobody: a facility custodian looks after rooms and equipment, not accounts.",
+  dean_of_research:
+    "Nobody: a Dean of Research reads institutional figures and changes no records.",
 };
 
 /**

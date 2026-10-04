@@ -9,8 +9,12 @@ everything up to and including that step.
 
 ## Roles and hierarchy
 
-`STUDENT`, `FACULTY`, `RESEARCH_COORDINATOR`, `ADMIN` (`docs/architecture.md`
-§1). `RESEARCH_COORDINATOR` inherits every `FACULTY` permission plus its own
+`STUDENT`, `FACULTY`, `RESEARCH_COORDINATOR`, `FACILITY_CUSTODIAN`,
+`DEAN_OF_RESEARCH`, `ADMIN` (`docs/architecture.md` §1). The first three and
+`ADMIN` form the provisioning chain; the other two are narrow, non-inheriting
+appointments described in their own section below (ADR 0028).
+
+`RESEARCH_COORDINATOR` inherits every `FACULTY` permission plus its own
 (coordinator-specific: review/approve actions, scoped to their department —
 see "Coordinator scope" below). `ADMIN` has its own explicit operational and
 moderation powers; it does not automatically inherit `FACULTY`'s or
@@ -41,6 +45,13 @@ request, which carries no role field at all.
 | `RESEARCH_COORDINATOR` | `FACULTY` | the department they oversee |
 | `FACULTY` | `STUDENT` | their own department, verified profile required |
 | `STUDENT` | — | — |
+
+`FACILITY_CUSTODIAN` and `DEAN_OF_RESEARCH` create nobody, and nobody's
+ordinary chain creates them: they are appointed through the admin override
+(`POST /api/v1/admin/users`), whose permitted set is `APPOINTABLE_BY_ADMIN`.
+That set is every role except `ADMIN` — promotion to administrator stays the
+two-person ceremony at `/admin/administrators` (ADR 0019), and allowing it in
+the override would be a one-click route around it.
 
 There is no public registration endpoint. Nobody, at any level, can change
 their own role: that is `user:update_role`, an admin action on someone else,
@@ -102,6 +113,38 @@ picking it up automatically via inheritance wherever `FACULTY` has it.
 | Permission | STUDENT | FACULTY | COORDINATOR | ADMIN | Step |
 |---|:-:|:-:|:-:|:-:|:-:|
 | `project:archive` | | ✅ (own) | | ✅ | 5 |
+
+## Two scoped, non-inheriting roles (ADR 0028)
+
+Both exist because a permission was being used to mean more than it says.
+Neither inherits anything, and neither appears in `CREATABLE_ROLE`, so
+appointing one cannot happen by accident.
+
+| | `FACILITY_CUSTODIAN` | `DEAN_OF_RESEARCH` |
+|---|---|---|
+| Holds | `facility:manage`, `booking:approve` | `analytics:read` |
+| Scope | the facilities whose `custodian_id` is them | the whole institution |
+| Department | required, like everyone but a dean | none (`INSTITUTION_WIDE_ROLES`) |
+| Creates | nobody | nobody |
+| Deletes | nobody | nobody |
+| Signs in at | `/login` | `/login` |
+
+`facility:manage` says a person may manage *a* facility; it never said
+*every* facility, and before this role nothing needed the distinction because
+the only holders were scoped by department. A custodian's scope is a **set of
+rows**, so it is enforced object-level against the loaded facility
+(`facilities/policies.py: may_manage_facility`) rather than by a column
+comparison in the dependency. `manageable_facility_filter` is the same rule as
+a query filter, used by the booking queue so a listing can never show a
+request the approve call would then refuse. A booking on somebody else's
+facility is a `404`.
+
+A dean reads and changes nothing: `analytics:read` is the whole grant, and
+`insights.scope_for` puts them in the same institution-wide scope as an
+admin. They reach `/analytics`, `/analytics/report` and the at-risk board
+(whose gate moved from `project:review` to `analytics:read`, since looking at
+the board is reading, not reviewing) — and no other queue, because every
+other one is an action on somebody's work.
 
 ## Status codes
 

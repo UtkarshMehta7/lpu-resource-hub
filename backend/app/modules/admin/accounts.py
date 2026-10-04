@@ -21,7 +21,11 @@ from dataclasses import dataclass
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.permissions import creatable_role
+from app.core.permissions import (
+    APPOINTABLE_BY_ADMIN,
+    INSTITUTION_WIDE_ROLES,
+    creatable_role,
+)
 from app.core.security import hash_password
 from app.modules.admin.models import Department
 from app.modules.audit import service as audit_service
@@ -121,6 +125,11 @@ def create_account(
     if override_role is not None:
         if creator.role is not UserRole.ADMIN:
             raise NotAllowedRoleError
+        # An administrator may appoint any role except another administrator.
+        # Promotion to admin is the two-person ceremony (ADR 0019); allowing
+        # it here would be a one-click route around it.
+        if override_role not in APPOINTABLE_BY_ADMIN:
+            raise NotAllowedRoleError
         role: UserRole | None = override_role
     else:
         role = creatable_role(creator.role)
@@ -131,7 +140,9 @@ def create_account(
         # A coordinator with no department oversees nothing, and a student or
         # faculty member with none can't be reached by any scoped rule. Only
         # another admin, who is scoped to everything, may have none.
-        if department_id is None and role is not UserRole.ADMIN:
+        # An institution-wide role has no department to belong to. Everybody
+        # else needs one, or no scoped rule can reach them.
+        if department_id is None and role not in INSTITUTION_WIDE_ROLES:
             raise DepartmentRequiredError
     else:
         # Everyone else works inside their own department, and may not name

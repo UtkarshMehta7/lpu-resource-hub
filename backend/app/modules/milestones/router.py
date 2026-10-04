@@ -185,9 +185,14 @@ def my_milestones(db: DbSession, current_user: CurrentUser) -> list[MyMilestone]
 @router.get("/coordinator/at-risk-projects", response_model=list[AtRiskProject])
 def at_risk_projects(
     db: DbSession,
-    viewer: Annotated[User, Depends(require_permission(Permission.PROJECT_REVIEW))],
+    viewer: Annotated[User, Depends(require_permission(Permission.ANALYTICS_READ))],
 ) -> list[AtRiskProject]:
     """Projects with slipping milestones, most overdue first.
+
+    Requires ANALYTICS_READ rather than PROJECT_REVIEW: this is a board to
+    read, not an action on a project. Gating it behind the review permission
+    would mean a dean could only see at-risk work by also being able to
+    approve and reject it.
 
     Scoped like every other project query: a coordinator sees their
     department, an administrator sees everything.

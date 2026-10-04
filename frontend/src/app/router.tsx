@@ -110,17 +110,35 @@ export const router = createBrowserRouter([
           { path: "publications/:publicationId/edit", element: <PublicationFormPage /> },
           { path: "profile", element: <ProfilePage /> },
           {
+            // Reading the institution's figures. A dean belongs here and
+            // nowhere else: every other reviewer route below is an action on
+            // somebody's work, which a dean deliberately cannot take.
+            element: <RoleRoute allow={["research_coordinator", "dean_of_research", "admin"]} />,
+            children: [
+              { path: "analytics", element: <AnalyticsPage /> },
+              { path: "analytics/report", element: <InstitutionalReportPage /> },
+              { path: "coordinator/at-risk", element: <AtRiskBoardPage /> },
+            ],
+          },
+          {
             element: <RoleRoute allow={["research_coordinator", "admin"]} />,
             children: [
-              { path: "coordinator/at-risk", element: <AtRiskBoardPage /> },
-              { path: "analytics/report", element: <InstitutionalReportPage /> },
               { path: "coordinator/verification-queue", element: <VerificationQueuePage /> },
               { path: "coordinator/review-queue", element: <ReviewQueuePage /> },
               { path: "admin/reports", element: <ModerationQueuePage /> },
-              { path: "analytics", element: <AnalyticsPage /> },
-              { path: "coordinator/booking-queue", element: <BookingQueuePage /> },
+              // Creating a facility is department-level, so a custodian --
+              // who holds a set of facilities, not a department -- is not here.
               { path: "facilities/new", element: <FacilityFormPage /> },
               { path: "funding/new", element: <FundingFormPage /> },
+            ],
+          },
+          {
+            // Looking after facilities. The server scopes both of these to the
+            // facilities the caller actually holds, so a custodian sees only
+            // their own rooms and a coordinator only their department's.
+            element: <RoleRoute allow={["research_coordinator", "facility_custodian", "admin"]} />,
+            children: [
+              { path: "coordinator/booking-queue", element: <BookingQueuePage /> },
               {
                 path: "facilities/:facilityId/equipment/new",
                 element: <EquipmentFormPage />,

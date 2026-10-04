@@ -5,7 +5,6 @@ import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { z } from "zod";
 
-import type { Role } from "@/features/auth/types";
 import { fetchDepartments } from "@/features/directory/api-org";
 import { toApiError } from "@/lib/api/errors";
 
@@ -28,7 +27,16 @@ const schema = z.object({
     .min(4, "Registration number is required")
     .max(50, "That's too long for a registration number"),
   full_name: z.string().trim().min(1, "Full name is required").max(200),
-  role: z.enum(["student", "faculty", "research_coordinator", "admin"]),
+  // Mirrors APPOINTABLE_BY_ADMIN on the server. Administrator is absent on
+  // purpose: promotion is the two-person ceremony at /admin/administrators
+  // (ADR 0019), and offering it here would be a one-click way round it.
+  role: z.enum([
+    "student",
+    "faculty",
+    "research_coordinator",
+    "facility_custodian",
+    "dean_of_research",
+  ]),
   department_id: z.string(),
   email: z
     .string()
@@ -38,11 +46,24 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-const ROLE_LABELS: Record<Role, string> = {
+/** The roles an administrator may appoint -- every role but their own. */
+type AppointableRole = FormValues["role"];
+
+const ROLE_LABELS: Record<AppointableRole, string> = {
   student: "Student",
   faculty: "Faculty / researcher",
   research_coordinator: "Research coordinator",
-  admin: "Administrator",
+  facility_custodian: "Facility custodian",
+  dean_of_research: "Dean of Research",
+};
+
+/** What each role is for, so the choice is not guessed from its name. */
+const ROLE_HINTS: Partial<Record<AppointableRole, string>> = {
+  research_coordinator: "The department chosen below becomes the department they oversee.",
+  facility_custodian:
+    "They look after the facilities assigned to them and approve bookings for those, and nothing else.",
+  dean_of_research:
+    "They read the institution’s research figures across every department, and change nothing.",
 };
 
 const FIELD = "mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm";
@@ -61,7 +82,7 @@ export function AdminCreateAccountPage() {
   // The role drives the copy and whether a department is required. Tracked in
   // state rather than through `watch`, which the React Compiler cannot see
   // into and therefore skips optimising the whole component over.
-  const [role, setRole] = useState<Role>("faculty");
+  const [role, setRole] = useState<AppointableRole>("faculty");
   const {
     register,
     handleSubmit,
@@ -78,9 +99,9 @@ export function AdminCreateAccountPage() {
     },
   });
 
-  // Only another admin is scoped to everything; everyone else lives in a
-  // department, and the API says so too.
-  const departmentRequired = role !== "admin";
+  // A dean reads the whole institution, so no department holds them;
+  // everyone else lives in one, and the API says so too.
+  const departmentRequired = role !== "dean_of_research";
   const roleField = register("role");
 
   const mutation = useMutation({
@@ -92,12 +113,14 @@ export function AdminCreateAccountPage() {
         department_id: values.department_id || null,
         email: values.email || null,
       }),
-    onSuccess: async (result) => {
+    onSuccess: async (result, values) => {
       setCreated({ name: result.user.full_name, password: result.temporary_password });
       setCopied(false);
-      setRole(result.user.role);
+      // The role that was asked for, not the one echoed back: the response
+      // carries the full role union and this form only offers part of it.
+      setRole(values.role);
       reset({
-        role: result.user.role,
+        role: values.role,
         department_id: "",
         registration_number: "",
         full_name: "",
@@ -195,27 +218,35 @@ export function AdminCreateAccountPage() {
               className={FIELD}
               {...roleField}
               onChange={(event) => {
-                setRole(event.target.value as Role);
+                setRole(event.target.value as AppointableRole);
                 void roleField.onChange(event);
               }}
             >
-              {(Object.keys(ROLE_LABELS) as Role[]).map((value) => (
+              {(Object.keys(ROLE_LABELS) as AppointableRole[]).map((value) => (
                 <option key={value} value={value}>
                   {ROLE_LABELS[value]}
                 </option>
               ))}
             </select>
-            {role === "admin" ? (
-              <p className="mt-1 text-xs text-brand-700">
-                A second administrator can do everything you can, immediately.
-              </p>
+            {ROLE_HINTS[role] ? (
+              <p className="mt-1 text-xs text-ink-muted">{ROLE_HINTS[role]}</p>
             ) : null}
+            <p className="mt-1 text-xs text-ink-muted">
+              To appoint another administrator, use{" "}
+              <Link
+                to="/admin/administrators"
+                className="font-medium text-brand-700 hover:underline"
+              >
+                Administrators
+              </Link>
+              . It takes two people.
+            </p>
           </div>
           <div>
             <label htmlFor="department_id" className="block text-sm font-medium">
               Department{" "}
               {departmentRequired ? null : (
-                <span className="font-normal text-ink-muted">(optional for an admin)</span>
+                <span className="font-normal text-ink-muted">(not needed for a dean)</span>
               )}
             </label>
             <select id="department_id" className={FIELD} {...register("department_id")}>
@@ -226,11 +257,6 @@ export function AdminCreateAccountPage() {
                 </option>
               ))}
             </select>
-            {role === "research_coordinator" ? (
-              <p className="mt-1 text-xs text-ink-muted">
-                This becomes the department they oversee.
-              </p>
-            ) : null}
           </div>
         </div>
 
