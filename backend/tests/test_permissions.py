@@ -41,6 +41,7 @@ def test_coordinator_inherits_faculty_grants_on_top_of_its_own() -> None:
             Permission.FACILITY_MANAGE,
             Permission.BOOKING_APPROVE,
             Permission.FUNDING_MANAGE,
+            Permission.PUBLICATION_DEDUPLICATE,
             Permission.USER_CREATE,  # inherited from FACULTY
             Permission.USER_DELETE,  # inherited from FACULTY
             Permission.STUDENT_DISCOVER,  # inherited from FACULTY
@@ -75,6 +76,7 @@ def test_admin_has_exactly_its_own_grants() -> None:
             Permission.FACILITY_MANAGE,
             Permission.BOOKING_APPROVE,
             Permission.FUNDING_MANAGE,
+            Permission.PUBLICATION_DEDUPLICATE,
         }
     )
 

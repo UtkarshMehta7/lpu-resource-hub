@@ -203,3 +203,39 @@ These are real, unfixed, and accepted:
   not merged into.
 - It never accepts bibliographic data from the browser: applying an import
   re-reads the sources, so the payload cannot be forged.
+
+## The review queue (ADR 0029)
+
+Everything above is the **importer**, which de-duplicates what it brings in and
+merges unattended at `TITLE_MATCH_THRESHOLD` (92). Duplicates still get into
+the database by routes it cannot intercept: two researchers each adding the
+same paper, or a hand-typed record later matched by an import carrying a DOI.
+
+`TITLE_SUGGEST_THRESHOLD` (84) is the other half. The band between the two is
+where a machine should not decide alone:
+
+```
+    84 -------------- suggest to a person -------------- 92 -------- merge
+  nothing below                                      already merged on import
+```
+
+`POST /api/v1/publication-duplicates/scan` compares every stored publication
+against every other and queues the pairs in that band. The same rules apply as
+on import, reused rather than reimplemented:
+
+- **two different DOIs are never the same work** — a veto, not a score
+  adjustment;
+- a *substituted* word ("wheat" against "maize") is a different study, while a
+  dropped subtitle is not;
+- titles are compared after accents, punctuation and case are folded.
+
+Each pair carries its evidence, so a reviewer judges rather than trusting a
+number: title similarity, whether the normalised titles are identical, the two
+years, whether a DOI is present on one side only, whether the venue matches,
+and which authors are shared.
+
+Three decisions: **merge** (names which record survives), **mark as different**
+(a judgement that sticks — a later scan will not raise the pair again), and
+**decide later**. A merge carries the losing record's authors, project links
+and DOI onto the survivor, snapshots it in full, and deletes it. Every merge
+can be undone, which recreates the record with a new id.

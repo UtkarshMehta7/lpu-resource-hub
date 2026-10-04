@@ -36,6 +36,11 @@ class Permission(StrEnum):
     PROJECT_CREATE = "project:create"
     PROJECT_REVIEW = "project:review"
     PUBLICATION_CREATE = "publication:create"
+    #: Curating the institution's publication records: finding duplicates
+    #: and deciding what to do about them. Separate from publication:create
+    #: because writing your own record and merging somebody else's are
+    #: different powers.
+    PUBLICATION_DEDUPLICATE = "publication:deduplicate"
     OPPORTUNITY_CREATE = "opportunity:create"
     APPLICATION_SUBMIT = "application:submit"
     COLLABORATION_SEND = "collaboration:send"
@@ -91,6 +96,7 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.FACILITY_MANAGE,
             Permission.BOOKING_APPROVE,
             Permission.FUNDING_MANAGE,
+            Permission.PUBLICATION_DEDUPLICATE,
         }
     ),
     # Looks after the facilities assigned to them. Which facilities is an
@@ -129,6 +135,7 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.FACILITY_MANAGE,
             Permission.BOOKING_APPROVE,
             Permission.FUNDING_MANAGE,
+            Permission.PUBLICATION_DEDUPLICATE,
         }
     ),
 }
