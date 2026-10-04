@@ -25,6 +25,34 @@ class FacilityUpdate(BaseModel):
     contact: str | None = Field(default=None, max_length=300)
 
 
+class CustodianAssign(BaseModel):
+    """Who looks after a facility, or nobody.
+
+    Its own request rather than a field on FacilityUpdate: this decides who
+    holds authority over the room, which is a different kind of act from
+    renaming it -- and a custodian may edit their own facility but must never
+    be able to hand it to somebody else.
+    """
+
+    #: None clears the assignment, leaving the facility between custodians.
+    user_id: uuid.UUID | None = None
+
+
+class CustodianCandidate(BaseModel):
+    """Somebody who could look after a given facility.
+
+    Deliberately narrow: id, name and UID only, and only the custodians who
+    are eligible for *this* facility. The admin user list would serve the
+    same purpose but is admin-only, and a coordinator who may assign a
+    custodian needs to be able to see which ones there are without being
+    handed the whole directory.
+    """
+
+    id: uuid.UUID
+    full_name: str
+    registration_number: str
+
+
 class FacilityRead(BaseModel):
     id: uuid.UUID
     name: str
@@ -32,6 +60,11 @@ class FacilityRead(BaseModel):
     department_id: uuid.UUID | None
     location: str | None
     contact: str | None
+    #: Who looks after it. Named, not just referenced: a page that shows only
+    #: an id cannot tell anyone whether the right person holds the room.
+    custodian_id: uuid.UUID | None = None
+    custodian_name: str | None = None
+    custodian_registration_number: str | None = None
     equipment_count: int
     created_at: datetime
 

@@ -13,17 +13,19 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
 from app.core.pagination import Page, PageParams
 from app.core.permissions import Permission, require_permission
-from app.core.rate_limit import enforce_search_rate_limit
+from app.core.rate_limit import client_ip, enforce_search_rate_limit
 from app.db.session import get_db
 from app.modules.facilities import service
 from app.modules.facilities.policies import OutOfScopeError
 from app.modules.facilities.schemas import (
+    CustodianAssign,
+    CustodianCandidate,
     EquipmentCreate,
     EquipmentRead,
     EquipmentUpdate,
@@ -53,6 +55,14 @@ _ERROR_MAP: dict[type[Exception], tuple[int, str]] = {
     service.DuplicateFacilityError: (
         status.HTTP_409_CONFLICT,
         "That department already has a facility with this name.",
+    ),
+    service.NotACustodianError: (
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "Only an account with the facility custodian role can look after a facility.",
+    ),
+    service.CustodianDepartmentError: (
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "A custodian must belong to the department that runs the facility.",
     ),
 }
 
@@ -104,6 +114,35 @@ def update_facility(
 def delete_facility(facility_id: uuid.UUID, db: DbSession, actor: Manager) -> None:
     with _domain_errors():
         service.delete_facility(db, actor, facility_id)
+
+
+@router.get(
+    "/facilities/{facility_id}/custodian-candidates",
+    response_model=list[CustodianCandidate],
+)
+def read_custodian_candidates(
+    facility_id: uuid.UUID, db: DbSession, actor: Manager
+) -> list[CustodianCandidate]:
+    """Who could look after this facility. Same gate as assigning one."""
+    with _domain_errors():
+        return service.custodian_candidates(db, actor, facility_id)
+
+
+@router.put("/facilities/{facility_id}/custodian", response_model=FacilityRead)
+def assign_facility_custodian(
+    facility_id: uuid.UUID,
+    data: CustodianAssign,
+    request: Request,
+    db: DbSession,
+    actor: Manager,
+) -> FacilityRead:
+    """Decide who looks after this facility, or clear it.
+
+    Department-scoped, not object-scoped: a custodian may edit their own
+    facility but may never decide who holds it. Audited either way.
+    """
+    with _domain_errors():
+        return service.assign_custodian(db, actor, facility_id, data, ip=client_ip(request))
 
 
 @router.get(

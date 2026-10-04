@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
 from app.modules.admin.models import Department, School
+from app.modules.facilities.models import Equipment, Facility
 from app.modules.profiles.models import (
     ResearcherProfile,
     StudentProfile,
@@ -19,6 +20,8 @@ from app.modules.taxonomy.models import ResearchArea, Skill, TagAlias
 from app.modules.users.models import User, UserRole
 from scripts.seed_demo_data import (
     COORDINATOR_COUNT,
+    DEMO_EQUIPMENT,
+    DEMO_FACILITIES,
     FACULTY_COUNT,
     STUDENT_COUNT,
     _demo_registration_number,
@@ -53,10 +56,13 @@ def test_seed_creates_the_documented_counts(db: Session) -> None:
     assert _count(db, Skill) == 60
     assert _count(db, ResearchArea) == 40
     assert _count(db, TagAlias) == 6
-    assert _count(db, User) == FACULTY_COUNT + STUDENT_COUNT + COORDINATOR_COUNT + 1
+    # +1 admin, +1 custodian, +1 dean -- the two roles outside the chain.
+    assert _count(db, User) == FACULTY_COUNT + STUDENT_COUNT + COORDINATOR_COUNT + 3
     assert _count(db, ResearcherProfile) == FACULTY_COUNT
     assert _count(db, StudentProfile) == STUDENT_COUNT
-    assert summary.users == FACULTY_COUNT + STUDENT_COUNT + COORDINATOR_COUNT + 1
+    assert summary.users == FACULTY_COUNT + STUDENT_COUNT + COORDINATOR_COUNT + 3
+    assert _count(db, Facility) == len(DEMO_FACILITIES)
+    assert _count(db, Equipment) == len(DEMO_FACILITIES) * len(DEMO_EQUIPMENT)
 
 
 def test_seed_is_idempotent(db: Session) -> None:
@@ -140,3 +146,50 @@ def test_some_profiles_stay_pending_for_the_verification_queue(db: Session) -> N
     ).scalar_one()
 
     assert pending > 0
+
+
+def test_seed_creates_the_two_roles_outside_the_provisioning_chain(db: Session) -> None:
+    """Without these, neither role can be signed in as on a fresh install.
+
+    A role nobody can sign in as cannot be shown to work, which is how the
+    custodian shipped enforced but unassignable.
+    """
+    seed(db, PLACEHOLDER_HASH)
+
+    custodian = db.execute(
+        select(User).where(User.role == UserRole.FACILITY_CUSTODIAN)
+    ).scalar_one()
+    dean = db.execute(select(User).where(User.role == UserRole.DEAN_OF_RESEARCH)).scalar_one()
+
+    assert custodian.registration_number == _demo_registration_number(
+        "demo.custodian01@example.com"
+    )
+    assert dean.registration_number == _demo_registration_number("demo.dean01@example.com")
+    # A custodian belongs to a department; a dean reads the whole institution
+    # and must not, or INSTITUTION_WIDE_ROLES means nothing.
+    assert custodian.department_id is not None
+    assert dean.department_id is None
+
+
+def test_the_seeded_custodian_actually_holds_a_facility(db: Session) -> None:
+    """The point of seeding the role at all.
+
+    An unassigned custodian has an empty scope, so every screen the role
+    reaches would be empty and the demo would show nothing.
+    """
+    seed(db, PLACEHOLDER_HASH)
+
+    custodian = db.execute(
+        select(User).where(User.role == UserRole.FACILITY_CUSTODIAN)
+    ).scalar_one()
+    held = list(db.execute(select(Facility).where(Facility.custodian_id == custodian.id)).scalars())
+
+    assert len(held) == 1
+    # And the room has something bookable in it, or the booking queue is empty.
+    in_room = db.execute(
+        select(func.count()).select_from(Equipment).where(Equipment.facility_id == held[0].id)
+    ).scalar_one()
+    assert int(in_room) == len(DEMO_EQUIPMENT)
+    # Same department as the facility it looks after -- the rule the API
+    # enforces on assignment, so the seed must not contradict it.
+    assert custodian.department_id == held[0].department_id

@@ -10,12 +10,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.pagination import Page, PageParams
+from app.modules.audit import service as audit_service
 from app.modules.facilities.models import Equipment, Facility
 from app.modules.facilities.policies import (
+    assert_can_manage,
     assert_may_manage_facility,
     coordinator_department,
 )
 from app.modules.facilities.schemas import (
+    CustodianAssign,
+    CustodianCandidate,
     EquipmentCreate,
     EquipmentRead,
     EquipmentUpdate,
@@ -42,6 +46,24 @@ class DepartmentRequiredError(Exception):
     """A coordinator's facility must belong to the department they oversee."""
 
 
+class NotACustodianError(Exception):
+    """Only a facility custodian can be made the custodian of a facility.
+
+    Pointing the column at anybody else would leave a facility looking looked
+    after by somebody who does not hold FACILITY_MANAGE at all -- a silent
+    nothing rather than a refusal.
+    """
+
+
+class CustodianDepartmentError(Exception):
+    """A custodian must belong to the department that runs the facility.
+
+    Otherwise the department's coordinator cannot oversee the person looking
+    after their own rooms, which is the "coordinator oversees nothing" bug in
+    a new place.
+    """
+
+
 def _facility_reads(db: Session, facilities: Sequence[Facility]) -> list[FacilityRead]:
     if not facilities:
         return []
@@ -53,19 +75,36 @@ def _facility_reads(db: Session, facilities: Sequence[Facility]) -> list[Facilit
             .group_by(Equipment.facility_id)
         ).all()
     }
-    return [
-        FacilityRead(
-            id=facility.id,
-            name=facility.name,
-            description=facility.description,
-            department_id=facility.department_id,
-            location=facility.location,
-            contact=facility.contact,
-            equipment_count=counts.get(facility.id, 0),
-            created_at=facility.created_at,
+    custodian_ids = {f.custodian_id for f in facilities if f.custodian_id is not None}
+    custodians: dict[uuid.UUID, User] = (
+        {
+            person.id: person
+            for person in db.execute(select(User).where(User.id.in_(custodian_ids))).scalars()
+        }
+        if custodian_ids
+        else {}
+    )
+    reads: list[FacilityRead] = []
+    for facility in facilities:
+        custodian = custodians.get(facility.custodian_id) if facility.custodian_id else None
+        reads.append(
+            FacilityRead(
+                id=facility.id,
+                name=facility.name,
+                description=facility.description,
+                department_id=facility.department_id,
+                location=facility.location,
+                contact=facility.contact,
+                custodian_id=facility.custodian_id,
+                custodian_name=custodian.full_name if custodian else None,
+                custodian_registration_number=(
+                    custodian.registration_number if custodian else None
+                ),
+                equipment_count=counts.get(facility.id, 0),
+                created_at=facility.created_at,
+            )
         )
-        for facility in facilities
-    ]
+    return reads
 
 
 def list_facilities(
@@ -180,6 +219,95 @@ def delete_facility(db: Session, actor: User, facility_id: uuid.UUID) -> None:
     facility = _load_managed_facility(db, actor, facility_id)
     db.delete(facility)
     db.commit()
+
+
+def custodian_candidates(
+    db: Session, actor: User, facility_id: uuid.UUID
+) -> list[CustodianCandidate]:
+    """The custodians eligible to look after this facility.
+
+    Same gate as the assignment itself, so being able to see the list and
+    being able to use it are one decision. Filtered by the same rules
+    `assign_custodian` enforces -- active, holding the role, and in the
+    department that runs the facility -- so the picker cannot offer somebody
+    the assignment would then refuse.
+    """
+    facility = db.get(Facility, facility_id)
+    if facility is None:
+        raise FacilityNotFoundError
+    assert_can_manage(actor, facility.department_id)
+
+    query = select(User).where(
+        User.role == UserRole.FACILITY_CUSTODIAN,
+        User.is_active.is_(True),
+    )
+    if facility.department_id is not None:
+        query = query.where(User.department_id == facility.department_id)
+    return [
+        CustodianCandidate(
+            id=person.id,
+            full_name=person.full_name,
+            registration_number=person.registration_number,
+        )
+        for person in db.execute(query.order_by(User.full_name)).scalars()
+    ]
+
+
+def assign_custodian(
+    db: Session,
+    actor: User,
+    facility_id: uuid.UUID,
+    data: CustodianAssign,
+    *,
+    ip: str | None = None,
+) -> FacilityRead:
+    """Put a facility in somebody's care, or take it out of theirs.
+
+    Gated at DEPARTMENT level (`assert_can_manage`), deliberately not at the
+    object level the rest of this module uses. A custodian passes the object
+    check for their own facility, so reusing it here would let them hand the
+    room to somebody else or seize a colleague's -- the one thing the role
+    must not be able to do. Only an admin, or the coordinator of the
+    department that runs the facility, may decide who holds it.
+
+    Audited either way: this is a change of authority, not of a label.
+    """
+    facility = db.get(Facility, facility_id)
+    if facility is None:
+        raise FacilityNotFoundError
+    assert_can_manage(actor, facility.department_id)
+
+    custodian: User | None = None
+    if data.user_id is not None:
+        custodian = db.get(User, data.user_id)
+        # 404 rather than 422: an actor who may manage this facility still has
+        # no business learning which account ids exist.
+        if custodian is None or not custodian.is_active:
+            raise FacilityNotFoundError
+        if custodian.role is not UserRole.FACILITY_CUSTODIAN:
+            raise NotACustodianError
+        if facility.department_id is not None and custodian.department_id != facility.department_id:
+            raise CustodianDepartmentError
+
+    before = facility.custodian_id
+    if before == data.user_id:
+        # Nothing changed; don't write an audit row claiming otherwise.
+        return _facility_reads(db, [facility])[0]
+
+    facility.custodian_id = data.user_id
+    audit_service.record(
+        db,
+        actor_id=actor.id,
+        action="facility.custodian_assigned" if data.user_id else "facility.custodian_cleared",
+        entity_type="facility",
+        entity_id=facility.id,
+        before={"custodian_id": str(before) if before else None},
+        after={"custodian_id": str(data.user_id) if data.user_id else None},
+        ip=ip,
+    )
+    db.commit()
+    db.refresh(facility)
+    return _facility_reads(db, [facility])[0]
 
 
 # --- equipment ---------------------------------------------------------------

@@ -129,6 +129,15 @@ appointing one cannot happen by accident.
 | Deletes | nobody | nobody |
 | Signs in at | `/login` | `/login` |
 
+**Assignment is department-level, not object-level.**
+`PUT /facilities/{id}/custodian` is gated by `assert_can_manage`, so only an
+admin or the department's coordinator decides who holds a facility. A
+custodian passes the *object* check for their own facility, so reusing it
+would let them hand the room away or seize a colleague's; they hold no
+department, so the department-level gate excludes them by construction. The
+target must be an active `FACILITY_CUSTODIAN` in the facility's own
+department, and both assigning and clearing are audited.
+
 `facility:manage` says a person may manage *a* facility; it never said
 *every* facility, and before this role nothing needed the distinction because
 the only holders were scoped by department. A custodian's scope is a **set of

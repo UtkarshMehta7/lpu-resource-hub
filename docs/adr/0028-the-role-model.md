@@ -126,6 +126,53 @@ lost access: coordinators and admins have both permissions.
   `tests/test_role_model.py` tests every boundary against the API directly —
   hiding a menu item is not a permission.
 
+## Correction, same day: the role was enforced but unassignable
+
+The first version of this shipped `facilities.custodian_id` and enforced it
+everywhere -- the object-level check, the queue filter, the 404s -- but
+provided **no way to set it**. It was absent from `FacilityUpdate` and from
+`FacilityRead`, so no endpoint could write it and no page could show it. The
+tests passed because the fixture wrote the column with raw SQL under a
+comment deferring the endpoint to "Phase 6".
+
+The effect was a role that could be created and never used: an administrator
+could appoint a custodian, but nobody could give them a room, so their scope
+stayed empty for ever. Enforcing a permission is not the same as making it
+reachable, and a test fixture that reaches past the API hides exactly that
+difference.
+
+Assignment is therefore `PUT /facilities/{id}/custodian`, with
+`GET /facilities/{id}/custodian-candidates` behind the same gate to populate
+the choice. Four decisions worth recording:
+
+- **Its own endpoint, not a `FacilityUpdate` field.** A custodian passes the
+  object-level check for their own facility, so an assignment folded into the
+  ordinary edit would let them hand the room to somebody else, or take a
+  colleague's. Deciding *who holds* a facility is a different act from
+  renaming it.
+- **Gated at department level** (`assert_can_manage`), deliberately not at the
+  object level the rest of the module uses. Only an admin, or the coordinator
+  of the department that runs the facility, may decide who holds it -- and a
+  custodian holds no department, so they are excluded by construction rather
+  than by a role check somebody can forget.
+- **The target must be an active account holding the role**, and must belong to
+  the department that runs the facility. Pointing the column at a faculty
+  member would leave a facility looking looked-after by somebody with no
+  `facility:manage` at all; pointing it outside the department would put the
+  custodian beyond the reach of the coordinator who oversees those rooms --
+  the "coordinator oversees nothing" bug in a new place.
+- **Audited both ways**, `facility.custodian_assigned` and
+  `facility.custodian_cleared`. A change of authority, not of a label.
+
+The candidate list is filtered by the same rules the assignment enforces, so
+the picker cannot offer somebody the assignment would then refuse -- the same
+reasoning as `manageable_facility_filter` and the booking queue.
+
+The interface carried the same conflation: `canManage` on the facility page
+was `coordinator || admin`, which hid the management controls from a custodian
+on their own facility. It is now the object-level rule, with assignment kept
+separate.
+
 ## What was deliberately not done
 
 No permission was widened to make a role fit. Where the specification's
