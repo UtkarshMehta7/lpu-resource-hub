@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.pagination import Page, PageParams
+from app.modules.admin.models import Department
 from app.modules.audit import service as audit_service
 from app.modules.facilities.models import Equipment, Facility
 from app.modules.facilities.policies import (
@@ -75,6 +76,17 @@ def _facility_reads(db: Session, facilities: Sequence[Facility]) -> list[Facilit
             .group_by(Equipment.facility_id)
         ).all()
     }
+    department_ids = {f.department_id for f in facilities if f.department_id is not None}
+    department_names: dict[uuid.UUID, str] = (
+        {
+            row.id: row.name
+            for row in db.execute(
+                select(Department).where(Department.id.in_(department_ids))
+            ).scalars()
+        }
+        if department_ids
+        else {}
+    )
     custodian_ids = {f.custodian_id for f in facilities if f.custodian_id is not None}
     custodians: dict[uuid.UUID, User] = (
         {
@@ -93,6 +105,9 @@ def _facility_reads(db: Session, facilities: Sequence[Facility]) -> list[Facilit
                 name=facility.name,
                 description=facility.description,
                 department_id=facility.department_id,
+                department_name=(
+                    department_names.get(facility.department_id) if facility.department_id else None
+                ),
                 location=facility.location,
                 contact=facility.contact,
                 custodian_id=facility.custodian_id,

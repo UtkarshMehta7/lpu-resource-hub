@@ -188,3 +188,27 @@ def test_equipment_crud_and_listing(client: TestClient, world: World) -> None:
         client.get(f"/api/v1/equipment/{equipment['id']}", headers=auth(world.student)).status_code
         == 404
     )
+
+
+def test_a_facility_names_the_department_that_runs_it(client: TestClient, world: World) -> None:
+    """The choice made on the form has to be visible afterwards.
+
+    A facility with no department can be managed by administrators alone, so
+    which one it is -- or that there is none -- is not a detail.
+    """
+    inside = client.post(
+        "/api/v1/facilities",
+        headers=auth(world.admin),
+        json={"name": "Departmental Lab", "department_id": world.department_id},
+    )
+    assert inside.status_code in (200, 201), inside.text
+    assert inside.json()["department_name"]
+
+    university_wide = client.post(
+        "/api/v1/facilities",
+        headers=auth(world.admin),
+        json={"name": "Central Instrumentation"},
+    )
+    assert university_wide.status_code in (200, 201), university_wide.text
+    assert university_wide.json()["department_id"] is None
+    assert university_wide.json()["department_name"] is None
