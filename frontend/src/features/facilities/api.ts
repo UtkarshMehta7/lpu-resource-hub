@@ -25,6 +25,10 @@ export interface Facility {
   department_id: string | null;
   location: string | null;
   contact: string | null;
+  /** Who looks after it, named as well as referenced. Null between custodians. */
+  custodian_id: string | null;
+  custodian_name: string | null;
+  custodian_registration_number: string | null;
   equipment_count: number;
   created_at: string;
 }
@@ -154,6 +158,37 @@ export async function createBooking(input: {
 export async function fetchMyBookings(status?: BookingStatus): Promise<Booking[]> {
   const response = await apiClient.get<Booking[]>("/api/v1/me/bookings", {
     params: status ? { status } : undefined,
+  });
+  return response.data;
+}
+
+export interface CustodianCandidate {
+  id: string;
+  full_name: string;
+  registration_number: string;
+}
+
+/** Who could look after this facility. Same permission as assigning one. */
+export async function fetchCustodianCandidates(facilityId: string): Promise<CustodianCandidate[]> {
+  const response = await apiClient.get<CustodianCandidate[]>(
+    `/api/v1/facilities/${facilityId}/custodian-candidates`,
+  );
+  return response.data;
+}
+
+/**
+ * Decide who looks after a facility, or clear it (`userId: null`).
+ *
+ * Its own endpoint rather than a field on the facility update: the server
+ * gates this at department level, because a custodian may edit their own
+ * facility but must never be able to hand it to somebody else.
+ */
+export async function assignFacilityCustodian(
+  facilityId: string,
+  userId: string | null,
+): Promise<Facility> {
+  const response = await apiClient.put<Facility>(`/api/v1/facilities/${facilityId}/custodian`, {
+    user_id: userId,
   });
   return response.data;
 }

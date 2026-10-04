@@ -34,6 +34,7 @@ from app.core.config import get_settings
 from app.core.security import MIN_PASSWORD_LENGTH, hash_password, is_common_password
 from app.db.session import create_db_engine, create_session_factory
 from app.modules.admin.models import Department, School
+from app.modules.facilities.models import Equipment, Facility, MaintenanceStatus
 from app.modules.funding.models import FundingOpportunity
 from app.modules.milestones.models import (
     Milestone,
@@ -192,6 +193,8 @@ class SeedSummary:
     funding_calls: int = 0
     projects: int = 0
     milestones: int = 0
+    facilities: int = 0
+    equipment: int = 0
 
     def render(self) -> str:
         return (
@@ -204,8 +207,86 @@ class SeedSummary:
             f"  profiles:       {self.profiles}\n"
             f"  funding calls:  {self.funding_calls}\n"
             f"  projects:       {self.projects}\n"
-            f"  milestones:     {self.milestones}"
+            f"  milestones:     {self.milestones}\n"
+            f"  facilities:     {self.facilities}\n"
+            f"  equipment:      {self.equipment}"
         )
+
+
+#: Two rooms per department is enough to show the difference between "a
+#: custodian looks after their own facilities" and "a coordinator oversees the
+#: department's". More would only pad the catalogue.
+DEMO_FACILITIES: tuple[tuple[str, str, str], ...] = (
+    ("Materials Characterisation Lab", "Block 34, Ground Floor", "Shared diffraction and imaging."),
+    ("Soil and Water Testing Lab", "Block 29, First Floor", "Sample preparation and assay."),
+)
+
+DEMO_EQUIPMENT: tuple[tuple[str, str, bool], ...] = (
+    ("X-Ray Diffractometer", "Diffraction", True),
+    ("Benchtop Centrifuge", "Sample preparation", False),
+    ("Optical Microscope", "Imaging", False),
+)
+
+
+def _seed_facilities(
+    db: Session,
+    summary: SeedSummary,
+    departments: list[Department],
+    custodian: User,
+) -> None:
+    """Rooms with things in them, one of them in the custodian's care.
+
+    The seed created none of this before, which meant the facility catalogue,
+    the booking queue and the whole custodian role were empty on a fresh
+    install -- a role nobody can exercise demonstrates nothing. Idempotent on
+    (department_id, name), which the table already makes unique.
+    """
+    existing = {
+        (facility.department_id, facility.name): facility
+        for facility in db.execute(select(Facility)).scalars()
+    }
+    for index, (name, location, description) in enumerate(DEMO_FACILITIES):
+        department = departments[index % len(departments)]
+        facility = existing.get((department.id, name))
+        if facility is None:
+            facility = Facility(
+                name=name,
+                description=description,
+                department_id=department.id,
+                location=location,
+                contact="facilities@example.edu",
+            )
+            db.add(facility)
+            summary.facilities += 1
+        # The first room is the custodian's, and only if they belong to the
+        # department that runs it -- the same rule the API enforces.
+        if index == 0 and custodian.department_id == department.id:
+            facility.custodian_id = custodian.id
+        db.flush()
+
+        for item_name, category, approval in DEMO_EQUIPMENT:
+            already = db.execute(
+                select(Equipment).where(
+                    Equipment.facility_id == facility.id, Equipment.name == item_name
+                )
+            ).scalar_one_or_none()
+            if already is not None:
+                continue
+            db.add(
+                Equipment(
+                    facility_id=facility.id,
+                    name=item_name,
+                    description=f"Fictional demo equipment: {item_name}.",
+                    category=category,
+                    maintenance_status=MaintenanceStatus.AVAILABLE,
+                    students_allowed=True,
+                    requires_approval=approval,
+                    max_hours=8,
+                    min_lead_hours=0,
+                )
+            )
+            summary.equipment += 1
+    db.flush()
 
 
 def _resolve_password() -> str:
@@ -296,7 +377,14 @@ def _seed_taxonomy(db: Session, summary: SeedSummary) -> tuple[list[Skill], list
 _DEMO_NUMBER_BASE = 12_500_000
 # The administrator has no number of its own in the email, so it takes the
 # first slot rather than ...000, which reads like a placeholder.
-_ROLE_BLOCK = {"admin": 1, "coordinator": 100, "faculty": 200, "student": 300}
+_ROLE_BLOCK = {
+    "admin": 1,
+    "coordinator": 100,
+    "faculty": 200,
+    "student": 300,
+    "custodian": 400,
+    "dean": 500,
+}
 
 
 def _demo_registration_number(email: str) -> str:
@@ -629,6 +717,37 @@ def seed(db: Session, password_hash: str) -> SeedSummary:
             )
         )
     db.flush()
+
+    # The two roles outside the provisioning chain (ADR 0028). Appointed by
+    # the admin here because that is the only route the API offers either, and
+    # seeded at all because a role nobody can sign in as cannot be shown to
+    # work -- the custodian's own facility is assigned in _seed_facilities.
+    custodian = _seed_user(
+        db,
+        existing_users,
+        summary,
+        email="demo.custodian01@example.com",
+        full_name="Demo Custodian 01",
+        role=UserRole.FACILITY_CUSTODIAN,
+        password_hash=password_hash,
+        department=departments[0],
+        created_by=admin,
+    )
+    # No department: a dean reads the whole institution, and
+    # INSTITUTION_WIDE_ROLES is what lets them exist without one.
+    _seed_user(
+        db,
+        existing_users,
+        summary,
+        email="demo.dean01@example.com",
+        full_name="Demo Dean 01",
+        role=UserRole.DEAN_OF_RESEARCH,
+        password_hash=password_hash,
+        created_by=admin,
+    )
+    db.flush()
+
+    _seed_facilities(db, summary, departments, custodian)
 
     students: list[User] = []
     for index in range(1, STUDENT_COUNT + 1):

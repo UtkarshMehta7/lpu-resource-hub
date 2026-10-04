@@ -46,8 +46,20 @@ def world(client: TestClient, seed_user: Callable[..., SeededUser]) -> World:
     return build_world(client, seed_user)
 
 
-def make_facility(client: TestClient, world: World, name: str) -> str:
-    created = client.post("/api/v1/facilities", headers=auth(world.admin), json={"name": name})
+def make_facility(
+    client: TestClient, world: World, name: str, *, in_department: bool = False
+) -> str:
+    """A facility, optionally belonging to the world's department.
+
+    Departmentless by default, which is what the object-level custodian tests
+    want -- no department means no coordinator can reach it, so only the
+    custodian column decides. Pass `in_department=True` for the tests about
+    department-level scope, where it is the whole point.
+    """
+    payload: dict[str, object] = {"name": name}
+    if in_department:
+        payload["department_id"] = world.department_id
+    created = client.post("/api/v1/facilities", headers=auth(world.admin), json=payload)
     assert created.status_code in (200, 201), created.text
     facility_id: str = created.json()["id"]
     return facility_id
@@ -369,6 +381,221 @@ def test_a_custodian_with_no_facility_has_an_empty_booking_queue(
     # Empty, not refused: they hold the permission, they just hold no rooms.
     assert queue.status_code == 200
     assert queue.json() == []
+
+
+# --- putting a facility in somebody's care ---------------------------------
+
+
+def test_an_admin_assigns_a_custodian_and_the_facility_names_them(
+    client: TestClient,
+    world: World,
+    seed_user: Callable[..., SeededUser],
+) -> None:
+    facility = make_facility(client, world, "Assignable Lab")
+    custodian = seed_user(UserRole.FACILITY_CUSTODIAN, department_id=world.department_id)
+
+    assigned = client.put(
+        f"/api/v1/facilities/{facility}/custodian",
+        headers=auth(world.admin),
+        json={"user_id": str(custodian.id)},
+    )
+
+    assert assigned.status_code == 200, assigned.text
+    body = assigned.json()
+    assert body["custodian_id"] == str(custodian.id)
+    # Named, not just referenced: an id alone tells a reader nothing about
+    # whether the right person holds the room.
+    assert body["custodian_name"]
+    assert body["custodian_registration_number"]
+
+    # And the assignment is what makes the role usable at all.
+    edited = client.patch(
+        f"/api/v1/facilities/{facility}",
+        headers=auth(custodian),
+        json={"location": "Block 7"},
+    )
+    assert edited.status_code == 200, edited.text
+
+
+def test_a_custodian_cannot_hand_their_own_facility_to_somebody_else(
+    client: TestClient,
+    world: World,
+    seed_user: Callable[..., SeededUser],
+) -> None:
+    """The reason this is its own endpoint rather than a FacilityUpdate field.
+
+    A custodian passes the object-level check for their own facility, so an
+    assignment folded into the ordinary edit would let them hand the room
+    away -- or take a colleague's. Deciding who holds a facility is
+    department-level, and a custodian holds no department.
+    """
+    facility = make_facility(client, world, "Contested Lab")
+    mine = seed_user(UserRole.FACILITY_CUSTODIAN, department_id=world.department_id)
+    theirs = seed_user(UserRole.FACILITY_CUSTODIAN, department_id=world.department_id)
+    client.put(
+        f"/api/v1/facilities/{facility}/custodian",
+        headers=auth(world.admin),
+        json={"user_id": str(mine.id)},
+    )
+
+    handover = client.put(
+        f"/api/v1/facilities/{facility}/custodian",
+        headers=auth(mine),
+        json={"user_id": str(theirs.id)},
+    )
+    assert handover.status_code == 403, handover.text
+
+    # Nor may they drop it, which would leave the room unattended.
+    cleared = client.put(
+        f"/api/v1/facilities/{facility}/custodian",
+        headers=auth(mine),
+        json={"user_id": None},
+    )
+    assert cleared.status_code == 403
+
+    still = client.get(f"/api/v1/facilities/{facility}", headers=auth(world.admin)).json()
+    assert still["custodian_id"] == str(mine.id)
+
+
+def test_a_coordinator_assigns_inside_their_department_and_not_outside_it(
+    client: TestClient,
+    world: World,
+    seed_user: Callable[..., SeededUser],
+) -> None:
+    ours = make_facility(client, world, "Our Lab", in_department=True)
+    custodian = seed_user(UserRole.FACILITY_CUSTODIAN, department_id=world.department_id)
+
+    inside = client.put(
+        f"/api/v1/facilities/{ours}/custodian",
+        headers=auth(world.coordinator),
+        json={"user_id": str(custodian.id)},
+    )
+    assert inside.status_code == 200, inside.text
+
+    # A facility in another department is out of their reach.
+    other_school = client.post(
+        "/api/v1/admin/schools", headers=auth(world.admin), json={"name": "Science School"}
+    ).json()["id"]
+    other_department = client.post(
+        "/api/v1/admin/departments",
+        headers=auth(world.admin),
+        json={"school_id": other_school, "name": "Physics"},
+    ).json()["id"]
+    theirs = client.post(
+        "/api/v1/facilities",
+        headers=auth(world.admin),
+        json={"name": "Their Lab", "department_id": other_department},
+    ).json()["id"]
+
+    outside = client.put(
+        f"/api/v1/facilities/{theirs}/custodian",
+        headers=auth(world.coordinator),
+        json={"user_id": str(custodian.id)},
+    )
+    assert outside.status_code == 403
+
+
+def test_only_a_custodian_may_be_made_one(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """A faculty member in the column would look looked-after and not be.
+
+    They hold no FACILITY_MANAGE at all, so the facility would simply have
+    nobody -- a silent nothing is worse than a refusal.
+    """
+    facility = make_facility(client, world, "Mislabelled Lab")
+
+    response = client.put(
+        f"/api/v1/facilities/{facility}/custodian",
+        headers=auth(world.admin),
+        json={"user_id": str(world.faculty.id)},
+    )
+
+    assert response.status_code == 422, response.text
+
+
+def test_a_custodian_must_belong_to_the_department_that_runs_the_facility(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """Otherwise the department's coordinator oversees nobody again."""
+    facility = make_facility(client, world, "Departmental Lab", in_department=True)
+    other_school = client.post(
+        "/api/v1/admin/schools", headers=auth(world.admin), json={"name": "Arts School"}
+    ).json()["id"]
+    other_department = client.post(
+        "/api/v1/admin/departments",
+        headers=auth(world.admin),
+        json={"school_id": other_school, "name": "History"},
+    ).json()["id"]
+    stranger = seed_user(UserRole.FACILITY_CUSTODIAN, department_id=other_department)
+
+    response = client.put(
+        f"/api/v1/facilities/{facility}/custodian",
+        headers=auth(world.admin),
+        json={"user_id": str(stranger.id)},
+    )
+
+    assert response.status_code == 422, response.text
+
+
+def test_clearing_a_custodian_leaves_the_facility_between_custodians(
+    client: TestClient,
+    world: World,
+    seed_user: Callable[..., SeededUser],
+) -> None:
+    facility = make_facility(client, world, "Vacated Lab")
+    custodian = seed_user(UserRole.FACILITY_CUSTODIAN, department_id=world.department_id)
+    client.put(
+        f"/api/v1/facilities/{facility}/custodian",
+        headers=auth(world.admin),
+        json={"user_id": str(custodian.id)},
+    )
+
+    cleared = client.put(
+        f"/api/v1/facilities/{facility}/custodian",
+        headers=auth(world.admin),
+        json={"user_id": None},
+    )
+
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["custodian_id"] is None
+    # The facility survives; only the authority over it went away.
+    assert cleared.json()["name"] == "Vacated Lab"
+    # And the former custodian can no longer touch it.
+    refused = client.patch(
+        f"/api/v1/facilities/{facility}",
+        headers=auth(custodian),
+        json={"location": "Nowhere"},
+    )
+    assert refused.status_code == 403
+
+
+def test_assigning_a_custodian_is_audited(
+    client: TestClient,
+    world: World,
+    seed_user: Callable[..., SeededUser],
+) -> None:
+    """A change of authority, not of a label, so it leaves a record."""
+    facility = make_facility(client, world, "Audited Lab")
+    custodian = seed_user(UserRole.FACILITY_CUSTODIAN, department_id=world.department_id)
+    client.put(
+        f"/api/v1/facilities/{facility}/custodian",
+        headers=auth(world.admin),
+        json={"user_id": str(custodian.id)},
+    )
+    client.put(
+        f"/api/v1/facilities/{facility}/custodian",
+        headers=auth(world.admin),
+        json={"user_id": None},
+    )
+
+    logs = client.get(
+        "/api/v1/admin/audit-logs", headers=auth(world.admin), params={"entity_type": "facility"}
+    )
+    assert logs.status_code == 200, logs.text
+    actions = [row["action"] for row in logs.json()["items"]]
+    assert "facility.custodian_assigned" in actions
+    assert "facility.custodian_cleared" in actions
 
 
 # --- the dean's reach ------------------------------------------------------

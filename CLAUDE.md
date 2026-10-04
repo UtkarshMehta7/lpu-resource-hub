@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 154 API operations over 123 paths, 44 tables, 26 migrations,
-28 ADRs, 26 backend modules, 1019 backend tests, 237 frontend tests,
+Current shape: 156 API operations over 125 paths, 44 tables, 26 migrations,
+28 ADRs, 26 backend modules, 1028 backend tests, 242 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -187,6 +187,24 @@ Current shape: 154 API operations over 123 paths, 44 tables, 26 migrations,
   a listing can never show a request the approve call would then refuse. A dean
   holds `analytics:read` and nothing else, and `INSTITUTION_WIDE_ROLES` is why
   they alone need no department.
+- **Enforcing a permission is not the same as making it reachable.** The
+  custodian role shipped fully enforced and *unassignable*: `custodian_id` was
+  in no schema and no endpoint wrote it, so the role could be created and
+  never used. The tests passed because the fixture wrote the column with raw
+  SQL. A fixture that reaches past the API hides exactly that gap -- if a
+  helper needs SQL to set something up, ask which endpoint is missing.
+- **Holding a facility and deciding who holds it are different powers.**
+  `PUT /facilities/{id}/custodian` is gated at DEPARTMENT level
+  (`assert_can_manage`), never object level: a custodian passes the object
+  check for their own facility, so folding the assignment into
+  `FacilityUpdate` would let them hand the room away or take a colleague's.
+  The candidate list (`/custodian-candidates`) is filtered by the same rules
+  the assignment enforces, so the picker can never offer somebody the
+  assignment would refuse. Both directions audited.
+- **The demo seed creates facilities and equipment now**, and assigns the
+  first to `demo.custodian01` (12500401); `demo.dean01` (12500501) has no
+  department, as a dean must not. Before this the catalogue, the booking queue
+  and the custodian role were all empty on a fresh install.
 - A fix to the service layer does not fix the rows already in the deployed
   database. The coordinators appointed before `_sync_coordinator_scope` needed
   migration 0018 as well, and the users page now shows each coordinator's
