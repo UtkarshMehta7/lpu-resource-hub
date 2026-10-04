@@ -3,15 +3,26 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { SkeletonList } from "@/components/ui/Skeleton";
+import { useAuth } from "@/features/auth/authContext";
 import { toApiError } from "@/lib/api/errors";
 
 import { decideBooking, fetchBookingQueue } from "./api";
 
-/** Coordinator/admin approvals. Two overlapping requests can both sit here;
- * approving the second one fails cleanly, because the database says so. */
+/**
+ * Approvals, for whoever is responsible for the equipment.
+ *
+ * The server decides what lands here -- a department for a coordinator, the
+ * assigned facilities for a custodian, everything for an admin -- so the only
+ * thing the role changes on this page is the sentence describing it.
+ *
+ * Two overlapping requests can both sit here; approving the second one fails
+ * cleanly, because the database says so.
+ */
 export function BookingQueuePage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -33,11 +44,16 @@ export function BookingQueuePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Booking requests</h1>
-      <p className="mt-1 text-sm text-ink-muted">
-        Requests for equipment in your department. Approving a slot that someone else already holds
-        is rejected by the database, so double-booking can&apos;t happen.
-      </p>
+      <PageHeader
+        title="Booking requests"
+        description={`${
+          user?.role === "facility_custodian"
+            ? "Requests for equipment in the facilities assigned to you."
+            : user?.role === "admin"
+              ? "Requests for equipment anywhere in the university."
+              : "Requests for equipment in your department."
+        } Approving a slot that someone else already holds is rejected by the database, so double-booking cannot happen.`}
+      />
 
       {error ? (
         <p role="alert" className="mt-4 text-sm text-red-700">

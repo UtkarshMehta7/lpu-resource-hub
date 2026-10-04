@@ -118,7 +118,9 @@ class Scope:
 
 
 def scope_for(user: User) -> Scope:
-    if user.role is UserRole.ADMIN:
+    # A dean reads the institution, which is the point of the role: figures
+    # for the place as a whole, without the ability to edit what they read.
+    if user.role in (UserRole.ADMIN, UserRole.DEAN_OF_RESEARCH):
         return Scope(department_id=None)
     if (
         user.role is UserRole.RESEARCH_COORDINATOR

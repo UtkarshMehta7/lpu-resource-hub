@@ -106,21 +106,23 @@ export const NAV: NavItem[] = [
     to: "/coordinator/booking-queue",
     label: "Bookings",
     group: "Review",
-    roles: ["research_coordinator", "admin"],
+    // A custodian belongs here and nowhere else in Review: the queue is
+    // filtered to the facilities assigned to them.
+    roles: ["research_coordinator", "facility_custodian", "admin"],
     keywords: "approve slots",
   },
   {
     to: "/coordinator/at-risk",
     label: "At-risk projects",
     group: "Review",
-    roles: ["research_coordinator", "admin"],
+    roles: ["research_coordinator", "dean_of_research", "admin"],
     keywords: "milestones overdue slipping late deadlines",
   },
   {
     to: "/analytics/report",
     label: "Research report",
     group: "Review",
-    roles: ["research_coordinator", "admin"],
+    roles: ["research_coordinator", "dean_of_research", "admin"],
     keywords: "institutional annual academic year export pdf csv statistics",
   },
   {
@@ -134,7 +136,7 @@ export const NAV: NavItem[] = [
     to: "/analytics",
     label: "Analytics",
     group: "Review",
-    roles: ["research_coordinator", "admin"],
+    roles: ["research_coordinator", "dean_of_research", "admin"],
     keywords: "stats numbers network",
   },
 

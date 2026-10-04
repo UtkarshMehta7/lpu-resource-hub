@@ -319,9 +319,13 @@ def test_an_admin_can_create_any_role_through_the_override(
     assert response.json()["user"]["role"] == "faculty"
 
 
-def test_the_override_can_create_an_admin_without_a_department(
-    client: TestClient, world: World
-) -> None:
+def test_the_override_cannot_create_another_administrator(client: TestClient, world: World) -> None:
+    """It could, until ADR 0028 closed it.
+
+    Promotion to administrator is the two-person ceremony of ADR 0019 -- a
+    code to the target's own inbox -- and the override was a one-click way
+    round it. Every other role it may still name.
+    """
     response = client.post(
         "/api/v1/admin/users",
         headers=auth(world.admin),
@@ -332,8 +336,26 @@ def test_the_override_can_create_an_admin_without_a_department(
         },
     )
 
+    assert response.status_code == 403, response.json()
+
+
+def test_the_override_can_create_a_dean_without_a_department(
+    client: TestClient, world: World
+) -> None:
+    """A dean reads the whole institution, so no department holds them."""
+    response = client.post(
+        "/api/v1/admin/users",
+        headers=auth(world.admin),
+        json={
+            "registration_number": "OVERRIDE02A",
+            "full_name": "Dean Of Research",
+            "role": "dean_of_research",
+        },
+    )
+
     assert response.status_code == 201, response.json()
-    assert response.json()["user"]["role"] == "admin"
+    assert response.json()["user"]["role"] == "dean_of_research"
+    assert response.json()["user"]["department_id"] is None
 
 
 def test_the_override_still_needs_a_department_for_everyone_else(

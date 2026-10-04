@@ -9,10 +9,20 @@ import type { Role } from "@/features/auth/types";
  * refusal is shown if it comes.
  */
 export const DELETABLE_ROLES: Record<Role, readonly Role[]> = {
-  admin: ["student", "faculty", "research_coordinator", "admin"],
+  admin: [
+    "student",
+    "faculty",
+    "research_coordinator",
+    "facility_custodian",
+    "dean_of_research",
+    "admin",
+  ],
   research_coordinator: ["student", "faculty"],
   faculty: ["student"],
   student: [],
+  // Neither removes anybody: a custodian looks after rooms, a dean reads.
+  facility_custodian: [],
+  dean_of_research: [],
 };
 
 export function mayDeleteRole(actorRole: Role, targetRole: Role): boolean {

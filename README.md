@@ -309,6 +309,15 @@ The request body carries no role. Sending one changes nothing: the created
 role is `CREATABLE_ROLE[caller.role]`. See
 [ADR 0019](docs/adr/0019-account-provisioning-hierarchy.md).
 
+Two roles sit outside that chain and are appointed only through the admin
+override (`POST /api/v1/admin/users`, the one place a role is named):
+`FACILITY_CUSTODIAN`, who manages the facilities assigned to them and approves
+bookings for those alone, and `DEAN_OF_RESEARCH`, who reads the institution's
+research figures and changes nothing. Neither inherits anything and neither
+creates anybody. The override may appoint every role **except** another
+administrator — that stays the two-person ceremony. See
+[ADR 0028](docs/adr/0028-the-role-model.md).
+
 ### Creating the first admin account
 
 Nobody self-registers, so the first admin is created from the command line and
@@ -330,6 +339,15 @@ full design in [`docs/rbac-matrix.md`](docs/rbac-matrix.md)). `401` = not
 authenticated, `403` = authenticated but not allowed, `404` = you must not
 learn the resource exists. `RESEARCH_COORDINATOR` inherits everything
 `FACULTY` can do, plus `taxonomy:manage` and `profile:verify` of its own.
+`FACILITY_CUSTODIAN` and `DEAN_OF_RESEARCH` inherit nothing: one holds
+`facility:manage` and `booking:approve` over the facilities assigned to them,
+the other holds `analytics:read` and nothing else.
+
+A permission says what kind of thing you may do, never which one. A
+custodian's scope is a set of facility rows, so `facility:manage` is checked
+against the loaded facility, and the booking queue is filtered by the same
+rule — a queue that showed a request the approve call then refused would be a
+dead button.
 
 | Endpoint | Notes |
 |---|---|
