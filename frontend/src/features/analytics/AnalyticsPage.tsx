@@ -16,6 +16,8 @@ import {
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonList } from "@/components/ui/Skeleton";
 
+import { DepartmentComparison } from "./DepartmentComparison";
+
 import { applicationStages, fetchNetwork, fetchOverview, statusCounts } from "./api";
 import { NetworkGraph } from "./NetworkGraph";
 
@@ -53,6 +55,16 @@ export function AnalyticsPage() {
           : "For your department only — the numbers stop at your scope."}{" "}
         Aggregates only; no personal data.
       </p>
+
+      {data.scope === "platform" ? (
+        <section className="mt-6">
+          <h2 className="text-lg font-semibold">By department</h2>
+          <p className="mb-3 mt-1 text-sm text-ink-muted">
+            Where the work is, and where it is slipping. Departments needing attention come first.
+          </p>
+          <DepartmentComparison />
+        </section>
+      ) : null}
 
       <section className="mt-6">
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -9,6 +9,8 @@ export interface ResearcherCard {
   full_name: string;
   designation: string;
   department_id: string | null;
+  /** Named, not just referenced — a card showing a UUID says nothing. */
+  department_name: string | null;
   availability: Availability;
   verification_status: VerificationStatus;
   research_areas: string[];
@@ -28,6 +30,8 @@ export interface StudentCard {
   program: string;
   year: number;
   department_id: string | null;
+  /** Named, not just referenced — a card showing a UUID says nothing. */
+  department_name: string | null;
   interests: string | null;
   research_areas: string[];
   skills: string[];

@@ -28,6 +28,10 @@ class ResearcherCard(BaseModel):
     full_name: str
     designation: str
     department_id: uuid.UUID | None
+    #: Named, not just referenced. A card showing a UUID -- or nothing --
+    #: tells a reader none of what they came for, and which department
+    #: somebody belongs to is the first thing anyone asks about a person.
+    department_name: str | None = None
     availability: ResearcherAvailability
     verification_status: VerificationStatus
     research_areas: list[str]
@@ -49,6 +53,10 @@ class StudentCard(BaseModel):
     program: str
     year: int
     department_id: uuid.UUID | None
+    #: Named, not just referenced. A card showing a UUID -- or nothing --
+    #: tells a reader none of what they came for, and which department
+    #: somebody belongs to is the first thing anyone asks about a person.
+    department_name: str | None = None
     interests: str | None
     research_areas: list[str]
     skills: list[str]

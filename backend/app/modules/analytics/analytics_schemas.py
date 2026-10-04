@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from pydantic import BaseModel
@@ -119,3 +120,18 @@ class PlatformSettings(BaseModel):
 
     environment: str
     settings: dict[str, Any]
+
+
+class DepartmentComparisonRow(BaseModel):
+    """One department's headline figures, for comparing against the others."""
+
+    department_id: uuid.UUID
+    department_name: str
+    school_name: str | None
+    researchers: int
+    students: int
+    projects_active: int
+    publications: int
+    milestones_overdue: int
+    milestones_at_risk: int
+    verification_pending: int
