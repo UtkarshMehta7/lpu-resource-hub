@@ -14,6 +14,7 @@ const {
   useAuthMock,
   deleteUser,
   fetchDeletionImpact,
+  changeUserRole,
 } = vi.hoisted(() => ({
   fetchUsers: vi.fn(),
   updateUser: vi.fn(),
@@ -22,6 +23,7 @@ const {
   useAuthMock: vi.fn(),
   deleteUser: vi.fn(),
   fetchDeletionImpact: vi.fn(),
+  changeUserRole: vi.fn(),
 }));
 
 vi.mock("./api", () => ({
@@ -30,7 +32,7 @@ vi.mock("./api", () => ({
   resetTemporaryPassword,
   deleteUser,
   fetchDeletionImpact,
-  changeUserRole: vi.fn(),
+  changeUserRole,
   setUserActive: vi.fn(),
 }));
 
@@ -277,5 +279,110 @@ describe("AdminUsersPage", () => {
     await user.selectOptions(await screen.findByLabelText(/department for/i), "dept-1");
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
+  });
+});
+
+describe("roles that are not in the provisioning chain", () => {
+  it("shows a dean as a Dean, not as a Student", async () => {
+    // The bug this replaces: ROLE_OPTIONS listed only the original four
+    // roles, so a select holding "dean_of_research" matched no option and
+    // the browser displayed the FIRST one. Every dean and custodian read
+    // "Student" on this page, and touching the control would have demoted
+    // them.
+    fetchUsers.mockResolvedValue({
+      items: [
+        {
+          ...STRANDED,
+          id: "dean-1",
+          full_name: "Vikram Chopra",
+          registration_number: "12400501",
+          role: "dean_of_research",
+          department_id: null,
+        },
+      ],
+      page: 1,
+      page_size: 100,
+      total: 1,
+    });
+    renderPage();
+
+    await screen.findByText("Vikram Chopra");
+    const select = screen.getByLabelText(/role for Vikram Chopra/i);
+    expect(select).toHaveValue("dean_of_research");
+  });
+
+  it("offers every role, so a dean can be appointed or stood down", async () => {
+    renderPage();
+    await screen.findByText("Demo Faculty 01");
+
+    const select = screen.getByLabelText(/role for Demo Faculty 01/i);
+    const values = Array.from(select.querySelectorAll("option")).map((o) => o.value);
+
+    expect(values).toEqual([
+      "student",
+      "faculty",
+      "research_coordinator",
+      "facility_custodian",
+      "dean_of_research",
+      "admin",
+    ]);
+  });
+
+  it("can change somebody to dean of research", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Demo Faculty 01");
+
+    await user.selectOptions(
+      screen.getByLabelText(/role for Demo Faculty 01/i),
+      "dean_of_research",
+    );
+    await user.click(await screen.findByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => expect(changeUserRole).toHaveBeenCalledWith("user-1", "dean_of_research"));
+  });
+});
+
+describe("searching the account list", () => {
+  it("asks the server rather than filtering the page", async () => {
+    // The list is capped at 100 rows, so filtering in the browser would only
+    // ever search the first hundred accounts of 153.
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Demo Faculty 01");
+
+    await user.type(screen.getByLabelText("Search", { exact: true }), "Vikram");
+
+    await waitFor(
+      () => expect(fetchUsers).toHaveBeenCalledWith(expect.objectContaining({ q: "Vikram" })),
+      { timeout: 2000 },
+    );
+  });
+
+  it("filters by role", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Demo Faculty 01");
+
+    await user.selectOptions(screen.getByLabelText("Role", { exact: true }), "dean_of_research");
+
+    await waitFor(() =>
+      expect(fetchUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ role: "dean_of_research" }),
+      ),
+    );
+  });
+
+  it("says so when nothing matches", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Demo Faculty 01");
+    fetchUsers.mockResolvedValue({ items: [], page: 1, page_size: 100, total: 0 });
+
+    await user.type(screen.getByLabelText("Search", { exact: true }), "zzzz");
+
+    expect(
+      await screen.findByText("No account matches that.", {}, { timeout: 2000 }),
+    ).toBeInTheDocument();
   });
 });

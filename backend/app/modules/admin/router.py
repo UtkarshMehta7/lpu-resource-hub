@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
@@ -85,8 +85,15 @@ def read_users(
     params: Annotated[PageParams, Depends()],
     role: UserRole | None = None,
     is_active: bool | None = None,
+    q: Annotated[
+        str | None,
+        Query(
+            max_length=200,
+            description="Name or email anywhere, registration number as a prefix.",
+        ),
+    ] = None,
 ) -> Page[AdminUserRead]:
-    return list_users(db, params, role=role, is_active=is_active)
+    return list_users(db, params, role=role, is_active=is_active, q=q)
 
 
 @router.patch("/{user_id}", response_model=AdminUserRead)
