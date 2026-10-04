@@ -7,6 +7,7 @@ import { useAuth } from "@/features/auth/authContext";
 import type { Role } from "@/features/auth/types";
 import { fetchDepartments } from "@/features/directory/api-org";
 import { toApiError } from "@/lib/api/errors";
+import { useDebounced } from "@/lib/useDebounced";
 
 import {
   changeUserRole,
@@ -21,8 +22,6 @@ import { DeletionDetails } from "./DeletionDetails";
 import { mayDelete } from "./hierarchy";
 import type { AdminUserRead, CoordinatorScopeType } from "./types";
 
-const ROLE_OPTIONS: Role[] = ["student", "faculty", "research_coordinator", "admin"];
-
 const ROLE_LABELS: Record<Role, string> = {
   student: "Student",
   faculty: "Faculty",
@@ -31,6 +30,18 @@ const ROLE_LABELS: Record<Role, string> = {
   dean_of_research: "Dean of Research",
   admin: "Admin",
 };
+
+/**
+ * Every role, derived from the label map rather than written out again.
+ *
+ * It used to be a second hand-written list, and it fell behind when the
+ * custodian and dean were added: a select whose value is not among its own
+ * options falls back to displaying the FIRST one, so a dean's row read
+ * "Student" and changing anything on it would have demoted them. Deriving it
+ * means the two can never disagree, and `Record<Role, string>` above makes
+ * the compiler refuse a missing role.
+ */
+const ROLE_OPTIONS = Object.keys(ROLE_LABELS) as Role[];
 
 type PendingAction =
   | { type: "role"; user: AdminUserRead; newRole: Role }
@@ -52,9 +63,22 @@ export function AdminUsersPage() {
   const [issued, setIssued] = useState<{ name: string; password: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Searching asks the server rather than filtering the page in the browser:
+  // the list is capped at 100 rows, so a client-side filter would only ever
+  // search the first hundred accounts and quietly miss the rest.
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<Role | "">("");
+  const query = useDebounced(search, 250);
+
   const { data, isPending, isError } = useQuery({
-    queryKey: USERS_QUERY_KEY,
-    queryFn: () => fetchUsers({ page_size: 100 }),
+    queryKey: [...USERS_QUERY_KEY, query, roleFilter],
+    queryFn: () =>
+      fetchUsers({
+        page_size: 100,
+        ...(query ? { q: query } : {}),
+        ...(roleFilter ? { role: roleFilter } : {}),
+      }),
+    placeholderData: (previous) => previous,
   });
   const { data: departments } = useQuery({
     queryKey: ["departments"],
@@ -186,6 +210,56 @@ export function AdminUsersPage() {
         {data.total} accounts. A person with no department can&apos;t use anything
         department-scoped, so place them here.
       </p>
+
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <div className="min-w-64 flex-1">
+          <label htmlFor="account-search" className="block text-sm font-medium">
+            Search
+          </label>
+          <input
+            id="account-search"
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Name, registration number or email"
+            className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="account-role-filter" className="block text-sm font-medium">
+            Role
+          </label>
+          <select
+            id="account-role-filter"
+            value={roleFilter}
+            onChange={(event) => setRoleFilter(event.target.value as Role | "")}
+            className="mt-1 rounded-md border border-line bg-surface px-3 py-2 text-sm"
+          >
+            <option value="">Every role</option>
+            {ROLE_OPTIONS.map((role) => (
+              <option key={role} value={role}>
+                {ROLE_LABELS[role]}
+              </option>
+            ))}
+          </select>
+        </div>
+        {search || roleFilter ? (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setRoleFilter("");
+            }}
+            className="rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium hover:bg-canvas"
+          >
+            Clear
+          </button>
+        ) : null}
+      </div>
+
+      {(search || roleFilter) && data.items.length === 0 ? (
+        <p className="mt-4 text-sm text-ink-muted">No account matches that.</p>
+      ) : null}
 
       {actionError ? (
         <p role="alert" className="mt-4 text-sm text-red-700">

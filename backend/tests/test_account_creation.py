@@ -412,3 +412,85 @@ def test_nobody_below_an_admin_can_reach_the_override(
     )
 
     assert response.status_code == 403
+
+
+# --- searching the account list --------------------------------------------
+
+
+def test_the_account_list_searches_name_number_and_email(client: TestClient, world: World) -> None:
+    """153 accounts do not fit on a screen, and the list is capped at 100 rows
+    -- so the search has to happen in the database, not the browser."""
+    created = client.post(
+        "/api/v1/admin/users",
+        headers=auth(world.admin),
+        json={
+            "registration_number": "12477001",
+            "full_name": "Vikram Chopra",
+            "role": "dean_of_research",
+            "email": "vikram.chopra@example.edu",
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    def search(term: str) -> list[dict[str, object]]:
+        response = client.get("/api/v1/admin/users", headers=auth(world.admin), params={"q": term})
+        assert response.status_code == 200, response.text
+        items: list[dict[str, object]] = response.json()["items"]
+        return items
+
+    # By name, case-insensitively and in the middle of it.
+    assert any(u["registration_number"] == "12477001" for u in search("chopra"))
+    # By email.
+    assert any(u["registration_number"] == "12477001" for u in search("vikram.chopra@"))
+    # By registration number as a PREFIX -- an identifier is not prose, so
+    # "12477" finds that block rather than every name containing the digits.
+    assert any(u["registration_number"] == "12477001" for u in search("12477"))
+    # And a term that matches nothing returns nothing rather than everything.
+    assert search("zzzznothing") == []
+
+
+def test_the_account_list_filters_by_role(client: TestClient, world: World) -> None:
+    """Filtering is how somebody finds the one dean among 153 accounts."""
+    client.post(
+        "/api/v1/admin/users",
+        headers=auth(world.admin),
+        json={
+            "registration_number": "12477002",
+            "full_name": "Another Dean",
+            "role": "dean_of_research",
+        },
+    )
+
+    response = client.get(
+        "/api/v1/admin/users", headers=auth(world.admin), params={"role": "dean_of_research"}
+    )
+
+    assert response.status_code == 200, response.text
+    items = response.json()["items"]
+    assert items
+    assert {u["role"] for u in items} == {"dean_of_research"}
+
+
+def test_a_role_outside_the_provisioning_chain_can_be_set_and_unset(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """The accounts page offers every role in its dropdown; the server has to
+    honour the ones outside admin -> coordinator -> faculty -> student."""
+    person = seed_user(UserRole.FACULTY, department_id=world.department_id)
+
+    promoted = client.post(
+        f"/api/v1/admin/users/{person.id}/role",
+        headers=auth(world.admin),
+        json={"role": "dean_of_research"},
+    )
+    assert promoted.status_code == 200, promoted.text
+    assert promoted.json()["role"] == "dean_of_research"
+
+    # And back again, which is the "downgrade" half.
+    restored = client.post(
+        f"/api/v1/admin/users/{person.id}/role",
+        headers=auth(world.admin),
+        json={"role": "faculty"},
+    )
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["role"] == "faculty"
