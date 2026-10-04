@@ -1,4 +1,12 @@
-export type Role = "student" | "faculty" | "research_coordinator" | "admin";
+export type Role =
+  | "student"
+  | "faculty"
+  | "research_coordinator"
+  /** Looks after assigned facilities, scoped per facility (ADR 0028). */
+  | "facility_custodian"
+  /** Reads institutional analytics across the institution, and changes nothing. */
+  | "dean_of_research"
+  | "admin";
 
 // Students don't self-register: their department creates the account.
 export type SelfRegisterableRole = Extract<Role, "faculty">;

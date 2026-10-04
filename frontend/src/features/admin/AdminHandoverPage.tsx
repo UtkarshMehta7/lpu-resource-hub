@@ -24,6 +24,8 @@ const ROLE_LABELS: Record<Role, string> = {
   student: "Student",
   faculty: "Faculty",
   research_coordinator: "Research coordinator",
+  facility_custodian: "Facility custodian",
+  dean_of_research: "Dean of Research",
   admin: "Administrator",
 };
 

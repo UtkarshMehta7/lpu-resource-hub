@@ -52,6 +52,12 @@ ROLE_HIERARCHY: dict[UserRole, UserRole | None] = {
     UserRole.STUDENT: None,
     UserRole.FACULTY: None,
     UserRole.RESEARCH_COORDINATOR: UserRole.FACULTY,
+    # Neither of these inherits. A custodian is not a researcher who also
+    # keeps a store room, and a dean is not a coordinator with a wider view --
+    # giving either the faculty grants would hand them the ability to create
+    # accounts and publish projects, which is nobody's reading of the role.
+    UserRole.FACILITY_CUSTODIAN: None,
+    UserRole.DEAN_OF_RESEARCH: None,
     UserRole.ADMIN: None,
 }
 
@@ -87,6 +93,21 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.FUNDING_MANAGE,
         }
     ),
+    # Looks after the facilities assigned to them. Which facilities is an
+    # object-level check (facilities.custodian_id), not a permission: holding
+    # FACILITY_MANAGE says "may manage a facility", never "may manage every
+    # facility".
+    UserRole.FACILITY_CUSTODIAN: frozenset(
+        {
+            Permission.FACILITY_MANAGE,
+            Permission.BOOKING_APPROVE,
+        }
+    ),
+    # Reads, and changes nothing. The whole point of the role in the
+    # specification is that institutional figures are visible to someone
+    # senior without that person acquiring the ability to edit the records
+    # they are reading.
+    UserRole.DEAN_OF_RESEARCH: frozenset({Permission.ANALYTICS_READ}),
     UserRole.ADMIN: frozenset(
         {
             Permission.USER_CREATE,
@@ -139,7 +160,29 @@ CREATABLE_ROLE: dict[UserRole, UserRole | None] = {
     UserRole.RESEARCH_COORDINATOR: UserRole.FACULTY,
     UserRole.FACULTY: UserRole.STUDENT,
     UserRole.STUDENT: None,
+    UserRole.FACILITY_CUSTODIAN: None,
+    UserRole.DEAN_OF_RESEARCH: None,
 }
+
+# Custodians and deans are deliberately absent from the table above. Each
+# would be a second role an administrator could create, and the moment a role
+# has two choices the role stops being *derived* from the creator and has to
+# be named in the request -- which is exactly the client-supplied role this
+# design exists to avoid. They are appointed through the admin override
+# (POST /api/v1/admin/users), the one audited place a role may be named.
+# Roles that answer to the institution rather than to a department, and so
+# need no department of their own.
+INSTITUTION_WIDE_ROLES: frozenset[UserRole] = frozenset({UserRole.ADMIN, UserRole.DEAN_OF_RESEARCH})
+
+APPOINTABLE_BY_ADMIN: frozenset[UserRole] = frozenset(
+    {
+        UserRole.STUDENT,
+        UserRole.FACULTY,
+        UserRole.RESEARCH_COORDINATOR,
+        UserRole.FACILITY_CUSTODIAN,
+        UserRole.DEAN_OF_RESEARCH,
+    }
+)
 
 
 def creatable_role(creator_role: UserRole) -> UserRole | None:
@@ -157,11 +200,22 @@ def creatable_role(creator_role: UserRole) -> UserRole | None:
 # faculty, but not another department's faculty.
 DELETABLE_ROLES: dict[UserRole, frozenset[UserRole]] = {
     UserRole.ADMIN: frozenset(
-        {UserRole.STUDENT, UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR, UserRole.ADMIN}
+        {
+            UserRole.STUDENT,
+            UserRole.FACULTY,
+            UserRole.RESEARCH_COORDINATOR,
+            UserRole.FACILITY_CUSTODIAN,
+            UserRole.DEAN_OF_RESEARCH,
+            UserRole.ADMIN,
+        }
     ),
     UserRole.RESEARCH_COORDINATOR: frozenset({UserRole.STUDENT, UserRole.FACULTY}),
     UserRole.FACULTY: frozenset({UserRole.STUDENT}),
     UserRole.STUDENT: frozenset(),
+    # Neither removes anybody. A custodian looks after rooms, not people, and
+    # a dean reads.
+    UserRole.FACILITY_CUSTODIAN: frozenset(),
+    UserRole.DEAN_OF_RESEARCH: frozenset(),
 }
 
 

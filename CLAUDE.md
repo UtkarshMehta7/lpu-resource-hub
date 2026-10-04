@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 154 API operations over 123 paths, 44 tables, 25 migrations,
-27 ADRs, 26 backend modules, 991 backend tests, 226 frontend tests,
+Current shape: 154 API operations over 123 paths, 44 tables, 26 migrations,
+28 ADRs, 26 backend modules, 1019 backend tests, 237 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -176,6 +176,17 @@ Current shape: 154 API operations over 123 paths, 44 tables, 25 migrations,
   erratum, a preprint and its version of record are separate works. The
   de-duplication rules and their known failure cases are written up in
   `docs/publication-deduplication.md`.
+- **Six roles, and two of them inherit nothing.** `FACILITY_CUSTODIAN` and
+  `DEAN_OF_RESEARCH` (ADR 0028) sit outside `CREATABLE_ROLE` entirely: they are
+  appointed only through the admin override, whose permitted set is
+  `APPOINTABLE_BY_ADMIN` -- every role but `ADMIN`, because promotion stays the
+  two-person ceremony. A custodian's scope is a **set of facility rows**, not a
+  department, so `facility:manage` is checked object-level against the loaded
+  facility (`facilities/policies.py: may_manage_facility`); the same rule as a
+  query filter is `manageable_facility_filter`, and the booking queue uses it so
+  a listing can never show a request the approve call would then refuse. A dean
+  holds `analytics:read` and nothing else, and `INSTITUTION_WIDE_ROLES` is why
+  they alone need no department.
 - A fix to the service layer does not fix the rows already in the deployed
   database. The coordinators appointed before `_sync_coordinator_scope` needed
   migration 0018 as well, and the users page now shows each coordinator's

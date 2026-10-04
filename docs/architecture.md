@@ -9,7 +9,7 @@ This is the living source of truth for the approved architecture. Change it thro
 | Decision | Outcome |
 |---|---|
 | Submission scope | MVP, then facilities/equipment/booking, then funding/notifications/deadline reminders. Semantic AI, analytics and advanced moderation are advanced scope. |
-| Roles | `STUDENT`, `FACULTY` (researcher), `RESEARCH_COORDINATOR`, `ADMIN` |
+| Roles | `STUDENT`, `FACULTY` (researcher), `RESEARCH_COORDINATOR`, `FACILITY_CUSTODIAN`, `DEAN_OF_RESEARCH`, `ADMIN` (ADR 0028) |
 | Faculty onboarding | A Research Coordinator provisions the faculty of the department they oversee. The coordinator must then verify the researcher profile before that faculty member can publish projects or opportunities, or enrol students. |
 | Accounts and sign-in | Everyone signs in with their LPU registration number (UMS-style); email is optional contact information. **Nobody self-registers**: accounts are provisioned down the hierarchy — admin → coordinator → faculty → student — each with a temporary password the new user must replace before using anything (ADR 0015, ADR 0019). The first admin comes from `scripts/create_admin.py`. |
 | Coordinator scope | Department-level initially. Stored so it can extend to school-level or university-wide without schema redesign. The service layer keeps it equal to the coordinator's department (`admin/service.py::_sync_coordinator_scope`), because a coordinator with no scope oversees nothing: an empty verification queue and 403 on every decision. Migration 0018 repaired the coordinators appointed before that, and the users page shows each coordinator's scope so a missing one is visible rather than silent. |

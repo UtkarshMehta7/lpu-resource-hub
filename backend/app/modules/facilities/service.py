@@ -11,7 +11,10 @@ from sqlalchemy.orm import Session
 
 from app.core.pagination import Page, PageParams
 from app.modules.facilities.models import Equipment, Facility
-from app.modules.facilities.policies import assert_can_manage, coordinator_department
+from app.modules.facilities.policies import (
+    assert_may_manage_facility,
+    coordinator_department,
+)
 from app.modules.facilities.schemas import (
     EquipmentCreate,
     EquipmentRead,
@@ -137,7 +140,21 @@ def _load_managed_facility(db: Session, actor: User, facility_id: uuid.UUID) -> 
     facility = db.get(Facility, facility_id)
     if facility is None:
         raise FacilityNotFoundError
-    assert_can_manage(actor, facility.department_id)
+    # Object-level: a custodian's scope is a set of facilities, so the check
+    # has to be against this row rather than against a department.
+    assert_may_manage_facility(actor, facility)
+    return facility
+
+
+def _facility_of(db: Session, equipment: Equipment) -> Facility:
+    """The facility a piece of equipment belongs to.
+
+    Equipment inherits its facility's custodian: whoever looks after the room
+    looks after what is in it.
+    """
+    facility = db.get(Facility, equipment.facility_id)
+    if facility is None:  # pragma: no cover - a FK makes this unreachable
+        raise FacilityNotFoundError
     return facility
 
 
@@ -268,7 +285,7 @@ def update_equipment(
     db: Session, actor: User, equipment_id: uuid.UUID, data: EquipmentUpdate
 ) -> EquipmentRead:
     equipment = load_equipment(db, equipment_id)
-    assert_can_manage(actor, equipment_department(db, equipment))
+    assert_may_manage_facility(actor, _facility_of(db, equipment))
     for field in (
         "name",
         "category",
@@ -290,6 +307,6 @@ def update_equipment(
 
 def delete_equipment(db: Session, actor: User, equipment_id: uuid.UUID) -> None:
     equipment = load_equipment(db, equipment_id)
-    assert_can_manage(actor, equipment_department(db, equipment))
+    assert_may_manage_facility(actor, _facility_of(db, equipment))
     db.delete(equipment)
     db.commit()

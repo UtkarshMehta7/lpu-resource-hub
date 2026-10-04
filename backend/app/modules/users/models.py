@@ -17,6 +17,12 @@ class UserRole(StrEnum):
     STUDENT = "student"
     FACULTY = "faculty"
     RESEARCH_COORDINATOR = "research_coordinator"
+    #: Looks after the facilities assigned to them, and nothing else. Scoped
+    #: per facility rather than per department -- see ADR 0028.
+    FACILITY_CUSTODIAN = "facility_custodian"
+    #: Reads institutional research analytics across the whole institution,
+    #: and changes nothing.
+    DEAN_OF_RESEARCH = "dean_of_research"
     ADMIN = "admin"
 
 
