@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import { useAuth } from "@/features/auth/authContext";
-import { isInstitutionWide, roleLabel } from "@/features/auth/roleLabels";
+import { buildsResearchProfile, roleLabel } from "@/features/auth/roleLabels";
 
 import {
   fetchDashboard,
@@ -41,11 +41,12 @@ export function DashboardPage() {
         </p>
       ) : null}
 
-      {/* Not shown to the roles that have nothing to onboard: an
-          administrator and a dean have no research profile and get no
-          matches, so "your profile is incomplete, so matches will be rough"
-          names a consequence that cannot reach them. */}
-      {data && !data.onboarding_complete && !isInstitutionWide(data.role) ? (
+      {/* Only the roles that actually build a profile and are matched on
+          it. An administrator, a dean and a facility custodian are not, so
+          "your profile is incomplete, so matches will be rough" named a
+          consequence that cannot reach them and a job with no page behind
+          it. */}
+      {data && !data.onboarding_complete && buildsResearchProfile(data.role) ? (
         <div className="mt-6 rounded-card border border-line bg-surface px-4 py-3 text-sm">
           Your profile is incomplete, so matches will be rough.{" "}
           <Link to="/onboarding" className="text-brand-700 hover:underline">

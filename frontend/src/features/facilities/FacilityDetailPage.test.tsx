@@ -183,15 +183,21 @@ describe("the custodian panel", () => {
     await waitFor(() => expect(assignFacilityCustodian).toHaveBeenCalledWith("f1", "c1"));
   });
 
-  it("does not let a custodian hand their own facility to anybody", async () => {
+  it("does not let a custodian hand their own facility away, or abolish it", async () => {
     fetchFacility.mockResolvedValue(HELD);
     useAuthMock.mockReturnValue({ user: { id: "c1", role: "facility_custodian" } });
     renderPage();
 
-    // They hold this room, so they get the management controls...
-    expect(await screen.findByRole("button", { name: "Delete facility" })).toBeInTheDocument();
-    // ...but never the power to decide who holds it.
+    // They hold this room, so they get the day-to-day controls...
+    expect(await screen.findByRole("link", { name: "Add equipment" })).toBeInTheDocument();
+    // ...but never the power to decide who holds it...
     expect(screen.queryByLabelText("Assign a custodian", { exact: true })).not.toBeInTheDocument();
+    // ...nor to delete it. This asserted the opposite, which was true while
+    // deletion was gated object-level like editing — and that let the person
+    // who looks after a room destroy it, taking its equipment and every
+    // booking held on it by cascade. Creating a facility is a department
+    // decision; deleting one is the same decision in reverse.
+    expect(screen.queryByRole("button", { name: "Delete facility" })).not.toBeInTheDocument();
   });
 
   it("gives a custodian nothing on a facility that is not theirs", async () => {

@@ -43,6 +43,28 @@ export function isInstitutionWide(role: string): boolean {
 }
 
 /**
+ * The roles that build a research profile and are matched on it.
+ *
+ * Onboarding is a profile and a set of skills, and "matches will be rough"
+ * is a consequence only these roles can feel. An administrator and a dean
+ * have no profile; a facility custodian looks after rooms and is not matched
+ * with anybody either — yet all three were being told their profile was
+ * incomplete, which is a job with no page behind it.
+ *
+ * Deliberately not the inverse of `INSTITUTION_WIDE_ROLES`: a custodian
+ * belongs to a department, so that set is the wrong question.
+ */
+export const RESEARCH_PROFILE_ROLES: ReadonlySet<Role> = new Set<Role>([
+  "student",
+  "faculty",
+  "research_coordinator",
+]);
+
+export function buildsResearchProfile(role: string): boolean {
+  return RESEARCH_PROFILE_ROLES.has(role as Role);
+}
+
+/**
  * A label for a role that arrived as a plain string -- a dashboard key, say.
  *
  * Falls back to the words of the enum rather than CSS `capitalize`, which

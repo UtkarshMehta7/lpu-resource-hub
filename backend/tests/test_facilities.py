@@ -212,3 +212,69 @@ def test_a_facility_names_the_department_that_runs_it(client: TestClient, world:
     assert university_wide.status_code in (200, 201), university_wide.text
     assert university_wide.json()["department_id"] is None
     assert university_wide.json()["department_name"] is None
+
+
+def test_a_custodian_cannot_delete_the_facility_they_look_after(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """Looking after a room is not the power to abolish it.
+
+    Deletion was gated object-level, the same gate as editing -- and a
+    custodian passes that for their own facility, which is exactly the
+    reasoning that already keeps custodian ASSIGNMENT at department level.
+    It was the more dangerous of the two: `equipment` cascades from
+    `facilities` and `bookings` cascades from `equipment`, so one press took
+    the room, its equipment and every booking anyone held on it.
+    """
+    facility = _facility(client, world.coordinator, department_id=world.department_id)
+    custodian = seed_user(UserRole.FACILITY_CUSTODIAN, department_id=world.department_id)
+    assigned = client.put(
+        f"/api/v1/facilities/{facility['id']}/custodian",
+        headers=auth(world.coordinator),
+        json={"user_id": str(custodian.id)},
+    )
+    assert assigned.status_code == 200, assigned.text
+
+    refused = client.delete(f"/api/v1/facilities/{facility['id']}", headers=auth(custodian))
+
+    assert refused.status_code == 403, refused.text
+    # Still there, and still theirs to run.
+    assert (
+        client.get(f"/api/v1/facilities/{facility['id']}", headers=auth(custodian)).status_code
+        == 200
+    )
+
+
+def test_a_custodian_still_manages_the_facility_they_hold(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """The narrowing is deletion only: the day-to-day powers stay."""
+    facility = _facility(client, world.coordinator, department_id=world.department_id)
+    custodian = seed_user(UserRole.FACILITY_CUSTODIAN, department_id=world.department_id)
+    assigned = client.put(
+        f"/api/v1/facilities/{facility['id']}/custodian",
+        headers=auth(world.coordinator),
+        json={"user_id": str(custodian.id)},
+    )
+    assert assigned.status_code == 200, assigned.text
+    fetched = client.get(f"/api/v1/facilities/{facility['id']}", headers=auth(custodian)).json()
+    assert fetched["custodian_id"] == str(custodian.id), fetched
+
+    renamed = client.patch(
+        f"/api/v1/facilities/{facility['id']}",
+        headers=auth(custodian),
+        json={"name": "Soil and Water Lab"},
+    )
+
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["name"] == "Soil and Water Lab"
+
+
+def test_the_coordinator_may_still_delete_it(client: TestClient, world: World) -> None:
+    """Creating a facility is a department decision; deleting one is the same
+    decision in reverse, so it stays with the same people."""
+    facility = _facility(client, world.coordinator, department_id=world.department_id)
+
+    removed = client.delete(f"/api/v1/facilities/{facility['id']}", headers=auth(world.coordinator))
+
+    assert removed.status_code == 204, removed.text
