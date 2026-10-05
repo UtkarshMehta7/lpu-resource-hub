@@ -27,7 +27,9 @@ export function ResearcherCardItem({ researcher }: { researcher: ResearcherCard 
             {researcher.full_name}
             <Uid value={researcher.registration_number} className="ml-2" />
           </Link>
-          <p className="text-sm text-ink-muted">{researcher.designation}</p>
+          <p className="text-sm text-ink-muted">
+            {[researcher.designation, researcher.department_name].filter(Boolean).join(" · ")}
+          </p>
         </div>
         {researcher.verification_status === "verified" ? (
           <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">

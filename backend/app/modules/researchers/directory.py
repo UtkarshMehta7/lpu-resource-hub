@@ -106,6 +106,25 @@ def _apply_researcher_filters(
     return query
 
 
+def _department_names(db: Session, user_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """Department name by department id, for the people in this page.
+
+    One query for the page rather than one per card.
+    """
+    if not user_ids:
+        return {}
+    rows = db.execute(
+        select(Department.id, Department.name).where(
+            Department.id.in_(
+                select(User.department_id).where(
+                    User.id.in_(user_ids), User.department_id.is_not(None)
+                )
+            )
+        )
+    ).all()
+    return {department_id: name for department_id, name in rows}
+
+
 def _tags_by_user(
     db: Session, user_ids: Sequence[uuid.UUID]
 ) -> tuple[dict[uuid.UUID, list[str]], dict[uuid.UUID, list[str]]]:
@@ -139,6 +158,7 @@ def _to_cards(
 ) -> list[ResearcherCard]:
     user_ids = [row[0].id for row in rows]
     areas, skills = _tags_by_user(db, user_ids)
+    departments = _department_names(db, user_ids)
     return [
         ResearcherCard(
             user_id=user.id,
@@ -146,6 +166,7 @@ def _to_cards(
             full_name=user.full_name,
             designation=profile.designation,
             department_id=user.department_id,
+            department_name=departments.get(user.department_id) if user.department_id else None,
             availability=profile.availability,
             verification_status=profile.verification_status,
             research_areas=areas.get(user.id, []),
@@ -181,7 +202,9 @@ def cards_for_students(db: Session, user_ids: Sequence[uuid.UUID]) -> list[Stude
             StudentProfile.is_discoverable.is_(True),
         )
     ).all()
-    areas, skills = _tags_by_user(db, [user.id for user, _ in rows])
+    student_ids = [user.id for user, _ in rows]
+    areas, skills = _tags_by_user(db, student_ids)
+    departments = _department_names(db, student_ids)
     return [
         StudentCard(
             user_id=user.id,
@@ -190,6 +213,7 @@ def cards_for_students(db: Session, user_ids: Sequence[uuid.UUID]) -> list[Stude
             program=profile.program,
             year=profile.year,
             department_id=user.department_id,
+            department_name=departments.get(user.department_id) if user.department_id else None,
             interests=profile.interests,
             research_areas=areas.get(user.id, []),
             skills=skills.get(user.id, []),
