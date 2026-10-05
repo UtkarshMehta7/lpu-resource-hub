@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import { useAuth } from "@/features/auth/authContext";
+import { isInstitutionWide, roleLabel } from "@/features/auth/roleLabels";
 
 import {
   fetchDashboard,
@@ -40,7 +41,11 @@ export function DashboardPage() {
         </p>
       ) : null}
 
-      {data && !data.onboarding_complete ? (
+      {/* Not shown to the roles that have nothing to onboard: an
+          administrator and a dean have no research profile and get no
+          matches, so "your profile is incomplete, so matches will be rough"
+          names a consequence that cannot reach them. */}
+      {data && !data.onboarding_complete && !isInstitutionWide(data.role) ? (
         <div className="mt-6 rounded-card border border-line bg-surface px-4 py-3 text-sm">
           Your profile is incomplete, so matches will be rough.{" "}
           <Link to="/onboarding" className="text-brand-700 hover:underline">
@@ -360,7 +365,15 @@ function AdminSections({ data }: { data: AdminDashboard }) {
   return (
     <>
       <Section title="Users" action={{ label: "Manage users", to: "/admin/users" }}>
-        <Stats entries={Object.entries(data.users_by_role)} />
+        {/* Labelled here rather than left to the CSS `capitalize` the other
+            stats use: that title-cases every word, so `dean_of_research`
+            read "Dean Of Research". */}
+        <Stats
+          entries={Object.entries(data.users_by_role).map(([role, count]) => [
+            roleLabel(role),
+            count,
+          ])}
+        />
       </Section>
 
       <Section title="Platform">

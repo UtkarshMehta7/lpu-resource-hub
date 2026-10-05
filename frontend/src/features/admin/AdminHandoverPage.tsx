@@ -8,6 +8,7 @@ import { toApiError } from "@/lib/api/errors";
 
 import { confirmAdminPromotion, fetchUsers, requestAdminPromotion, stepDownAsAdmin } from "./api";
 import type { AdminUserRead } from "./types";
+import { ROLE_LABELS } from "@/features/auth/roleLabels";
 
 /**
  * Handing the platform over.
@@ -19,15 +20,6 @@ import type { AdminUserRead } from "./types";
  * it.
  */
 const STEP_DOWN_ROLES: Role[] = ["faculty", "research_coordinator", "student"];
-
-const ROLE_LABELS: Record<Role, string> = {
-  student: "Student",
-  faculty: "Faculty",
-  research_coordinator: "Research coordinator",
-  facility_custodian: "Facility custodian",
-  dean_of_research: "Dean of Research",
-  admin: "Administrator",
-};
 
 export function AdminHandoverPage() {
   const { user: currentUser } = useAuth();

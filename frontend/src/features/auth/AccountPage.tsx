@@ -2,15 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { fetchCurrentUser } from "./api";
 import { ChangePasswordForm } from "./ChangePasswordForm";
-
-const ROLE_LABELS: Record<string, string> = {
-  student: "Student",
-  faculty: "Faculty / researcher",
-  research_coordinator: "Research coordinator",
-  admin: "Administrator",
-  facility_custodian: "Facility custodian",
-  dean_of_research: "Dean of Research",
-};
+import { ROLE_LABELS } from "@/features/auth/roleLabels";
 
 export function AccountPage() {
   const { data, isPending, isError, error } = useQuery({

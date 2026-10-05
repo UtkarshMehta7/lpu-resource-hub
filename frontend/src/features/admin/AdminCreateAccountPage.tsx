@@ -9,6 +9,7 @@ import { fetchDepartments } from "@/features/directory/api-org";
 import { toApiError } from "@/lib/api/errors";
 
 import { createAccountAsAdmin } from "./api";
+import { ROLE_LABELS } from "@/features/auth/roleLabels";
 
 /**
  * The admin override: create an account of any role directly.
@@ -49,13 +50,19 @@ type FormValues = z.infer<typeof schema>;
 /** The roles an administrator may appoint -- every role but their own. */
 type AppointableRole = FormValues["role"];
 
-const ROLE_LABELS: Record<AppointableRole, string> = {
-  student: "Student",
-  faculty: "Faculty / researcher",
-  research_coordinator: "Research coordinator",
-  facility_custodian: "Facility custodian",
-  dean_of_research: "Dean of Research",
-};
+/**
+ * The appointable subset, in the order the form offers them. The *labels*
+ * come from the shared map rather than being written again here -- this page
+ * and the accounts table disagreeing about what a role is called is exactly
+ * the drift that map exists to stop.
+ */
+const APPOINTABLE_ROLES: AppointableRole[] = [
+  "student",
+  "faculty",
+  "research_coordinator",
+  "facility_custodian",
+  "dean_of_research",
+];
 
 /** What each role is for, so the choice is not guessed from its name. */
 const ROLE_HINTS: Partial<Record<AppointableRole, string>> = {
@@ -222,7 +229,7 @@ export function AdminCreateAccountPage() {
                 void roleField.onChange(event);
               }}
             >
-              {(Object.keys(ROLE_LABELS) as AppointableRole[]).map((value) => (
+              {APPOINTABLE_ROLES.map((value) => (
                 <option key={value} value={value}>
                   {ROLE_LABELS[value]}
                 </option>

@@ -285,3 +285,70 @@ def test_deactivate_a_second_admin_is_allowed(
 
     assert response.status_code == 200
     assert response.json()["is_active"] is False
+
+
+def test_a_dean_cannot_be_placed_in_a_department(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    """A dean reads every department, so belonging to one says something
+    untrue. The create-account form always refused to set one; the users page
+    did not, and a dean on the deployed instance ended up sitting in a
+    department (migration 0031 repaired those rows)."""
+    admin = seed_user(UserRole.ADMIN)
+    dean = seed_user(UserRole.DEAN_OF_RESEARCH)
+    department_id = _create_department(client, admin)
+
+    response = client.patch(
+        f"/api/v1/admin/users/{dean.id}",
+        headers=_auth_headers(admin),
+        json={"department_id": department_id},
+    )
+
+    assert response.status_code == 200, response.json()
+    assert response.json()["department_id"] is None
+
+
+def test_becoming_a_dean_leaves_the_department_behind(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    """The role change is where it matters most: a faculty member legitimately
+    has a department, and promoting them to dean must not keep it."""
+    admin = seed_user(UserRole.ADMIN)
+    faculty = seed_user(UserRole.FACULTY)
+    department_id = _create_department(client, admin)
+    placed = client.patch(
+        f"/api/v1/admin/users/{faculty.id}",
+        headers=_auth_headers(admin),
+        json={"department_id": department_id},
+    )
+    assert placed.json()["department_id"] == department_id
+
+    promoted = client.post(
+        f"/api/v1/admin/users/{faculty.id}/role",
+        headers=_auth_headers(admin),
+        json={"role": "dean_of_research"},
+    )
+
+    assert promoted.status_code == 200, promoted.json()
+    assert promoted.json()["role"] == "dean_of_research"
+    assert promoted.json()["department_id"] is None
+
+
+def test_a_coordinator_keeps_their_department(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    """The guard is for institution-wide roles only. A coordinator's
+    department IS their scope, so clearing it would take their authority."""
+    admin = seed_user(UserRole.ADMIN)
+    coordinator = seed_user(UserRole.RESEARCH_COORDINATOR)
+    department_id = _create_department(client, admin)
+
+    response = client.patch(
+        f"/api/v1/admin/users/{coordinator.id}",
+        headers=_auth_headers(admin),
+        json={"department_id": department_id},
+    )
+
+    assert response.status_code == 200, response.json()
+    assert response.json()["department_id"] == department_id
+    assert response.json()["coordinator_scope_id"] == department_id

@@ -35,7 +35,7 @@ export function PlatformSettingsPage() {
         {Object.entries(data.settings).map(([key, value]) => (
           <div key={key} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
             <dt className="text-sm capitalize">{key.replace(/_/g, " ")}</dt>
-            <dd className="font-mono text-xs text-ink-muted">{format(value)}</dd>
+            <dd className="font-mono text-xs text-ink-muted">{format(value, key)}</dd>
           </div>
         ))}
       </dl>
@@ -43,9 +43,14 @@ export function PlatformSettingsPage() {
   );
 }
 
-function format(value: unknown): string {
+function format(value: unknown, key?: string): string {
   if (value === null || value === undefined) return "—";
   if (typeof value === "boolean") return value ? "on" : "off";
+  // A byte limit is a number nobody reads as one: 5242880 means nothing at a
+  // glance, 5 MB is the thing the reader is actually checking.
+  if (typeof value === "number" && key?.endsWith("_bytes")) {
+    return `${(value / (1024 * 1024)).toFixed(value % (1024 * 1024) === 0 ? 0 : 1)} MB`;
+  }
   if (typeof value === "object") {
     return Object.entries(value as Record<string, unknown>)
       .map(([key, item]) => `${key} ${JSON.stringify(item)}`)

@@ -14,17 +14,9 @@ import { toApiError } from "@/lib/api/errors";
 import { deleteUser, fetchDeletionImpact, fetchManageableUsers } from "./api";
 import { DeletionDetails } from "./DeletionDetails";
 import type { AdminUserRead } from "./types";
+import { ROLE_LABELS } from "@/features/auth/roleLabels";
 
 const PEOPLE_QUERY_KEY = ["people", "manageable"] as const;
-
-const ROLE_LABELS: Record<Role, string> = {
-  student: "Student",
-  faculty: "Faculty",
-  research_coordinator: "Coordinator",
-  facility_custodian: "Facility custodian",
-  dean_of_research: "Dean of Research",
-  admin: "Administrator",
-};
 
 /** What each role is responsible for, so the page says whose list this is. */
 const RESPONSIBILITY: Record<Role, string> = {

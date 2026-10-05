@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.pagination import Page, PageParams
+from app.core.permissions import INSTITUTION_WIDE_ROLES
 from app.core.security import hash_password
 from app.modules.admin.accounts import generate_temporary_password
 from app.modules.admin.models import Department, School
@@ -138,6 +139,21 @@ def _sync_coordinator_scope(target: User) -> None:
         target.coordinator_scope_id = None
 
 
+def _sync_institution_wide_placement(target: User) -> None:
+    """An institution-wide role belongs to no department.
+
+    A dean reads every department and an administrator serves all of them, so
+    placing either in one says something untrue -- and `INSTITUTION_WIDE_ROLES`
+    is precisely the set that needs no department (ADR 0028). The create-account
+    form already refuses to set one; the users page did not, so a dean on the
+    deployed instance was sitting in a department. The same shape as the
+    coordinator scope above: a derived fact that was left as an independent
+    choice in one place and drifted.
+    """
+    if target.role in INSTITUTION_WIDE_ROLES:
+        target.department_id = None
+
+
 def update_user(
     db: Session, actor: User, target: User, data: AdminUserUpdate, *, ip: str | None
 ) -> User:
@@ -159,6 +175,9 @@ def update_user(
         # department is what they oversee.
         if "coordinator_scope_id" not in fields_set:
             _sync_coordinator_scope(target)
+        # Unconditional: a department set on a dean or an administrator is
+        # wrong whatever else the request asked for.
+        _sync_institution_wide_placement(target)
 
     resulting_type = (
         data.coordinator_scope_type
@@ -241,6 +260,8 @@ def change_role(
     before = {"role": target.role.value}
     target.role = new_role
     _sync_coordinator_scope(target)
+    # Becoming a dean or an administrator leaves the department behind.
+    _sync_institution_wide_placement(target)
     db.flush()
     audit_service.record(
         db,
