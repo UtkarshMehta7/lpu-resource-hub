@@ -66,6 +66,12 @@ class MemberRead(BaseModel):
     full_name: str
     registration_number: str
     member_role: str
+    #: A name, never a UUID, like everywhere else a person is named. On a team
+    #: it is also the fact that decides who may review the project: a team
+    #: reaching into a second department is a dean's to approve rather than a
+    #: coordinator's (ADR 0032), and the panel showed no way to see that.
+    department_id: uuid.UUID | None = None
+    department_name: str | None = None
 
 
 class ProjectCard(BaseModel):
@@ -77,6 +83,15 @@ class ProjectCard(BaseModel):
     owner_name: str
     owner_registration_number: str
     department_id: uuid.UUID | None
+    #: A name, never a UUID, like everywhere else a department is shown.
+    department_name: str | None = None
+    #: The OTHER departments this project's team reaches into, named.
+    #:
+    #: Empty for ordinary work. On a dean's review queue it is the reason the
+    #: project is theirs to decide at all (ADR 0032) -- without it a dean saw
+    #: a list identical to a coordinator's, with nothing saying why these
+    #: projects and not others.
+    spans_departments: list[str] = []
     start_date: date | None
     end_date: date | None
     research_areas: list[str]

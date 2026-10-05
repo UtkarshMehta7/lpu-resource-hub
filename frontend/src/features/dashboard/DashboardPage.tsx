@@ -310,12 +310,19 @@ function DeanSections({ data }: { data: DeanDashboard }) {
   return (
     <>
       <Section title="The institution" action={{ label: "Compare departments", to: "/analytics" }}>
+        {/* The verification backlog belongs here, not under "Waiting on you".
+            Verifying a researcher is a departmental act and is deliberately
+            absent from a dean's navigation — so listing it as waiting on them
+            named a job they have no way to do, under a heading that said it
+            was theirs. Here it reads as what it is: the state of the
+            institution they oversee. */}
         <Stats
           entries={[
             ["departments", data.departments],
             ["needing attention", data.departments_needing_attention],
             ["active projects", data.active_projects],
             ["researchers", data.researchers],
+            ["researchers awaiting verification", data.verification_backlog],
           ]}
         />
       </Section>
@@ -328,11 +335,9 @@ function DeanSections({ data }: { data: DeanDashboard }) {
         title="Waiting on you"
         action={{ label: "Review queue", to: "/coordinator/review-queue" }}
       >
+        {/* Only what a dean can actually decide. */}
         <Stats
-          entries={[
-            ["cross-department projects to decide", data.pending_cross_department_reviews],
-            ["researchers awaiting verification", data.verification_backlog],
-          ]}
+          entries={[["cross-department projects to decide", data.pending_cross_department_reviews]]}
         />
       </Section>
     </>

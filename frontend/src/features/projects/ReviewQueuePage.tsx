@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Uid } from "@/components/ui/Uid";
+import { useAuth } from "@/features/auth/authContext";
 import { toApiError } from "@/lib/api/errors";
 
 import { fetchReviewQueue, reviewProject, type ProjectCard } from "./api";
@@ -13,8 +14,17 @@ interface Pending {
   decision: "approve" | "reject";
 }
 
-/** Coordinator/admin: projects awaiting review in the reviewer's scope. */
+/**
+ * Projects awaiting review in the reviewer's scope.
+ *
+ * "Scope" means something different per role, so the page says which: a
+ * coordinator's is their department, a dean's is work that crosses two
+ * (ADR 0032). A dean previously saw a page identical to a coordinator's with
+ * nothing explaining why these projects were theirs to decide.
+ */
 export function ReviewQueuePage() {
+  const { user } = useAuth();
+  const isDean = user?.role === "dean_of_research";
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<Pending | null>(null);
   const [comment, setComment] = useState("");
@@ -52,8 +62,9 @@ export function ReviewQueuePage() {
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Project review queue</h1>
       <p className="mt-1 text-sm text-ink-muted">
-        Projects submitted for review in your scope. {data.length} pending. You can never review
-        your own project.
+        {isDean
+          ? `Projects whose team reaches across departments. ${data.length} pending. A project inside one department is its coordinator's to decide, not yours.`
+          : `Projects submitted for review in your scope. ${data.length} pending. You can never review your own project.`}
       </p>
 
       {error ? (
@@ -79,7 +90,23 @@ export function ReviewQueuePage() {
               <p className="mt-1 text-sm text-ink-muted">{project.summary}</p>
               <p className="mt-1 text-xs text-ink-muted">
                 Led by {project.owner_name} <Uid value={project.owner_registration_number} />
+                {project.department_name ? <> · {project.department_name}</> : null}
               </p>
+              {/* Why this project is a dean's to decide, said on the card
+                  rather than left to be worked out from the team page. */}
+              {project.spans_departments.length > 0 ? (
+                <p className="mt-2 text-xs">
+                  <span className="rounded bg-brand-50 px-1.5 py-0.5 font-medium text-brand-800">
+                    Also{" "}
+                    {project.spans_departments.length === 1
+                      ? project.spans_departments[0]
+                      : `${project.spans_departments.slice(0, -1).join(", ")} and ${project.spans_departments.at(-1)}`}
+                  </span>{" "}
+                  <span className="text-ink-muted">
+                    — the team crosses departments, so no single coordinator sees all of it.
+                  </span>
+                </p>
+              ) : null}
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"

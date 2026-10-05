@@ -230,6 +230,23 @@ export function ProjectDetailPage() {
                 <span className="text-sm">
                   {member.full_name} <Uid value={member.registration_number} />{" "}
                   <span className="text-ink-muted">· {member.member_role}</span>
+                  {/* The department is shown here for the same reason it is
+                      shown on every other card, and for one more: a team
+                      reaching into a second department makes the project a
+                      dean's to approve rather than a coordinator's
+                      (ADR 0032), and that was impossible to see. Marked when
+                      it differs from the project's own. */}
+                  {member.department_name ? (
+                    <span
+                      className={
+                        member.department_id !== project.department_id
+                          ? "ml-1 rounded bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-800"
+                          : "ml-1 text-xs text-ink-muted"
+                      }
+                    >
+                      {member.department_name}
+                    </span>
+                  ) : null}
                 </span>
                 {isOwner ? (
                   <button

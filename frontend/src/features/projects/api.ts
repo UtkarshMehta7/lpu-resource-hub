@@ -15,6 +15,11 @@ export interface ProjectCard {
   owner_name: string;
   owner_registration_number: string;
   department_id: string | null;
+  /** A name, never a UUID. */
+  department_name: string | null;
+  /** The other departments this project's team reaches into. Empty for
+   *  ordinary work; on a dean's queue it is why the project is theirs. */
+  spans_departments: string[];
   start_date: string | null;
   end_date: string | null;
   research_areas: string[];
@@ -26,6 +31,9 @@ export interface ProjectMember {
   full_name: string;
   registration_number: string;
   member_role: string;
+  department_id: string | null;
+  /** A name, never a UUID. Null for someone who belongs to no department. */
+  department_name: string | null;
 }
 
 export interface Project extends ProjectCard {

@@ -37,6 +37,8 @@ const PROJECT = {
   owner_name: "Dr. Demo",
   owner_registration_number: "DEMOFACULTY07",
   department_id: null,
+  department_name: null,
+  spans_departments: [],
   start_date: null,
   end_date: null,
   research_areas: [],

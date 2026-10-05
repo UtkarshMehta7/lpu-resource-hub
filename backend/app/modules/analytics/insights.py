@@ -649,9 +649,22 @@ def by_department(db: Session) -> list[DepartmentRow]:
     producing and which are slipping -- had no answer. A single blended total
     hides exactly what it is wanted for.
 
-    Counted per department rather than aggregated once and split, because the
-    scoped helpers already know how to count correctly and reusing them keeps
-    one definition of each figure.
+    Counted for every department at once, not once per department. The first
+    version called the scoped helpers in a loop, which kept one definition of
+    each figure at the cost of six queries per department: 22 departments
+    meant about 130 round trips to a database at the other end of a network,
+    and the dean's own page took ten to twenty seconds to arrive. These are
+    the same figures under the same rules, gathered with a GROUP BY instead.
+
+    What is NOT reimplemented here is risk: milestones are still judged by
+    `assess`, the one function the project page and the board also use
+    (ADR 0026). Deriving "at risk" in SQL would be a second opinion, and the
+    number people trust is whichever they saw last.
+
+    `test_by_department_agrees_with_the_scoped_helpers` holds the definitions
+    together, by asserting this function and the per-department helpers give
+    the same answer for every department. That is a stronger guarantee than
+    the loop had: it was assumed, and now it is checked.
     """
     departments = list(
         db.execute(
@@ -660,53 +673,155 @@ def by_department(db: Session) -> list[DepartmentRow]:
             .order_by(Department.name)
         ).all()
     )
+    if not departments:
+        return []
+
+    people = _people_per_department(db)
+    active_projects = _active_projects_per_department(db)
+    publications = _publications_per_department(db)
+    risk = _milestone_risk_per_department(db)
+    pending = _verification_pending_per_department(db)
 
     rows: list[DepartmentRow] = []
     for department, school_name in departments:
-        scope = Scope(department_id=department.id)
-        statuses = projects_by_status(db, scope)
-        adherence = milestone_adherence(db, scope)
-        backlog = verification_backlog(db, scope)
+        overdue, at_risk = risk.get(department.id, (0, 0))
+        researchers, students = people.get(department.id, (0, 0))
         rows.append(
             DepartmentRow(
                 department_id=department.id,
                 department_name=department.name,
                 school_name=school_name,
-                researchers=int(
-                    db.execute(
-                        select(func.count())
-                        .select_from(User)
-                        .where(
-                            User.department_id == department.id,
-                            User.role.in_((UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR)),
-                            User.is_active.is_(True),
-                        )
-                    ).scalar_one()
-                ),
-                students=int(
-                    db.execute(
-                        select(func.count())
-                        .select_from(User)
-                        .where(
-                            User.department_id == department.id,
-                            User.role == UserRole.STUDENT,
-                            User.is_active.is_(True),
-                        )
-                    ).scalar_one()
-                ),
-                projects_active=int(statuses.get("active", 0)),
-                publications=int(
-                    db.execute(
-                        select(func.count(func.distinct(Publication.id)))
-                        .select_from(Publication)
-                        .join(PublicationAuthor, PublicationAuthor.publication_id == Publication.id)
-                        .join(User, User.id == PublicationAuthor.user_id)
-                        .where(User.department_id == department.id)
-                    ).scalar_one()
-                ),
-                milestones_overdue=int(adherence.get("overdue", 0)),
-                milestones_at_risk=int(adherence.get("at_risk", 0)),
-                verification_pending=int(backlog.get("pending", 0)),
+                researchers=researchers,
+                students=students,
+                projects_active=active_projects.get(department.id, 0),
+                publications=publications.get(department.id, 0),
+                milestones_overdue=overdue,
+                milestones_at_risk=at_risk,
+                verification_pending=pending.get(department.id, 0),
             )
         )
     return rows
+
+
+def _people_per_department(db: Session) -> dict[uuid.UUID, tuple[int, int]]:
+    """(researchers, students) per department, active accounts only --
+    the same population `_scoped_users` counts."""
+    found: dict[uuid.UUID, tuple[int, int]] = {}
+    for department_id, role, count in db.execute(
+        select(User.department_id, User.role, func.count())
+        .where(User.is_active.is_(True), User.department_id.is_not(None))
+        .group_by(User.department_id, User.role)
+    ).all():
+        researchers, students = found.get(department_id, (0, 0))
+        if role in (UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR):
+            found[department_id] = (researchers + count, students)
+        elif role is UserRole.STUDENT:
+            found[department_id] = (researchers, students + count)
+    return found
+
+
+def _active_projects_per_department(db: Session) -> dict[uuid.UUID, int]:
+    """What `projects_by_status(...)["active"]` reports, for every department."""
+    return {
+        department_id: int(count)
+        for department_id, count in db.execute(
+            select(Project.department_id, func.count())
+            .where(
+                Project.deleted_at.is_(None),
+                Project.department_id.is_not(None),
+                Project.status == ProjectStatus.ACTIVE,
+            )
+            .group_by(Project.department_id)
+        ).all()
+    }
+
+
+def _publications_per_department(db: Session) -> dict[uuid.UUID, int]:
+    """Distinct publications with at least one author in the department --
+    a paper co-authored across two departments counts once in each, which is
+    what the per-department query did too."""
+    return {
+        department_id: int(count)
+        for department_id, count in db.execute(
+            select(User.department_id, func.count(func.distinct(Publication.id)))
+            .select_from(Publication)
+            .join(PublicationAuthor, PublicationAuthor.publication_id == Publication.id)
+            .join(User, User.id == PublicationAuthor.user_id)
+            .where(User.department_id.is_not(None))
+            .group_by(User.department_id)
+        ).all()
+    }
+
+
+def _verification_pending_per_department(db: Session) -> dict[uuid.UUID, int]:
+    """What `verification_backlog(...).pending` reports, for every department."""
+    return {
+        department_id: int(count)
+        for department_id, count in db.execute(
+            select(User.department_id, func.count())
+            .select_from(ResearcherProfile)
+            .join(User, User.id == ResearcherProfile.user_id)
+            .where(
+                ResearcherProfile.verification_status == VerificationStatus.PENDING,
+                User.is_active.is_(True),
+                User.department_id.is_not(None),
+            )
+            .group_by(User.department_id)
+        ).all()
+    }
+
+
+def _milestone_risk_per_department(db: Session) -> dict[uuid.UUID, tuple[int, int]]:
+    """(overdue, at_risk) per department, judged by `assess`.
+
+    Every outstanding milestone is read once with the department of the
+    project it belongs to, and the dependency edges once more, then each is
+    put through the same function the project page uses. Two queries for the
+    whole institution rather than two per department.
+    """
+    from app.core.config import get_settings
+
+    today = datetime.now(UTC).date()
+    threshold = get_settings().milestone_at_risk_days
+
+    rows = db.execute(
+        select(
+            Milestone.id,
+            Milestone.status,
+            Milestone.due_date,
+            Project.department_id,
+        )
+        .join(Project, Project.id == Milestone.project_id)
+        .where(Project.deleted_at.is_(None), Project.department_id.is_not(None))
+    ).all()
+
+    by_id = {row.id: row for row in rows}
+    edges: dict[uuid.UUID, list[uuid.UUID]] = {}
+    if by_id:
+        for milestone_id, depends_on_id in db.execute(
+            select(MilestoneDependency.milestone_id, MilestoneDependency.depends_on_id).where(
+                MilestoneDependency.milestone_id.in_(by_id)
+            )
+        ).all():
+            edges.setdefault(milestone_id, []).append(depends_on_id)
+
+    found: dict[uuid.UUID, tuple[int, int]] = {}
+    for row in rows:
+        if row.status in SETTLED_STATUSES:
+            continue
+        risk = assess(
+            RiskInput(status=row.status, due_date=row.due_date),
+            today=today,
+            threshold_days=threshold,
+            depends_on=[
+                RiskInput(status=by_id[dep].status, due_date=by_id[dep].due_date)
+                for dep in edges.get(row.id, [])
+                if dep in by_id
+            ],
+        )
+        overdue, at_risk = found.get(row.department_id, (0, 0))
+        if risk is Risk.OVERDUE:
+            found[row.department_id] = (overdue + 1, at_risk)
+        elif risk is Risk.AT_RISK:
+            found[row.department_id] = (overdue, at_risk + 1)
+    return found
