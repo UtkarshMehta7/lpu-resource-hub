@@ -23,6 +23,13 @@ class NudgeKind(StrEnum):
     PROJECT_REVIEW = "project_review"
     BOOKING_APPROVAL = "booking_approval"
     APPLICATION_DECISION = "application_decision"
+    #: The only kind that travels DOWNWARD. Every other nudge is "my own
+    #: thing is stuck, please act" -- sent by the person waiting, and refused
+    #: if the entity is not theirs. This one is an institutional reader
+    #: saying "somebody else's project is slipping, please look at it", which
+    #: is how a Dean of Research acts on what they can see without acquiring
+    #: the ability to edit any of it (ADR 0031).
+    PROJECT_AT_RISK = "project_at_risk"
 
 
 class Nudge(Base):
