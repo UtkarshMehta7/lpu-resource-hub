@@ -46,3 +46,18 @@ export function dayLabel(iso: string, now: Date = new Date()): string {
 export function clockTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
+
+/**
+ * "4 KB", "1.2 MB" — the size of an attachment, at a glance.
+ *
+ * Rounded to whole units below a megabyte, because nobody reading a chat
+ * needs "4.31 KB", and to one decimal above, where the difference between
+ * 1 MB and 4.8 MB is the difference between tapping it on mobile data and
+ * waiting.
+ */
+export function fileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kilobytes = bytes / 1024;
+  if (kilobytes < 1024) return `${Math.round(kilobytes)} KB`;
+  return `${(kilobytes / 1024).toFixed(1)} MB`;
+}

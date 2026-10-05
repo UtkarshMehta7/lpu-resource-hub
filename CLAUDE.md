@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 162 API operations over 131 paths, 44 tables, 29 migrations,
-32 ADRs, 27 backend modules, 1107 backend tests, 278 frontend tests,
+Current shape: 165 API operations over 134 paths, 45 tables, 30 migrations,
+33 ADRs, 28 backend modules, 1155 backend tests, 285 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -109,6 +109,42 @@ Current shape: 162 API operations over 131 paths, 44 tables, 29 migrations,
   forget. One conversation per pair, for the life of the pair: collaborating
   again after ending reopens the same thread. Never key a thread or a
   relationship to a request again.
+- **Joining a team joins its chat, and ONE place writes both** (ADR 0033).
+  Three paths made somebody a `ProjectMember` and only two synced the thread:
+  accepting an application inserted the row itself, so being approved into a
+  project put you on the team and left you out of its chat. `record_membership`
+  and `discard_membership` in `projects/service.py` are now the only writers,
+  and each syncs with the insert. Never write `ProjectMember` anywhere else.
+  The bug only bit when the thread already existed, because opening one later
+  syncs from `ProjectMember` regardless -- which is to say it bit exactly the
+  active teams that had been talking.
+- **A project gets its thread when it is CREATED**, with the creator in it.
+  It used to appear on first use, so a new project looked like it had no chat.
+  `_open_team_thread` runs in a savepoint and swallows SQLAlchemyError, like
+  the acceptance path: chat must never break the older act. No backfill was
+  needed, because `open_for_project` is still idempotent.
+- **An attachment IS a message** (ADR 0033), which is what makes it small:
+  the participant check, the closed-thread refusal, unread counts, the rate
+  limit and the notification already existed and all apply. There is also no
+  moment when uploaded bytes have no owner, so nothing to reap.
+- **An attachment's bytes are on its own row, and the download runs the
+  thread's check.** Bytes in `message_attachments.data`, not a shared blob
+  table -- a shared table wants de-duplication, and that means blobs
+  outliving their attachment, orphaned against a 0.5 GB quota. There is **no
+  public path to a file**: a private thread is worth nothing if its files are
+  reachable by whoever holds a URL, so `GET /conversations/{cid}/attachments/
+  {aid}` re-checks participation, scopes the id to the conversation in the
+  path, and refuses a hidden message's file. Hence the frontend fetches bytes
+  through the API client and hands itself the download -- an `<a href>` sends
+  no Authorization header, which is the point.
+- **An upload's type comes from its BYTES** (`uploads/validation.py`). The
+  filename and the browser's Content-Type are both attacker-chosen, so a RAR
+  called `report.pdf` is stored and labelled as a RAR. A `.docx` is a zip, so
+  only its table of contents separates them -- read without touching an
+  entry's data, so a bomb has nothing to expand into. PDF, DOCX, PNG, JPEG,
+  RAR, ZIP; 5 MB (`UPLOAD_MAX_BYTES`), checked on bytes read, never on a
+  declared length. **No EXIF stripping and no virus scanning** -- revisit
+  before building profile photos on these rules.
 - **Threads are scoped, and there is no endpoint that creates one.** A
   conversation belongs to an accepted collaboration request or a project
   team; it appears when that happens. Never add a create-conversation

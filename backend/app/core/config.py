@@ -82,6 +82,12 @@ class Settings(BaseSettings):
     #: `run_migrations_at_boot` below. Set it explicitly to override.
     run_migrations_on_start: bool | None = None
     reminder_interval_minutes: int = Field(default=60, ge=5, le=1440)
+    # Attachments. The cap is enforced on the bytes actually read, not on a
+    # Content-Length header the client chooses, and the upper bound here is
+    # deliberate: attachment bytes live in PostgreSQL, so every megabyte
+    # allowed is a megabyte of the database quota -- see
+    # app/modules/uploads/validation.py and ADR 0033.
+    upload_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1024, le=20 * 1024 * 1024)
 
     @field_validator("database_url", "test_database_url", mode="before")
     @classmethod

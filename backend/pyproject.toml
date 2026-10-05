@@ -38,6 +38,11 @@ dependencies = [
     # The institutional research report exports to PDF. Pure Python wheels, no
     # system libraries, so it installs on a slim container the same as locally.
     "reportlab>=4.2,<5.0",
+    # Conversation attachments: multipart/form-data is how a browser uploads a
+    # file, and Starlette parses it only when this is installed. Without it a
+    # File() route raises at import time rather than at request time, so it is
+    # a hard runtime dependency, not an extra.
+    "python-multipart>=0.0.20,<0.1",
 ]
 
 [project.optional-dependencies]

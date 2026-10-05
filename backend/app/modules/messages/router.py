@@ -13,14 +13,28 @@ from __future__ import annotations
 
 import uuid
 from typing import Annotated
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user
+from app.core.config import Settings
+from app.core.deps import get_app_settings, get_current_user
 from app.core.rate_limit import enforce_message_rate_limit
 from app.db.session import get_db
 from app.modules.messages import service
+from app.modules.messages.models import MESSAGE_MAX_LENGTH
 from app.modules.messages.policies import ThreadNotFoundError
 from app.modules.messages.schemas import (
     ConversationRead,
@@ -29,10 +43,12 @@ from app.modules.messages.schemas import (
     MessageRead,
 )
 from app.modules.messages.service import PAGE_SIZE, ThreadClosedError
+from app.modules.uploads import validation
 from app.modules.users.models import User
 
 router = APIRouter(tags=["messages"])
 
+AppSettings = Annotated[Settings, Depends(get_app_settings)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 DbSession = Annotated[Session, Depends(get_db)]
 
@@ -103,6 +119,99 @@ def post_message(
             status_code=status.HTTP_409_CONFLICT,
             detail="This collaboration has ended, so the conversation is read-only.",
         ) from exc
+
+
+@router.post(
+    "/conversations/{conversation_id}/attachments",
+    response_model=MessageRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def post_attachment(
+    conversation_id: uuid.UUID,
+    request: Request,
+    db: DbSession,
+    sender: CurrentUser,
+    settings: AppSettings,
+    file: Annotated[UploadFile, File(description="The file to share.")],
+    caption: Annotated[str, Form(max_length=MESSAGE_MAX_LENGTH)] = "",
+) -> MessageRead:
+    """Share a file in a thread. It arrives as a message, with an optional
+    caption, so it is subject to every rule an ordinary message is."""
+    # Shares the message budget: both are "this account is putting things in
+    # other people's threads", and a file costs more to carry than a line.
+    enforce_message_rate_limit(request, sender.id)
+    data = file.file.read(settings.upload_max_bytes + 1)
+    try:
+        return service.send_attachment(
+            db,
+            sender,
+            conversation_id,
+            data=data,
+            filename=file.filename,
+            caption=caption,
+            max_bytes=settings.upload_max_bytes,
+        )
+    except ThreadNotFoundError as exc:
+        raise _NOT_FOUND from exc
+    except ThreadClosedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This collaboration has ended, so the conversation is read-only.",
+        ) from exc
+    except validation.EmptyFileError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="That file is empty.",
+        ) from exc
+    except validation.FileTooLargeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=(
+                f"That file is larger than {exc.limit // (1024 * 1024)} MB. "
+                "Share a link to it instead."
+            ),
+        ) from exc
+    except validation.UnsupportedFileTypeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"That file type is not accepted. Allowed: {validation.ALLOWED_LABELS}.",
+        ) from exc
+
+
+@router.get(
+    "/conversations/{conversation_id}/attachments/{attachment_id}",
+    response_class=Response,
+    responses={200: {"content": {"application/octet-stream": {}}}},
+)
+def download_attachment(
+    conversation_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+    db: DbSession,
+    viewer: CurrentUser,
+) -> Response:
+    """The file itself, for a participant only.
+
+    Always `Content-Disposition: attachment`: nothing shared in a thread is
+    rendered in the browser on this origin, so an uploaded file cannot become
+    a script running as the application. `private` caching for the same
+    reason the thread is scoped -- a shared cache must not hold it.
+    """
+    try:
+        attachment = service.read_attachment(db, viewer, conversation_id, attachment_id)
+    except ThreadNotFoundError as exc:
+        raise _NOT_FOUND from exc
+    return Response(
+        content=attachment.data,
+        media_type=attachment.content_type,
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{attachment.filename}"; '
+                f"filename*=UTF-8''{quote(attachment.filename)}"
+            ),
+            "Cache-Control": "private, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.post("/conversations/{conversation_id}/read", status_code=status.HTTP_204_NO_CONTENT)
