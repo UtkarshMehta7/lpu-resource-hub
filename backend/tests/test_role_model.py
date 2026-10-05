@@ -97,7 +97,11 @@ def test_a_custodian_holds_only_facility_powers() -> None:
 
 def test_a_dean_reads_and_changes_nothing() -> None:
     held = ROLE_PERMISSIONS[UserRole.DEAN_OF_RESEARCH]
-    assert held == {Permission.ANALYTICS_READ}
+    # Two, and the second is tightly scoped: PROJECT_REVIEW lets a dean decide
+    # work that CROSSES departments and nothing else (ADR 0032), enforced in
+    # projects/policies.py rather than by the permission. Holding it says a
+    # person may review *a* project, never every project.
+    assert held == {Permission.ANALYTICS_READ, Permission.PROJECT_REVIEW}
 
 
 def test_neither_new_role_can_remove_anybody() -> None:
@@ -900,3 +904,127 @@ def test_the_directory_names_a_person_s_department(client: TestClient, world: Wo
     named = [card for card in items if card.get("department_id")]
     assert named, "the fixture should have somebody in a department"
     assert all(card["department_name"] for card in named)
+
+
+# --- a dean decides what crosses departments (ADR 0032) --------------------
+
+
+def _pending_cross_department_project(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> str:
+    """A project whose team reaches outside its own department.
+
+    Nobody at department level can review this properly: a coordinator sees
+    one department, and half this team is in another.
+    """
+    other_school = client.post(
+        "/api/v1/admin/schools", headers=auth(world.admin), json={"name": "Second School"}
+    ).json()["id"]
+    other_department = client.post(
+        "/api/v1/admin/departments",
+        headers=auth(world.admin),
+        json={"school_id": other_school, "name": "Second Department"},
+    ).json()["id"]
+    outsider = seed_user(UserRole.STUDENT, department_id=other_department)
+
+    created = client.post(
+        "/api/v1/projects",
+        headers=auth(world.faculty),
+        json={"title": "Across two departments", "summary": "Joint work.", "description": "x"},
+    )
+    assert created.status_code == 201, created.text
+    project_id: str = created.json()["id"]
+    added = client.post(
+        f"/api/v1/projects/{project_id}/members",
+        headers=auth(world.faculty),
+        json={"user_id": str(outsider.id), "member_role": "Research assistant"},
+    )
+    assert added.status_code in (200, 201), added.text
+    submitted = client.post(f"/api/v1/projects/{project_id}/submit", headers=auth(world.faculty))
+    assert submitted.status_code == 200, submitted.text
+    return project_id
+
+
+def test_a_dean_reviews_work_that_crosses_departments(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    dean = seed_user(UserRole.DEAN_OF_RESEARCH)
+    project_id = _pending_cross_department_project(client, world, seed_user)
+
+    queue = client.get("/api/v1/coordinator/review-queue", headers=auth(dean))
+    assert queue.status_code == 200, queue.text
+    assert any(card["id"] == project_id for card in queue.json())
+
+    decided = client.post(
+        f"/api/v1/projects/{project_id}/review",
+        headers=auth(dean),
+        json={"decision": "approve", "comment": "Worth doing across both."},
+    )
+    assert decided.status_code == 200, decided.text
+    assert decided.json()["status"] == "active"
+
+
+def test_a_dean_does_not_decide_ordinary_departmental_work(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """Otherwise the dean quietly replaces the coordinator who is meant to."""
+    dean = seed_user(UserRole.DEAN_OF_RESEARCH)
+    created = client.post(
+        "/api/v1/projects",
+        headers=auth(world.faculty),
+        json={"title": "One department only", "summary": "Local work.", "description": "x"},
+    )
+    project_id = created.json()["id"]
+    client.post(f"/api/v1/projects/{project_id}/submit", headers=auth(world.faculty))
+
+    queue = client.get("/api/v1/coordinator/review-queue", headers=auth(dean))
+    decided = client.post(
+        f"/api/v1/projects/{project_id}/review",
+        headers=auth(dean),
+        json={"decision": "approve"},
+    )
+
+    assert queue.status_code == 200
+    assert all(card["id"] != project_id for card in queue.json())
+    assert decided.status_code == 403, decided.text
+
+
+def test_the_queue_and_the_decision_agree_for_a_dean(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """A queue offering what the review call refuses is a dead button."""
+    dean = seed_user(UserRole.DEAN_OF_RESEARCH)
+    _pending_cross_department_project(client, world, seed_user)
+    client.post(
+        "/api/v1/projects",
+        headers=auth(world.faculty),
+        json={"title": "Purely local", "summary": "s", "description": "d"},
+    )
+
+    offered = client.get("/api/v1/coordinator/review-queue", headers=auth(dean)).json()
+
+    for card in offered:
+        decided = client.post(
+            f"/api/v1/projects/{card['id']}/review",
+            headers=auth(dean),
+            json={"decision": "approve"},
+        )
+        assert decided.status_code == 200, decided.text
+
+
+def test_a_coordinator_still_decides_their_own_department(client: TestClient, world: World) -> None:
+    created = client.post(
+        "/api/v1/projects",
+        headers=auth(world.faculty),
+        json={"title": "Coordinator decides", "summary": "s", "description": "d"},
+    )
+    project_id = created.json()["id"]
+    client.post(f"/api/v1/projects/{project_id}/submit", headers=auth(world.faculty))
+
+    decided = client.post(
+        f"/api/v1/projects/{project_id}/review",
+        headers=auth(world.coordinator),
+        json={"decision": "approve"},
+    )
+
+    assert decided.status_code == 200, decided.text

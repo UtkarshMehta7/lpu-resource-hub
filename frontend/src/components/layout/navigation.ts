@@ -106,7 +106,9 @@ export const NAV: NavItem[] = [
     to: "/coordinator/review-queue",
     label: "Reviews",
     group: "Review",
-    roles: ["research_coordinator", "admin"],
+    // A dean decides what crosses departments; their queue is filtered to
+    // exactly that, so the same page serves both (ADR 0032).
+    roles: ["research_coordinator", "dean_of_research", "admin"],
     keywords: "approve projects",
   },
   {

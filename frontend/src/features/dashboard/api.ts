@@ -39,6 +39,22 @@ export interface CoordinatorDashboard {
   department_activity: Record<string, number>;
 }
 
+export interface DeanDashboard {
+  departments: number;
+  departments_needing_attention: number;
+  projects_at_risk: number;
+  pending_cross_department_reviews: number;
+  verification_backlog: number;
+  active_projects: number;
+  researchers: number;
+}
+
+export interface CustodianDashboard {
+  facilities_held: number;
+  equipment: number;
+  bookings_awaiting_decision: number;
+}
+
 export interface AdminDashboard {
   users_by_role: Record<string, number>;
   platform_counts: Record<string, number>;
@@ -52,6 +68,8 @@ export interface DashboardResponse {
   student: StudentDashboard | null;
   faculty: FacultyDashboard | null;
   coordinator: CoordinatorDashboard | null;
+  dean: DeanDashboard | null;
+  custodian: CustodianDashboard | null;
   admin: AdminDashboard | null;
 }
 

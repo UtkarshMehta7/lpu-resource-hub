@@ -62,6 +62,33 @@ class CoordinatorDashboard(BaseModel):
     department_activity: dict[str, int]
 
 
+class DeanDashboard(BaseModel):
+    """What a Dean of Research opens the platform to see.
+
+    The dashboard had sections for student, faculty, coordinator and admin and
+    none for a dean, so the role signed in to an empty page. These are the
+    institution-wide figures that decide where attention goes, each one a
+    number the dean can then act on -- the at-risk board, the review queue,
+    the department comparison.
+    """
+
+    departments: int
+    departments_needing_attention: int
+    projects_at_risk: int
+    pending_cross_department_reviews: int
+    verification_backlog: int
+    active_projects: int
+    researchers: int
+
+
+class CustodianDashboard(BaseModel):
+    """The rooms this person looks after, and what is waiting on them."""
+
+    facilities_held: int
+    equipment: int
+    bookings_awaiting_decision: int
+
+
 class AdminDashboard(BaseModel):
     users_by_role: dict[str, int]
     platform_counts: dict[str, int]
@@ -75,4 +102,6 @@ class DashboardResponse(BaseModel):
     student: StudentDashboard | None = None
     faculty: FacultyDashboard | None = None
     coordinator: CoordinatorDashboard | None = None
+    dean: DeanDashboard | None = None
+    custodian: CustodianDashboard | None = None
     admin: AdminDashboard | None = None
