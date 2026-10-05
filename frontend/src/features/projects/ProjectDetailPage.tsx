@@ -29,7 +29,10 @@ type PendingAction = ProjectAction | "delete";
 const ACTION_COPY: Record<PendingAction, { title: string; body: string; label: string }> = {
   submit: {
     title: "Submit for review?",
-    body: "Your department's research coordinator will review it. You can't edit it while it's under review.",
+    // Not always the coordinator since ADR 0032: a project whose team
+    // reaches into a second department is the Dean of Research's to decide,
+    // because no single coordinator can see all of it.
+    body: "A reviewer will decide on it — your department's research coordinator, or the Dean of Research if the team spans departments. You can't edit it while it's under review.",
     label: "Submit",
   },
   complete: {
@@ -230,6 +233,23 @@ export function ProjectDetailPage() {
                 <span className="text-sm">
                   {member.full_name} <Uid value={member.registration_number} />{" "}
                   <span className="text-ink-muted">· {member.member_role}</span>
+                  {/* The department is shown here for the same reason it is
+                      shown on every other card, and for one more: a team
+                      reaching into a second department makes the project a
+                      dean's to approve rather than a coordinator's
+                      (ADR 0032), and that was impossible to see. Marked when
+                      it differs from the project's own. */}
+                  {member.department_name ? (
+                    <span
+                      className={
+                        member.department_id !== project.department_id
+                          ? "ml-1 rounded bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-800"
+                          : "ml-1 text-xs text-ink-muted"
+                      }
+                    >
+                      {member.department_name}
+                    </span>
+                  ) : null}
                 </span>
                 {isOwner ? (
                   <button

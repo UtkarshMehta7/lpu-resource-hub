@@ -83,7 +83,12 @@ export function FacilityDetailPage() {
     user?.role === "research_coordinator" ||
     user?.role === "admin" ||
     (user?.role === "facility_custodian" && facility.custodian_id === user.id);
-  const canAssignCustodian = user?.role === "research_coordinator" || user?.role === "admin";
+  // Department-level. Two powers sit here, not one: deciding who holds the
+  // room, and deciding the room exists at all. A custodian has neither --
+  // looking after a room is not the power to abolish it, and deleting one
+  // takes its equipment and every booking anyone held on it with it.
+  const isDepartmentManager = user?.role === "research_coordinator" || user?.role === "admin";
+  const canAssignCustodian = isDepartmentManager;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -131,7 +136,7 @@ export function FacilityDetailPage() {
         </p>
       ) : null}
 
-      {canManage ? (
+      {isDepartmentManager ? (
         <button
           type="button"
           onClick={() => {

@@ -301,3 +301,31 @@ def test_search_document_refreshes_when_skills_change(
 
     assert hits("haskell") == 1
     assert hits("fortran") == 0
+
+
+def test_the_researcher_page_names_their_department(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    """A person's department is shown wherever they are named — and the page
+    devoted to one person was the only place it was missing.
+
+    The detail response declared `department_name` and never filled it, so it
+    carried the id with no name and the page rendered nothing, while the card
+    that led there showed the department plainly.
+    """
+    admin = seed_user(UserRole.ADMIN)
+    school_id = client.post(
+        "/api/v1/admin/schools", headers=_auth(admin), json={"name": "Optics School"}
+    ).json()["id"]
+    department_id = client.post(
+        "/api/v1/admin/departments",
+        headers=_auth(admin),
+        json={"school_id": school_id, "name": "Applied Optics"},
+    ).json()["id"]
+    faculty = seed_user(UserRole.FACULTY, department_id=department_id)
+    _make_researcher(client, admin, faculty)
+
+    detail = client.get(f"/api/v1/researchers/{faculty.id}", headers=_auth(admin)).json()
+
+    assert detail["department_id"] == department_id
+    assert detail["department_name"] == "Applied Optics", detail

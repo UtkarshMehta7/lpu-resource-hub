@@ -21,15 +21,7 @@ import {
 import { DeletionDetails } from "./DeletionDetails";
 import { mayDelete } from "./hierarchy";
 import type { AdminUserRead, CoordinatorScopeType } from "./types";
-
-const ROLE_LABELS: Record<Role, string> = {
-  student: "Student",
-  faculty: "Faculty",
-  research_coordinator: "Coordinator",
-  facility_custodian: "Facility custodian",
-  dean_of_research: "Dean of Research",
-  admin: "Admin",
-};
+import { INSTITUTION_WIDE_ROLES, ROLE_LABELS, ROLE_OPTIONS } from "@/features/auth/roleLabels";
 
 /**
  * Every role, derived from the label map rather than written out again.
@@ -41,7 +33,6 @@ const ROLE_LABELS: Record<Role, string> = {
  * means the two can never disagree, and `Record<Role, string>` above makes
  * the compiler refuse a missing role.
  */
-const ROLE_OPTIONS = Object.keys(ROLE_LABELS) as Role[];
 
 type PendingAction =
   | { type: "role"; user: AdminUserRead; newRole: Role }
@@ -207,8 +198,8 @@ export function AdminUsersPage() {
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
       <p className="mt-1 text-sm text-ink-muted">
-        {data.total} accounts. A person with no department can&apos;t use anything
-        department-scoped, so place them here.
+        {data.total} {data.total === 1 ? "account" : "accounts"}. A person with no department
+        can&apos;t use anything department-scoped, so place them here.
       </p>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -375,10 +366,17 @@ export function AdminUsersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
+                    {/* A dean reads every department and an administrator
+                        serves all of them, so neither belongs to one. The
+                        create-account form has always refused to set one;
+                        this table did not, and a dean on the deployed
+                        instance ended up sitting in a department. */}
                     <select
                       aria-label={`Department for ${item.full_name}`}
-                      value={item.department_id ?? ""}
-                      disabled={isMutating}
+                      value={
+                        INSTITUTION_WIDE_ROLES.has(item.role) ? "" : (item.department_id ?? "")
+                      }
+                      disabled={isMutating || INSTITUTION_WIDE_ROLES.has(item.role)}
                       onChange={(event) => {
                         setActionError(null);
                         detailsMutation.mutate({
@@ -388,7 +386,11 @@ export function AdminUsersPage() {
                       }}
                       className={CONTROL}
                     >
-                      <option value="">No department</option>
+                      <option value="">
+                        {INSTITUTION_WIDE_ROLES.has(item.role)
+                          ? "Not needed for this role"
+                          : "No department"}
+                      </option>
                       {departments?.map((department) => (
                         <option key={department.id} value={department.id}>
                           {department.name}

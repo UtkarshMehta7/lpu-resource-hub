@@ -78,7 +78,21 @@ export function AnalyticsPage() {
             }
           />
           <Stat label="Accepted collaborations" value={data.accepted_collaborations} />
-          <Stat label="Open reports" value={data.open_reports} />
+          {/* Moderation is not department-scoped: a coordinator holds
+              REPORT_MODERATE over the whole platform and `list_reports`
+              returns every open report, so this count matches the queue they
+              can actually act on. It is the page's promise that was wrong,
+              not the number — every other figure here does stop at their
+              scope, and a figure that quietly does not must say so. */}
+          <Stat
+            label="Open reports"
+            value={data.open_reports}
+            note={
+              data.scope === "platform"
+                ? undefined
+                : "Across the platform — moderation is not department-scoped."
+            }
+          />
         </dl>
       </section>
 
@@ -206,11 +220,21 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-function Stat({ label, value }: { label: string; value: number | string }) {
+function Stat({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: number | string;
+  /** Said when a figure does not obey the scope the page just promised. */
+  note?: string;
+}) {
   return (
     <div className="rounded-card border border-line bg-surface p-4">
       <dt className="text-xs text-ink-muted">{label}</dt>
       <dd className="mt-1 text-xl font-semibold">{value}</dd>
+      {note ? <p className="mt-1 text-xs text-ink-muted">{note}</p> : null}
     </div>
   );
 }

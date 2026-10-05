@@ -86,7 +86,14 @@ describe("BookingForm", () => {
     expect(new Date(payload.starts_at).getHours()).toBe(9);
     expect(new Date(payload.ends_at).getHours()).toBe(10);
     expect(payload.purpose).toBe("Calibrating the probes");
-    expect(await screen.findByText(/coordinator will review it/i)).toBeInTheDocument();
+    // Named by the room rather than by a role: a booking goes to the
+    // facility's custodian when it has one, and only to the department's
+    // coordinator when it does not. This asserted "coordinator will review
+    // it", which was wrong for every facility with a custodian — and the
+    // request had in fact been landing in the custodian's queue.
+    expect(
+      await screen.findByText(/whoever looks after Soil Lab will review it/i),
+    ).toBeInTheDocument();
   });
 
   it("says so instead of offering a form when the equipment is down", () => {

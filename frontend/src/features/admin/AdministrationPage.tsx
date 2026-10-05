@@ -15,11 +15,21 @@ import { fetchUsers } from "./api";
  * someone into a table of 117 accounts and leaving them to infer it.
  */
 
-const ROLE_CARDS = [
-  { role: "research_coordinator" as const, label: "Coordinators", to: "/admin/coordinators" },
-  { role: "faculty" as const, label: "Faculty", to: "/researchers" },
-  { role: "student" as const, label: "Students", to: "/students" },
-  { role: "admin" as const, label: "Admins", to: "/admin/users" },
+/**
+ * Every role that can sign in, so this panel and the dashboard agree.
+ *
+ * It listed four and the platform has six: facility custodians and deans
+ * were simply absent, so an administrator reading "the platform" here was
+ * told about 148 of its 153 accounts. A role added without a card here goes
+ * uncounted silently, which is why the cards are checked against `Role`.
+ */
+const ROLE_CARDS: { role: Role; label: string; to: string }[] = [
+  { role: "research_coordinator", label: "Coordinators", to: "/admin/coordinators" },
+  { role: "faculty", label: "Faculty", to: "/researchers" },
+  { role: "student", label: "Students", to: "/students" },
+  { role: "facility_custodian", label: "Facility custodians", to: "/admin/users" },
+  { role: "dean_of_research", label: "Deans of research", to: "/admin/users" },
+  { role: "admin", label: "Admins", to: "/admin/users" },
 ];
 
 const PRIVILEGES: { group: string; items: { label: string; detail: string; to: string }[] }[] = [
@@ -123,10 +133,14 @@ function useActiveRoleCount(role: Role) {
 }
 
 export function AdministrationPage() {
-  const counts: Record<string, number | undefined> = {
+  // One hook per role, written out rather than mapped: a hook cannot be
+  // called in a loop whose length could change between renders.
+  const counts: Record<Role, number | undefined> = {
     research_coordinator: useActiveRoleCount("research_coordinator").data,
     faculty: useActiveRoleCount("faculty").data,
     student: useActiveRoleCount("student").data,
+    facility_custodian: useActiveRoleCount("facility_custodian").data,
+    dean_of_research: useActiveRoleCount("dean_of_research").data,
     admin: useActiveRoleCount("admin").data,
   };
   // Deactivated accounts still exist and can be reactivated, so they are

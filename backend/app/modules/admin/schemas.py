@@ -118,6 +118,12 @@ class DepartmentRead(BaseModel):
 
     id: uuid.UUID
     school_id: uuid.UUID
+    #: The school's NAME, not just its id. Two schools may legitimately each
+    #: run a department of the same name -- the deployed instance has an
+    #: "Information Technology" in two of them -- and a picker that shows the
+    #: name alone offers two identical options, where choosing the wrong one
+    #: puts a person under the wrong coordinator.
+    school_name: str | None = None
     name: str
     created_at: datetime
     updated_at: datetime

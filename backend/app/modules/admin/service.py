@@ -13,8 +13,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.pagination import Page, PageParams
+from app.core.permissions import INSTITUTION_WIDE_ROLES
 from app.core.security import hash_password
 from app.modules.admin.accounts import generate_temporary_password
+from app.modules.admin.deletion import assert_may_set_active
 from app.modules.admin.models import Department, School
 from app.modules.admin.policies import (
     assert_not_self_password_reset,
@@ -25,6 +27,7 @@ from app.modules.admin.schemas import (
     AdminUserRead,
     AdminUserUpdate,
     DepartmentCreate,
+    DepartmentRead,
     DepartmentUpdate,
     SchoolCreate,
     SchoolUpdate,
@@ -138,6 +141,21 @@ def _sync_coordinator_scope(target: User) -> None:
         target.coordinator_scope_id = None
 
 
+def _sync_institution_wide_placement(target: User) -> None:
+    """An institution-wide role belongs to no department.
+
+    A dean reads every department and an administrator serves all of them, so
+    placing either in one says something untrue -- and `INSTITUTION_WIDE_ROLES`
+    is precisely the set that needs no department (ADR 0028). The create-account
+    form already refuses to set one; the users page did not, so a dean on the
+    deployed instance was sitting in a department. The same shape as the
+    coordinator scope above: a derived fact that was left as an independent
+    choice in one place and drifted.
+    """
+    if target.role in INSTITUTION_WIDE_ROLES:
+        target.department_id = None
+
+
 def update_user(
     db: Session, actor: User, target: User, data: AdminUserUpdate, *, ip: str | None
 ) -> User:
@@ -159,6 +177,9 @@ def update_user(
         # department is what they oversee.
         if "coordinator_scope_id" not in fields_set:
             _sync_coordinator_scope(target)
+        # Unconditional: a department set on a dean or an administrator is
+        # wrong whatever else the request asked for.
+        _sync_institution_wide_placement(target)
 
     resulting_type = (
         data.coordinator_scope_type
@@ -241,6 +262,8 @@ def change_role(
     before = {"role": target.role.value}
     target.role = new_role
     _sync_coordinator_scope(target)
+    # Becoming a dean or an administrator leaves the department behind.
+    _sync_institution_wide_placement(target)
     db.flush()
     audit_service.record(
         db,
@@ -258,6 +281,10 @@ def change_role(
 
 
 def set_active(db: Session, actor: User, target: User, is_active: bool, *, ip: str | None) -> User:
+    # Scoped, because the permission is no longer an administrator's alone:
+    # a coordinator may suspend their own department's people, and nobody
+    # else's. Same authority as removing them (see assert_may_set_active).
+    assert_may_set_active(db, actor, target)
     assert_preserves_last_active_admin(db, target, new_is_active=is_active)
 
     before = {"is_active": target.is_active}
@@ -321,11 +348,20 @@ def delete_school(db: Session, school: School) -> None:
     db.commit()
 
 
-def list_departments(db: Session, *, school_id: uuid.UUID | None = None) -> list[Department]:
-    query = select(Department)
+def list_departments(db: Session, *, school_id: uuid.UUID | None = None) -> list[DepartmentRead]:
+    """Departments with the name of the school that runs each one.
+
+    The school is carried because two schools may each have a department of
+    the same name, and a list that shows only the name cannot be chosen from.
+    """
+    query = select(Department, School.name).outerjoin(School, School.id == Department.school_id)
     if school_id is not None:
         query = query.where(Department.school_id == school_id)
-    return list(db.execute(query.order_by(Department.name)).scalars().all())
+    rows = db.execute(query.order_by(Department.name)).all()
+    return [
+        DepartmentRead.model_validate(department).model_copy(update={"school_name": school_name})
+        for department, school_name in rows
+    ]
 
 
 def create_department(db: Session, data: DepartmentCreate) -> Department:

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.events import EVENT_BUS, Event, EventName
 from app.core.pagination import Page, PageParams
+from app.modules.admin.models import Department
 from app.modules.audit import service as audit_service
 from app.modules.messages import service as messages_service
 from app.modules.profiles.models import ResearcherProfile, VerificationStatus
@@ -176,10 +177,53 @@ def _owner_names(db: Session, owner_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID,
     }
 
 
-def _to_cards(db: Session, projects: Sequence[Project]) -> list[ProjectCard]:
+def _department_names(db: Session, ids: Sequence[uuid.UUID | None]) -> dict[uuid.UUID, str]:
+    wanted = {i for i in ids if i is not None}
+    if not wanted:
+        return {}
+    return {
+        row.id: row.name
+        for row in db.execute(
+            select(Department.id, Department.name).where(Department.id.in_(wanted))
+        )
+    }
+
+
+def _spanned_departments(db: Session, projects: Sequence[Project]) -> dict[uuid.UUID, list[str]]:
+    """For each project, the OTHER departments its team reaches into.
+
+    One query for the whole list rather than one per project: this feeds a
+    queue, and a queue is read far more often than it is acted on.
+    """
+    if not projects:
+        return {}
+    own = {p.id: p.department_id for p in projects}
+    rows = db.execute(
+        select(ProjectMember.project_id, User.department_id, Department.name)
+        .join(User, User.id == ProjectMember.user_id)
+        .join(Department, Department.id == User.department_id)
+        .where(ProjectMember.project_id.in_(list(own)))
+    ).all()
+    found: dict[uuid.UUID, list[str]] = {}
+    for project_id, department_id, name in rows:
+        if department_id == own.get(project_id):
+            continue
+        names = found.setdefault(project_id, [])
+        if name not in names:
+            names.append(name)
+    for names in found.values():
+        names.sort()
+    return found
+
+
+def _to_cards(
+    db: Session, projects: Sequence[Project], *, with_spans: bool = False
+) -> list[ProjectCard]:
     ids = [p.id for p in projects]
     areas, skills = _tags_by_project(db, ids)
     owners = _owner_names(db, list({p.owner_id for p in projects}))
+    department_names = _department_names(db, [p.department_id for p in projects])
+    spans = _spanned_departments(db, projects) if with_spans else {}
     return [
         ProjectCard(
             id=p.id,
@@ -190,6 +234,10 @@ def _to_cards(db: Session, projects: Sequence[Project]) -> list[ProjectCard]:
             owner_name=owners.get(p.owner_id, ("", ""))[0],
             owner_registration_number=owners.get(p.owner_id, ("", ""))[1],
             department_id=p.department_id,
+            department_name=(
+                department_names.get(p.department_id) if p.department_id is not None else None
+            ),
+            spans_departments=spans.get(p.id, []),
             start_date=p.start_date,
             end_date=p.end_date,
             research_areas=areas.get(p.id, []),
@@ -206,14 +254,24 @@ def _members(db: Session, project_id: uuid.UUID) -> list[MemberRead]:
             User.full_name,
             User.registration_number,
             ProjectMember.member_role,
+            User.department_id,
+            Department.name,
         )
         .join(User, User.id == ProjectMember.user_id)
+        .outerjoin(Department, Department.id == User.department_id)
         .where(ProjectMember.project_id == project_id)
         .order_by(ProjectMember.created_at)
     ).all()
     return [
-        MemberRead(user_id=uid, full_name=name, registration_number=number, member_role=role)
-        for uid, name, number, role in rows
+        MemberRead(
+            user_id=row.user_id,
+            full_name=row.full_name,
+            registration_number=row.registration_number,
+            member_role=row.member_role,
+            department_id=row.department_id,
+            department_name=row.name,
+        )
+        for row in rows
     ]
 
 
@@ -313,7 +371,7 @@ def review_queue(db: Session, reviewer: User) -> list[ProjectCard]:
         # function decides the queue and the decision -- a queue that offered
         # a project the review call would refuse is a dead button.
         projects = db.execute(query.order_by(Project.updated_at)).scalars().all()
-        return _to_cards(db, [p for p in projects if crosses_departments(db, p)])
+        return _to_cards(db, [p for p in projects if crosses_departments(db, p)], with_spans=True)
     if reviewer.role is not UserRole.ADMIN:
         if (
             reviewer.coordinator_scope_type is not CoordinatorScopeType.DEPARTMENT

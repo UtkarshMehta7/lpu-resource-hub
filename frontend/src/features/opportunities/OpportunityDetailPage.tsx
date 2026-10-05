@@ -67,11 +67,18 @@ export function OpportunityDetailPage() {
 
   const isOwner = user?.id === opportunity.created_by;
   const deadlinePassed = opportunity.deadline < new Date().toISOString().slice(0, 10);
+  // Counted, not taken from the status. An opening becomes FILLED inside the
+  // accept transaction, so one whose acceptances were written another way --
+  // a seed script, say -- stays "open" while being full. The deployed
+  // instance has one showing "1/1 positions filled" and still offering the
+  // form, for an application nobody could ever accept.
+  const positionsFilled = opportunity.accepted_count >= opportunity.positions;
   const canApply =
     !!user &&
     !isOwner &&
     opportunity.status === "open" &&
     !deadlinePassed &&
+    !positionsFilled &&
     opportunity.my_application_id === null &&
     canApplyAs(user.role, opportunity.opportunity_type);
 
@@ -186,6 +193,10 @@ export function OpportunityDetailPage() {
             <h2 className="text-base font-semibold">Apply</h2>
             <ApplyForm opportunityId={opportunity.id} />
           </>
+        ) : !isOwner && opportunity.status === "open" && !deadlinePassed && positionsFilled ? (
+          <p className="text-sm text-ink-muted">
+            Every position here is taken, so this opening is no longer accepting applications.
+          </p>
         ) : !isOwner && opportunity.status === "open" && !deadlinePassed ? (
           <p className="text-sm text-ink-muted">
             {user?.role === "student"

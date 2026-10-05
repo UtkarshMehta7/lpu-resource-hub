@@ -189,3 +189,84 @@ def test_platform_settings_are_admin_only_and_carry_no_secrets(
     serialised = str(body).lower()
     for secret in ("password", "secret", "jwt", "database_url"):
         assert secret not in serialised
+
+
+def test_by_department_agrees_with_the_scoped_helpers(
+    client: TestClient, world: World, db_settings: Settings
+) -> None:
+    """The aggregate and the per-department helpers must give one answer.
+
+    `by_department` used to BE the helpers, called once per department: six
+    queries each, about 130 round trips for 22 departments, and ten to twenty
+    seconds on the dean's own page. It aggregates in one pass now, which is
+    only safe while the two still agree -- so this asserts they do, for every
+    department, rather than leaving it to be assumed as the loop did.
+    """
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.modules.analytics.insights import (
+        Scope,
+        by_department,
+        milestone_adherence,
+        projects_by_status,
+        verification_backlog,
+    )
+
+    engine = create_engine(str(db_settings.database_url))
+    with sessionmaker(bind=engine)() as db:
+        rows = by_department(db)
+        assert rows, "the world fixture creates a department, so this cannot be empty"
+
+        for row in rows:
+            scope = Scope(department_id=row.department_id)
+            where = f"department {row.department_name}"
+            assert row.projects_active == projects_by_status(db, scope).get("active", 0), where
+            adherence = milestone_adherence(db, scope)
+            assert row.milestones_overdue == adherence.get("overdue", 0), where
+            assert row.milestones_at_risk == adherence.get("at_risk", 0), where
+            assert row.verification_pending == verification_backlog(db, scope)["pending"], where
+    engine.dispose()
+
+
+def test_by_department_does_not_leak_counts_between_departments(
+    client: TestClient, world: World, db_settings: Settings, seed_user: Callable[..., SeededUser]
+) -> None:
+    """The risk a GROUP BY introduces that a per-department loop could not.
+
+    The loop asked a scoped question 22 times, so a department could only ever
+    see its own rows. One aggregate pass has to attribute every row itself,
+    and getting that wrong shows up as one department wearing another's
+    figures.
+    """
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.modules.analytics.insights import by_department
+
+    admin = seed_user(UserRole.ADMIN)
+    school_id = client.post(
+        "/api/v1/admin/schools", headers=auth(admin), json={"name": "Second School"}
+    ).json()["id"]
+    other_department = client.post(
+        "/api/v1/admin/departments",
+        headers=auth(admin),
+        json={"school_id": school_id, "name": "Marine Biology"},
+    ).json()["id"]
+    # One faculty member and one student, in the new department only.
+    seed_user(UserRole.FACULTY, department_id=other_department)
+    seed_user(UserRole.STUDENT, department_id=other_department)
+
+    engine = create_engine(str(db_settings.database_url))
+    with sessionmaker(bind=engine)() as db:
+        rows = {row.department_name: row for row in by_department(db)}
+    engine.dispose()
+
+    assert set(rows) >= {"Agriculture", "Marine Biology"}
+    new = rows["Marine Biology"]
+    assert (new.researchers, new.students) == (1, 1), "only its own two people"
+    # The populated department keeps everyone it had; nothing moved across.
+    assert rows["Agriculture"].researchers >= 1
+    assert rows["Agriculture"].projects_active >= 1
+    assert new.projects_active == 0, "a brand-new department owns no projects"
+    assert new.publications == 0

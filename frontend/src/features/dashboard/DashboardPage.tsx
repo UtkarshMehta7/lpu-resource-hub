@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import { useAuth } from "@/features/auth/authContext";
+import { buildsResearchProfile, roleLabel } from "@/features/auth/roleLabels";
 
 import {
   fetchDashboard,
@@ -40,7 +41,12 @@ export function DashboardPage() {
         </p>
       ) : null}
 
-      {data && !data.onboarding_complete ? (
+      {/* Only the roles that actually build a profile and are matched on
+          it. An administrator, a dean and a facility custodian are not, so
+          "your profile is incomplete, so matches will be rough" named a
+          consequence that cannot reach them and a job with no page behind
+          it. */}
+      {data && !data.onboarding_complete && buildsResearchProfile(data.role) ? (
         <div className="mt-6 rounded-card border border-line bg-surface px-4 py-3 text-sm">
           Your profile is incomplete, so matches will be rough.{" "}
           <Link to="/onboarding" className="text-brand-700 hover:underline">
@@ -305,12 +311,19 @@ function DeanSections({ data }: { data: DeanDashboard }) {
   return (
     <>
       <Section title="The institution" action={{ label: "Compare departments", to: "/analytics" }}>
+        {/* The verification backlog belongs here, not under "Waiting on you".
+            Verifying a researcher is a departmental act and is deliberately
+            absent from a dean's navigation — so listing it as waiting on them
+            named a job they have no way to do, under a heading that said it
+            was theirs. Here it reads as what it is: the state of the
+            institution they oversee. */}
         <Stats
           entries={[
             ["departments", data.departments],
             ["needing attention", data.departments_needing_attention],
             ["active projects", data.active_projects],
             ["researchers", data.researchers],
+            ["researchers awaiting verification", data.verification_backlog],
           ]}
         />
       </Section>
@@ -323,11 +336,9 @@ function DeanSections({ data }: { data: DeanDashboard }) {
         title="Waiting on you"
         action={{ label: "Review queue", to: "/coordinator/review-queue" }}
       >
+        {/* Only what a dean can actually decide. */}
         <Stats
-          entries={[
-            ["cross-department projects to decide", data.pending_cross_department_reviews],
-            ["researchers awaiting verification", data.verification_backlog],
-          ]}
+          entries={[["cross-department projects to decide", data.pending_cross_department_reviews]]}
         />
       </Section>
     </>
@@ -360,7 +371,15 @@ function AdminSections({ data }: { data: AdminDashboard }) {
   return (
     <>
       <Section title="Users" action={{ label: "Manage users", to: "/admin/users" }}>
-        <Stats entries={Object.entries(data.users_by_role)} />
+        {/* Labelled here rather than left to the CSS `capitalize` the other
+            stats use: that title-cases every word, so `dean_of_research`
+            read "Dean Of Research". */}
+        <Stats
+          entries={Object.entries(data.users_by_role).map(([role, count]) => [
+            roleLabel(role),
+            count,
+          ])}
+        />
       </Section>
 
       <Section title="Platform">

@@ -185,6 +185,28 @@ def assert_may_delete(db: Session, actor: User, target: User) -> None:
         raise OutOfScopeError
 
 
+def assert_may_set_active(db: Session, actor: User, target: User) -> None:
+    """Raise unless `actor` may deactivate or reactivate `target`.
+
+    Whoever may REMOVE an account may certainly suspend one: deactivation is
+    the lesser act, and the deletion route's own docstring calls it "the right
+    answer for somebody who has simply left". It was held by administrators
+    alone, so a coordinator could permanently delete a student from their
+    department and could not deactivate them -- the destructive power without
+    the gentle one, while the page they were given advised the gentle one.
+
+    Delegates to `assert_may_delete` rather than restating the hierarchy, so
+    the two can never answer differently about the same pair of people.
+
+    An administrator keeps exactly the latitude they had: they answer for the
+    whole platform, and deactivating their own account is already guarded by
+    the last-active-admin check rather than forbidden outright.
+    """
+    if actor.role is UserRole.ADMIN:
+        return
+    assert_may_delete(db, actor, target)
+
+
 def delete_account(db: Session, actor: User, target: User, *, ip: str | None) -> DeletionImpact:
     """Delete `target` and everything the database cascades from it.
 

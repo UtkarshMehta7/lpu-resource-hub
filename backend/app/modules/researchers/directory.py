@@ -288,12 +288,19 @@ def get_researcher(db: Session, user_id: uuid.UUID) -> ResearcherDetail:
 
     user, profile = row
     areas, skills = _tags_by_user(db, [user.id])
+    # The NAME, like the cards carry. The detail response declared the field
+    # and never filled it, so the researcher page -- the one screen devoted to
+    # a single person -- was the only place their department did not appear,
+    # while the card that led to it showed it. A department id with no name
+    # renders as nothing at all.
+    departments = _department_names(db, [user.id])
     return ResearcherDetail(
         user_id=user.id,
         registration_number=user.registration_number,
         full_name=user.full_name,
         designation=profile.designation,
         department_id=user.department_id,
+        department_name=(departments.get(user.department_id) if user.department_id else None),
         availability=profile.availability,
         verification_status=profile.verification_status,
         research_areas=areas.get(user.id, []),

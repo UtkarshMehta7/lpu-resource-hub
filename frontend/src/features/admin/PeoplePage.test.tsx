@@ -7,16 +7,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PeoplePage } from "./PeoplePage";
 import type { AdminUserRead } from "./types";
 
-const { fetchManageableUsers, fetchDeletionImpact, deleteUser, fetchDepartments, useAuthMock } =
-  vi.hoisted(() => ({
-    fetchManageableUsers: vi.fn(),
-    fetchDeletionImpact: vi.fn(),
-    deleteUser: vi.fn(),
-    fetchDepartments: vi.fn(),
-    useAuthMock: vi.fn(),
-  }));
+const {
+  fetchManageableUsers,
+  fetchDeletionImpact,
+  deleteUser,
+  setUserActive,
+  fetchDepartments,
+  useAuthMock,
+} = vi.hoisted(() => ({
+  fetchManageableUsers: vi.fn(),
+  setUserActive: vi.fn(),
+  fetchDeletionImpact: vi.fn(),
+  deleteUser: vi.fn(),
+  fetchDepartments: vi.fn(),
+  useAuthMock: vi.fn(),
+}));
 
-vi.mock("./api", () => ({ fetchManageableUsers, fetchDeletionImpact, deleteUser }));
+vi.mock("./api", () => ({ fetchManageableUsers, fetchDeletionImpact, deleteUser, setUserActive }));
 vi.mock("@/features/directory/api-org", () => ({ fetchDepartments }));
 vi.mock("@/features/auth/authContext", () => ({ useAuth: useAuthMock }));
 
@@ -121,5 +128,28 @@ describe("PeoplePage", () => {
     expect(
       await screen.findByText(/ask an administrator to check the department/i),
     ).toBeInTheDocument();
+  });
+});
+
+describe("suspending somebody who has left", () => {
+  it("offers the action the page has always advised", async () => {
+    // The description says "deactivate instead if the person has simply
+    // left", and for a coordinator the only button was the permanent one:
+    // the power belonged to administrators alone, so the advice named
+    // something the reader could not do.
+    renderPage();
+
+    await screen.findByText("Demo Student 01");
+    expect(screen.getByRole("button", { name: "Deactivate Demo Student 01" })).toBeInTheDocument();
+  });
+
+  it("deactivates on click and offers to put them back", async () => {
+    setUserActive.mockResolvedValue({});
+    renderPage();
+
+    await screen.findByText("Demo Student 01");
+    await userEvent.click(screen.getByRole("button", { name: "Deactivate Demo Student 01" }));
+
+    await waitFor(() => expect(setUserActive).toHaveBeenCalledWith("s1", false));
   });
 });

@@ -418,3 +418,34 @@ def test_mine_filter_returns_owned_projects(client: TestClient, world: World) ->
     ).json()
 
     assert [p["id"] for p in listed["items"]] == [mine]
+
+
+def test_a_team_member_is_shown_with_their_department(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """A person's department is shown wherever they are named, and on a team
+    it carries extra weight: a member from a second department is what makes
+    the project a dean's to approve rather than a coordinator's (ADR 0032).
+    The panel named people and their role and left the department out, so the
+    one fact that decides who may review the work was invisible on it."""
+    project_id = _active_project(client, world)
+    outsider = seed_user(UserRole.STUDENT, department_id=world.dept_b)
+    for member in (world.student, outsider):
+        client.post(
+            f"/api/v1/projects/{project_id}/members",
+            headers=_auth(world.owner),
+            json={"user_id": str(member.id), "member_role": "Research assistant"},
+        )
+
+    members = client.get(f"/api/v1/projects/{project_id}", headers=_auth(world.owner)).json()[
+        "members"
+    ]
+    by_id = {m["user_id"]: m for m in members}
+
+    own = by_id[str(world.student.id)]
+    assert own["department_id"] == world.dept_a
+    assert own["department_name"], "a name, not a UUID the reader must resolve"
+    # The member who makes this project cross-department.
+    across = by_id[str(outsider.id)]
+    assert across["department_id"] == world.dept_b
+    assert across["department_name"] != own["department_name"]

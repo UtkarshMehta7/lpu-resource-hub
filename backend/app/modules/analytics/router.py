@@ -154,6 +154,9 @@ def read_platform_settings(
             "semantic_search_available": embeddings.is_available(),
             "deadline_reminder_scheduler": settings.enable_scheduler,
             "milestone_at_risk_days": settings.milestone_at_risk_days,
+            # Attachment bytes live in PostgreSQL, so this limit is also a
+            # claim on the database quota -- worth seeing beside the rest.
+            "upload_max_bytes": settings.upload_max_bytes,
             "reminder_interval_minutes": settings.reminder_interval_minutes,
             "access_token_expire_minutes": settings.access_token_expire_minutes,
             "refresh_token_expire_days": settings.refresh_token_expire_days,

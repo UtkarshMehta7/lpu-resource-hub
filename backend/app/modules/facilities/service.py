@@ -231,7 +231,23 @@ def update_facility(
 
 
 def delete_facility(db: Session, actor: User, facility_id: uuid.UUID) -> None:
-    facility = _load_managed_facility(db, actor, facility_id)
+    """Remove a facility entirely.
+
+    Gated at DEPARTMENT level, never object level, for the same reason
+    assigning a custodian is: a custodian passes the object check for their
+    own facility, so the object gate let the person who looks after a room
+    destroy it. And not only the room -- `equipment` cascades from
+    `facilities` and `bookings` cascades from `equipment`, so one press took
+    the equipment and every booking anyone held on it.
+
+    Looking after a room is not the power to abolish it. Creating a facility
+    is already a department decision; deleting one is the same decision in
+    reverse and is now gated the same way.
+    """
+    facility = db.get(Facility, facility_id)
+    if facility is None:
+        raise FacilityNotFoundError
+    assert_can_manage(actor, facility.department_id)
     db.delete(facility)
     db.commit()
 

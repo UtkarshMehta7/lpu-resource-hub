@@ -426,3 +426,39 @@ def test_positions_cannot_drop_below_accepted(client: TestClient, world: World) 
 
     assert patch_positions(1) == 422  # two already accepted
     assert patch_positions(2) == 200
+
+
+def test_a_full_opening_takes_no_more_applications(client: TestClient, world: World) -> None:
+    """Counted, not inferred from the status flag.
+
+    An opening becomes FILLED inside the accept transaction, so one whose
+    acceptances were written any other way -- a seed script, a fix applied
+    straight to the database -- stays OPEN while being full. The deployed
+    instance has exactly that, and it was still inviting applications that
+    change_status would refuse on the very same count.
+    """
+    opportunity_id = _opportunity(client, world, positions=1)
+    first = _apply(client, world.student, opportunity_id)
+    assert _set_status(client, world.owner, first, "under_review") == 200
+    assert _set_status(client, world.owner, first, "accepted") == 200
+
+    # Reopened by hand, as a script writing directly to the database would
+    # leave it: full, but not marked FILLED.
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(str(client.app.state.settings.database_url))  # type: ignore[attr-defined]
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE opportunities SET status = 'open' WHERE id = :id"),
+            {"id": opportunity_id},
+        )
+    engine.dispose()
+
+    refused = client.post(
+        f"/api/v1/opportunities/{opportunity_id}/applications",
+        headers=_auth(world.student_2),
+        json={"statement": "I would like to help with this."},
+    )
+
+    assert refused.status_code == 409, refused.text
+    assert "positions" in refused.json()["error"]["message"].lower()
