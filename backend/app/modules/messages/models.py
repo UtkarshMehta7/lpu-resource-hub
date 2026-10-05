@@ -26,6 +26,9 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
+    LargeBinary,
+    String,
     Text,
     UniqueConstraint,
     func,
@@ -130,6 +133,42 @@ class Message(Base):
     hidden_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class MessageAttachment(Base):
+    """A file shared in a thread, bytes and all.
+
+    The bytes live in this row rather than in a shared blob table on purpose.
+    A shared table would want de-duplication, and de-duplication means a blob
+    outliving the attachment that referenced it -- an orphan nobody is
+    counting against a 0.5 GB database quota. Here the FK cascades: delete the
+    message, the conversation, the project or the person, and the bytes go
+    with them, by the same route everything else in this schema already
+    takes.
+
+    `content_type` is the SNIFFED type, never what the client declared --
+    see app/modules/uploads/validation.py.
+    """
+
+    __tablename__ = "message_attachments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("messages.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    #: Display label only. Sanitised on the way in, and never used as a path.
+    filename: Mapped[str] = mapped_column(String(200), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

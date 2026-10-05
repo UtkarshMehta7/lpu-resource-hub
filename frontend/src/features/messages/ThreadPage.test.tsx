@@ -7,20 +7,35 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ThreadPage } from "./ThreadPage";
 import type { Conversation, Message } from "./api";
 
-const { fetchConversation, fetchMessages, sendMessage, markConversationRead, useAuthMock } =
-  vi.hoisted(() => ({
-    fetchConversation: vi.fn(),
-    fetchMessages: vi.fn(),
-    sendMessage: vi.fn(),
-    markConversationRead: vi.fn(),
-    useAuthMock: vi.fn(),
-  }));
+const {
+  fetchConversation,
+  fetchMessages,
+  sendMessage,
+  sendAttachment,
+  downloadAttachment,
+  markConversationRead,
+  useAuthMock,
+} = vi.hoisted(() => ({
+  fetchConversation: vi.fn(),
+  fetchMessages: vi.fn(),
+  sendMessage: vi.fn(),
+  sendAttachment: vi.fn(),
+  downloadAttachment: vi.fn(),
+  markConversationRead: vi.fn(),
+  useAuthMock: vi.fn(),
+}));
 
 vi.mock("./api", () => ({
   fetchConversation,
   fetchMessages,
   sendMessage,
+  sendAttachment,
+  downloadAttachment,
   markConversationRead,
+  // Values, not functions: the component imports these to drive the picker
+  // and to refuse an oversized file before uploading it.
+  ACCEPTED_UPLOAD_TYPES: "application/pdf,image/png",
+  MAX_UPLOAD_BYTES: 5 * 1024 * 1024,
 }));
 vi.mock("@/features/auth/authContext", () => ({ useAuth: useAuthMock }));
 vi.mock("@/features/reports/ReportButton", () => ({
@@ -63,6 +78,7 @@ function message(overrides: Partial<Message> = {}): Message {
     body: "Welcome aboard",
     hidden: false,
     created_at: "2026-09-24T10:00:00Z",
+    attachments: [],
     ...overrides,
   };
 }
@@ -86,6 +102,8 @@ beforeEach(() => {
   fetchConversation.mockResolvedValue(CONVERSATION);
   fetchMessages.mockResolvedValue({ items: [message()], next_after: "cursor-1" });
   sendMessage.mockResolvedValue(message({ id: "m2", sender_id: "u-me", body: "Thanks" }));
+  sendAttachment.mockResolvedValue(message({ id: "m3", sender_id: "u-me", body: "" }));
+  downloadAttachment.mockResolvedValue(undefined);
   markConversationRead.mockResolvedValue(undefined);
 });
 
@@ -184,5 +202,132 @@ describe("ThreadPage", () => {
     renderThread();
 
     expect(await screen.findByText(/isn't available/i)).toBeInTheDocument();
+  });
+});
+
+describe("sharing a file in a thread", () => {
+  const pdf = () =>
+    new File([new Uint8Array([37, 80, 68, 70])], "survey.pdf", {
+      type: "application/pdf",
+    });
+
+  it("sends the chosen file with the draft as its caption", async () => {
+    renderThread();
+    await screen.findByText("Welcome aboard");
+
+    await userEvent.upload(screen.getByLabelText("Attach a file", { exact: true }), pdf());
+    // Named before it is sent, so nobody uploads the wrong file.
+    expect(await screen.findByText("survey.pdf")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText("Message", { exact: true }), "Last year's survey");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(sendAttachment).toHaveBeenCalledTimes(1));
+    expect(sendAttachment.mock.calls[0]?.[2]).toBe("Last year's survey");
+    // One send, not two: the caption rides with the file.
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("sends a file with no caption at all", async () => {
+    renderThread();
+    await screen.findByText("Welcome aboard");
+
+    await userEvent.upload(screen.getByLabelText("Attach a file", { exact: true }), pdf());
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(sendAttachment).toHaveBeenCalledTimes(1));
+    expect(sendAttachment.mock.calls[0]?.[2]).toBe("");
+  });
+
+  it("refuses a file over the limit before uploading it", async () => {
+    renderThread();
+    await screen.findByText("Welcome aboard");
+
+    const huge = new File([new Uint8Array(6 * 1024 * 1024)], "huge.pdf", {
+      type: "application/pdf",
+    });
+    await userEvent.upload(screen.getByLabelText("Attach a file", { exact: true }), huge);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/larger than 5 MB/i);
+    // The point of checking here: the server would refuse it anyway, but not
+    // before somebody spent six megabytes of mobile data on it.
+    expect(sendAttachment).not.toHaveBeenCalled();
+  });
+
+  it("lets a chosen file be removed again", async () => {
+    renderThread();
+    await screen.findByText("Welcome aboard");
+
+    await userEvent.upload(screen.getByLabelText("Attach a file", { exact: true }), pdf());
+    await userEvent.click(await screen.findByRole("button", { name: "Remove" }));
+
+    expect(screen.queryByText("survey.pdf")).toBeNull();
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  });
+
+  it("offers a received file for download, with its size", async () => {
+    fetchMessages.mockResolvedValue({
+      items: [
+        message({
+          body: "Here it is",
+          attachments: [
+            {
+              id: "a1",
+              filename: "survey.pdf",
+              content_type: "application/pdf",
+              byte_size: 2048,
+            },
+          ],
+        }),
+      ],
+      next_after: "cursor-1",
+    });
+    renderThread();
+
+    const file = await screen.findByRole("button", { name: /survey\.pdf/ });
+    expect(file).toHaveTextContent("2 KB");
+
+    await userEvent.click(file);
+
+    await waitFor(() => expect(downloadAttachment).toHaveBeenCalledTimes(1));
+    expect(downloadAttachment.mock.calls[0]?.[1]).toMatchObject({ filename: "survey.pdf" });
+  });
+
+  it("says so when a download fails instead of doing nothing", async () => {
+    downloadAttachment.mockRejectedValue(new Error("network"));
+    fetchMessages.mockResolvedValue({
+      items: [
+        message({
+          attachments: [
+            { id: "a1", filename: "survey.pdf", content_type: "application/pdf", byte_size: 10 },
+          ],
+        }),
+      ],
+      next_after: "cursor-1",
+    });
+    renderThread();
+
+    await userEvent.click(await screen.findByRole("button", { name: /survey\.pdf/ }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not download/i);
+  });
+
+  it("withholds the file of a hidden message, not just its text", async () => {
+    fetchMessages.mockResolvedValue({
+      items: [
+        message({
+          body: null,
+          hidden: true,
+          attachments: [
+            { id: "a1", filename: "survey.pdf", content_type: "application/pdf", byte_size: 10 },
+          ],
+        }),
+      ],
+      next_after: "cursor-1",
+    });
+    renderThread();
+
+    expect(await screen.findByText(/removed by a moderator/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /survey\.pdf/ })).toBeNull();
   });
 });

@@ -9,6 +9,7 @@ to conjure a channel to someone who has not agreed to one (ADR 0022).
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -17,9 +18,15 @@ from sqlalchemy.orm import Session
 
 from app.core.events import EVENT_BUS, Event, EventName
 from app.modules.collaborations.models import Collaboration, CollaborationState
-from app.modules.messages.models import Conversation, ConversationParticipant, Message
+from app.modules.messages.models import (
+    Conversation,
+    ConversationParticipant,
+    Message,
+    MessageAttachment,
+)
 from app.modules.messages.policies import ThreadNotFoundError, assert_participant
 from app.modules.messages.schemas import (
+    AttachmentRead,
     ConversationRead,
     MessagePage,
     MessageRead,
@@ -28,6 +35,7 @@ from app.modules.messages.schemas import (
 )
 from app.modules.notifications.models import Notification
 from app.modules.projects.models import Project, ProjectMember
+from app.modules.uploads import validation
 from app.modules.users.models import User
 
 #: How much of a message the conversation list shows.
@@ -358,6 +366,37 @@ def get_conversation(db: Session, viewer: User, conversation_id: uuid.UUID) -> C
     raise ThreadNotFoundError
 
 
+def _attachments_for(
+    db: Session, message_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, list[AttachmentRead]]:
+    """One query for the whole page. Deliberately selects every column except
+    `data`: a page of messages must never drag file bytes along with it."""
+    if not message_ids:
+        return {}
+    rows = db.execute(
+        select(
+            MessageAttachment.id,
+            MessageAttachment.message_id,
+            MessageAttachment.filename,
+            MessageAttachment.content_type,
+            MessageAttachment.byte_size,
+        )
+        .where(MessageAttachment.message_id.in_(message_ids))
+        .order_by(MessageAttachment.created_at, MessageAttachment.id)
+    ).all()
+    found: dict[uuid.UUID, list[AttachmentRead]] = {}
+    for row in rows:
+        found.setdefault(row.message_id, []).append(
+            AttachmentRead(
+                id=row.id,
+                filename=row.filename,
+                content_type=row.content_type,
+                byte_size=row.byte_size,
+            )
+        )
+    return found
+
+
 def read_messages(
     db: Session,
     viewer: User,
@@ -382,6 +421,7 @@ def read_messages(
         )
     rows = db.execute(query.order_by(Message.created_at, Message.id).limit(limit)).all()
 
+    attachments = _attachments_for(db, [message.id for message, _ in rows])
     items = [
         MessageRead(
             id=message.id,
@@ -392,6 +432,9 @@ def read_messages(
             body=None if message.hidden_at is not None else message.body,
             hidden=message.hidden_at is not None,
             created_at=message.created_at,
+            # Hiding withholds what was shared as well as what was said, so a
+            # hidden message lists nothing to download.
+            attachments=[] if message.hidden_at is not None else attachments.get(message.id, []),
         )
         for message, sender in rows
     ]
@@ -416,7 +459,63 @@ def is_closed(db: Session, conversation_id: uuid.UUID) -> bool:
     return state is not None and state is not CollaborationState.ACTIVE
 
 
+@dataclass(frozen=True, slots=True)
+class PendingAttachment:
+    """A validated file, on its way into a thread. Built only by
+    `send_attachment`, so nothing reaches the database unsniffed."""
+
+    filename: str
+    content_type: str
+    data: bytes
+
+
 def send_message(db: Session, sender: User, conversation_id: uuid.UUID, body: str) -> MessageRead:
+    return _append(db, sender, conversation_id, body, attachment=None)
+
+
+def send_attachment(
+    db: Session,
+    sender: User,
+    conversation_id: uuid.UUID,
+    *,
+    data: bytes,
+    filename: str | None,
+    caption: str,
+    max_bytes: int,
+) -> MessageRead:
+    """Share a file in a thread.
+
+    A file arrives AS a message rather than as a thing attached to one, which
+    is what lets it reuse every rule text already obeys: the participant
+    check, the closed-thread refusal, the unread counts and the notification.
+    It also means there is no window in which uploaded bytes exist without an
+    owner, so no orphan to collect later.
+
+    Raises whatever `uploads.validation` raises; the router turns those into
+    status codes. Validation happens before anything is written.
+    """
+    kind = validation.validate(data, max_bytes=max_bytes)
+    return _append(
+        db,
+        sender,
+        conversation_id,
+        caption,
+        attachment=PendingAttachment(
+            filename=validation.safe_filename(filename, kind),
+            content_type=kind.content_type,
+            data=data,
+        ),
+    )
+
+
+def _append(
+    db: Session,
+    sender: User,
+    conversation_id: uuid.UUID,
+    body: str,
+    *,
+    attachment: PendingAttachment | None,
+) -> MessageRead:
     assert_participant(db, conversation_id, sender)
     if is_closed(db, conversation_id):
         raise ThreadClosedError
@@ -425,6 +524,26 @@ def send_message(db: Session, sender: User, conversation_id: uuid.UUID, body: st
     db.add(message)
     db.flush()
 
+    stored: list[AttachmentRead] = []
+    if attachment is not None:
+        row = MessageAttachment(
+            message_id=message.id,
+            filename=attachment.filename,
+            content_type=attachment.content_type,
+            byte_size=len(attachment.data),
+            data=attachment.data,
+        )
+        db.add(row)
+        db.flush()
+        stored.append(
+            AttachmentRead(
+                id=row.id,
+                filename=row.filename,
+                content_type=row.content_type,
+                byte_size=row.byte_size,
+            )
+        )
+
     conversation = db.get(Conversation, conversation_id)
     assert conversation is not None
     conversation.last_message_at = message.created_at
@@ -432,6 +551,10 @@ def send_message(db: Session, sender: User, conversation_id: uuid.UUID, body: st
     # Sending is also reading: your own message must not come back unread.
     mark_read(db, sender, conversation_id, commit=False)
 
+    # A file sent without a caption has no text to preview, and a bell that
+    # reads "sent you a message" with nothing under it is worse than one
+    # naming the file.
+    preview = body.strip() or (attachment.filename if attachment is not None else "")
     for recipient_id in _others(db, conversation_id, sender.id):
         EVENT_BUS.publish(
             db,
@@ -442,7 +565,7 @@ def send_message(db: Session, sender: User, conversation_id: uuid.UUID, body: st
                     "recipient_id": recipient_id,
                     "conversation_id": conversation_id,
                     "sender_name": sender.full_name,
-                    "preview": body.strip()[:PREVIEW_LENGTH],
+                    "preview": preview[:PREVIEW_LENGTH],
                 },
             ),
         )
@@ -457,7 +580,37 @@ def send_message(db: Session, sender: User, conversation_id: uuid.UUID, body: st
         body=message.body,
         hidden=False,
         created_at=message.created_at,
+        attachments=stored,
     )
+
+
+def read_attachment(
+    db: Session, viewer: User, conversation_id: uuid.UUID, attachment_id: uuid.UUID
+) -> MessageAttachment:
+    """The bytes, for a participant and nobody else.
+
+    404 for everyone else, administrators included, exactly as the thread
+    itself answers: the scoping that makes a thread private is worth nothing
+    if the files in it are reachable by whoever holds a URL. This is also why
+    attachments are not served from a public path -- there is no path to them
+    that does not run this check.
+
+    A hidden message's attachment is unreachable too: moderation withholds
+    what was shared as well as what was said.
+    """
+    assert_participant(db, conversation_id, viewer)
+    attachment = db.execute(
+        select(MessageAttachment)
+        .join(Message, Message.id == MessageAttachment.message_id)
+        .where(
+            MessageAttachment.id == attachment_id,
+            Message.conversation_id == conversation_id,
+            Message.hidden_at.is_(None),
+        )
+    ).scalar_one_or_none()
+    if attachment is None:
+        raise ThreadNotFoundError
+    return attachment
 
 
 def _others(db: Session, conversation_id: uuid.UUID, actor_id: uuid.UUID) -> list[uuid.UUID]:

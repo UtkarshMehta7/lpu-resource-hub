@@ -49,6 +49,20 @@ class MessageCreate(BaseModel):
         return trimmed
 
 
+class AttachmentRead(BaseModel):
+    """A file in a thread, described but not delivered.
+
+    Never carries the bytes: those come from the download route, which
+    re-checks that the caller is a participant. Embedding them here would put
+    every file in a thread into every page of messages.
+    """
+
+    id: uuid.UUID
+    filename: str
+    content_type: str
+    byte_size: int
+
+
 class MessageRead(BaseModel):
     id: uuid.UUID
     conversation_id: uuid.UUID
@@ -60,6 +74,9 @@ class MessageRead(BaseModel):
     body: str | None
     hidden: bool
     created_at: datetime
+    #: Empty for an ordinary message, and empty for a hidden one: hiding a
+    #: message withholds what was shared as well as what was said.
+    attachments: list[AttachmentRead] = []
 
 
 class ConversationRead(BaseModel):

@@ -59,6 +59,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Project milestones with dependencies, at-risk states derived on every read, a Gantt timeline beside the list, reminders before and after the date, and an at-risk board for coordinators ([ADR 0026](docs/adr/0026-milestones-and-at-risk.md)) | Done |
 | Name searches offer candidates to choose between instead of guessing, every imported work links to its source, importing returns a profile for re-verification, and anyone waiting can nudge whoever must act ([ADR 0027](docs/adr/0027-choosing-yourself-and-nudging.md)) | Done |
 | Institutional research report for a full academic year, on screen and exportable to PDF and CSV, with six new analytics metrics and every figure carrying its definition ([reporting](docs/reporting.md), [analytics](docs/analytics.md)) | Done |
+| A project's chat exists from the moment it is created and its membership follows the team — however somebody joined, including by being accepted into an opportunity — and teams share PDFs, Word documents, images and archives up to 5 MB, typed from their bytes and downloadable only by a participant ([ADR 0033](docs/adr/0033-files-in-a-conversation.md)) | Done |
 
 ## Technology stack
 

@@ -9,13 +9,18 @@ import { ReportButton } from "@/features/reports/ReportButton";
 import { toApiError } from "@/lib/api/errors";
 
 import {
+  ACCEPTED_UPLOAD_TYPES,
+  MAX_UPLOAD_BYTES,
+  downloadAttachment,
   fetchConversation,
   fetchMessages,
   markConversationRead,
+  sendAttachment,
   sendMessage,
+  type Attachment,
   type Message,
 } from "./api";
-import { clockTime, dayLabel, initials } from "./format";
+import { clockTime, dayLabel, fileSize, initials } from "./format";
 import { CONVERSATIONS_QUERY_KEY, UNREAD_TOTAL_QUERY_KEY, threadKey } from "./queryKeys";
 import { useVisible } from "./useVisible";
 
@@ -37,7 +42,9 @@ export function ThreadPage() {
 
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: conversation, isError: conversationFailed } = useQuery({
     queryKey: ["conversation", conversationId],
@@ -80,23 +87,49 @@ export function ThreadPage() {
     }
   }, [newest]);
 
+  const clearComposer = async () => {
+    setDraft("");
+    setFile(null);
+    setError(null);
+    if (fileRef.current) fileRef.current.value = "";
+    await queryClient.invalidateQueries({ queryKey: threadKey(conversationId) });
+    await queryClient.invalidateQueries({ queryKey: CONVERSATIONS_QUERY_KEY });
+  };
+
   const send = useMutation({
-    mutationFn: (body: string) => sendMessage(conversationId, body),
-    onSuccess: async () => {
-      setDraft("");
-      setError(null);
-      await queryClient.invalidateQueries({
-        queryKey: threadKey(conversationId),
-      });
-      await queryClient.invalidateQueries({ queryKey: CONVERSATIONS_QUERY_KEY });
-    },
+    // A file and a line of text are one send, so they are one mutation: the
+    // caption travels with the file rather than arriving as a second message.
+    mutationFn: (payload: { body: string; file: File | null }) =>
+      payload.file
+        ? sendAttachment(conversationId, payload.file, payload.body)
+        : sendMessage(conversationId, payload.body),
+    onSuccess: clearComposer,
     onError: (caught: unknown) => setError(toApiError(caught).message),
   });
 
+  const chooseFile = (chosen: File | null) => {
+    if (!chosen) {
+      setFile(null);
+      return;
+    }
+    if (chosen.size > MAX_UPLOAD_BYTES) {
+      // Said before the upload rather than after it: the server refuses with
+      // 413 either way, but not after spending somebody's mobile data on it.
+      setError(`${chosen.name} is larger than 5 MB. Share a link to it instead.`);
+      setFile(null);
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    setError(null);
+    setFile(chosen);
+  };
+
   const submit = () => {
     const body = draft.trim();
-    if (!body || send.isPending) return;
-    send.mutate(body);
+    if (send.isPending) return;
+    // A file may travel with no caption; text may not be empty on its own.
+    if (!body && !file) return;
+    send.mutate({ body, file });
   };
 
   if (conversationFailed) {
@@ -183,6 +216,7 @@ export function ThreadPage() {
           <MessageBubble
             key={message.id}
             message={message}
+            conversationId={conversationId}
             mine={message.sender_id === user?.id}
             showDay={
               index === 0 ||
@@ -203,52 +237,142 @@ export function ThreadPage() {
         </p>
       ) : (
         <form
-          className="sticky bottom-0 mt-4 flex items-end gap-2 border-t border-line bg-canvas pt-3"
+          className="sticky bottom-0 mt-4 border-t border-line bg-canvas pt-3"
           onSubmit={(event) => {
             event.preventDefault();
             submit();
           }}
         >
-          <label htmlFor="message-body" className="sr-only">
-            Message
-          </label>
-          <textarea
-            id="message-body"
-            value={draft}
-            rows={1}
-            maxLength={4000}
-            placeholder="Write a message…"
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              // Enter sends, Shift+Enter starts a line: what people expect of a
-              // chat box, and the reason this is a textarea and not an input.
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                submit();
-              }
-            }}
-            className="max-h-40 min-h-10 flex-1 resize-y rounded-md border border-line bg-surface px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={!draft.trim() || send.isPending}
-            className="rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {send.isPending ? "Sending…" : "Send"}
-          </button>
+          {file ? (
+            <p className="mb-2 flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-sm">
+              <span aria-hidden="true">📄</span>
+              <span className="min-w-0 flex-1 truncate">{file.name}</span>
+              <span className="shrink-0 text-xs text-ink-muted">{fileSize(file.size)}</span>
+              <button
+                type="button"
+                onClick={() => chooseFile(null)}
+                className="shrink-0 rounded px-1 text-xs font-medium text-brand-700 hover:underline"
+              >
+                Remove
+              </button>
+            </p>
+          ) : null}
+          <div className="flex items-end gap-2">
+            <label htmlFor="message-file" className="sr-only">
+              Attach a file
+            </label>
+            <input
+              id="message-file"
+              ref={fileRef}
+              type="file"
+              accept={ACCEPTED_UPLOAD_TYPES}
+              className="sr-only"
+              onChange={(event) => chooseFile(event.target.files?.[0] ?? null)}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              title="Attach a PDF, Word document, image or archive (up to 5 MB)"
+              className="rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium hover:bg-brand-50"
+            >
+              <span aria-hidden="true">📎</span>
+              <span className="sr-only">Attach a file</span>
+            </button>
+            <label htmlFor="message-body" className="sr-only">
+              Message
+            </label>
+            <textarea
+              id="message-body"
+              value={draft}
+              rows={1}
+              maxLength={4000}
+              placeholder="Write a message…"
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                // Enter sends, Shift+Enter starts a line: what people expect of a
+                // chat box, and the reason this is a textarea and not an input.
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  submit();
+                }
+              }}
+              className="max-h-40 min-h-10 flex-1 resize-y rounded-md border border-line bg-surface px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={(!draft.trim() && !file) || send.isPending}
+              className="rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {send.isPending ? "Sending…" : "Send"}
+            </button>
+          </div>
         </form>
       )}
     </div>
   );
 }
 
+/**
+ * One file in a thread.
+ *
+ * A button rather than a link, because the bytes come through the API with
+ * the caller's credentials -- see `downloadAttachment`. Images are offered
+ * the same way as everything else: previewing one inline would mean fetching
+ * every image in a thread to render the page, and a file nobody opened
+ * should cost nothing to scroll past.
+ */
+function AttachmentCard({
+  attachment,
+  conversationId,
+  mine,
+}: {
+  attachment: Attachment;
+  conversationId: string;
+  mine: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  const download = useMutation({
+    mutationFn: () => downloadAttachment(conversationId, attachment),
+    onSuccess: () => setFailed(false),
+    onError: () => setFailed(true),
+  });
+
+  return (
+    <span className="mt-1 block">
+      <button
+        type="button"
+        onClick={() => download.mutate()}
+        disabled={download.isPending}
+        className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-xs ${
+          mine
+            ? "border-white/30 bg-white/10 hover:bg-white/20"
+            : "border-line bg-canvas hover:bg-brand-50"
+        }`}
+      >
+        <span aria-hidden="true">📄</span>
+        <span className="min-w-0 flex-1 truncate font-medium">{attachment.filename}</span>
+        <span className={mine ? "shrink-0 text-white/80" : "shrink-0 text-ink-muted"}>
+          {download.isPending ? "Opening…" : fileSize(attachment.byte_size)}
+        </span>
+      </button>
+      {failed ? (
+        <span role="alert" className="mt-1 block text-xs text-red-700">
+          Could not download {attachment.filename}.
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function MessageBubble({
   message,
+  conversationId,
   mine,
   showDay,
   startsRun,
 }: {
   message: Message;
+  conversationId: string;
   mine: boolean;
   showDay: boolean;
   startsRun: boolean;
@@ -279,7 +403,19 @@ function MessageBubble({
             {message.hidden ? (
               "This message was removed by a moderator."
             ) : (
-              <span className="whitespace-pre-wrap break-words">{message.body}</span>
+              <>
+                {message.body ? (
+                  <span className="whitespace-pre-wrap break-words">{message.body}</span>
+                ) : null}
+                {message.attachments.map((attachment) => (
+                  <AttachmentCard
+                    key={attachment.id}
+                    attachment={attachment}
+                    conversationId={conversationId}
+                    mine={mine}
+                  />
+                ))}
+              </>
             )}
           </div>
           <p className="mt-0.5 flex items-center justify-end gap-2 text-xs text-ink-muted">

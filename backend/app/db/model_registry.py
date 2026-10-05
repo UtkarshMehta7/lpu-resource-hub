@@ -22,6 +22,7 @@ from app.modules.messages.models import (  # noqa: F401
     Conversation,
     ConversationParticipant,
     Message,
+    MessageAttachment,
 )
 from app.modules.milestones.models import (  # noqa: F401
     Milestone,

@@ -6,12 +6,13 @@ must not see is simply not found. Services never import FastAPI.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, func, or_, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.events import EVENT_BUS, Event, EventName
@@ -48,6 +49,8 @@ from app.modules.projects.schemas import (
 )
 from app.modules.taxonomy.models import ResearchArea, Skill
 from app.modules.users.models import CoordinatorScopeType, User, UserRole
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectNotFoundError(Exception):
@@ -341,9 +344,34 @@ def create_project(db: Session, owner: User, data: ProjectCreate) -> ProjectRead
     db.add(project)
     db.flush()
     _replace_tags(db, project.id, data.skill_ids, data.research_area_ids)
+    _open_team_thread(db, project)
     db.commit()
     db.refresh(project)
     return _to_read(db, project)
+
+
+def _open_team_thread(db: Session, project: Project) -> None:
+    """Give the project its team thread, with the creator already in it.
+
+    The thread used to be created on first use, to keep an abandoned draft
+    from carrying an empty one around. That saved two rows and cost the
+    thing people actually expect: you make a project and its chat is there.
+    Two rows is the cheaper side of that trade.
+
+    Guarded like the acceptance path (ADR 0021): chat must never break the
+    older, more important act. If the conversation cannot be written, the
+    project is still created and `open_for_project` makes the thread on
+    first use exactly as before -- which is also why no backfill is needed
+    for projects that predate this.
+    """
+    try:
+        with db.begin_nested():
+            messages_service.open_for_project(db, project)
+    except SQLAlchemyError:
+        logger.exception(
+            "Could not open a team thread for project %s; the project is still created.",
+            project.id,
+        )
 
 
 def update_project(
@@ -491,6 +519,46 @@ def list_members(db: Session, viewer: User, project_id: uuid.UUID) -> list[Membe
     return _members(db, project.id)
 
 
+# --------------------------------------------------------------- membership
+#
+# Being on a team and being in its thread are one fact, so one place writes
+# both. Three paths made somebody a member and only two synced the thread:
+# accepting an application inserted a ProjectMember itself, so being accepted
+# into an opportunity put you on the team and left you out of its chat. That
+# is the shape _sync_coordinator_scope already exists to prevent -- a second
+# writer that forgets what the first one carries. Nothing else may write
+# ProjectMember.
+
+
+def record_membership(
+    db: Session, *, project_id: uuid.UUID, user_id: uuid.UUID, member_role: str
+) -> None:
+    """Put somebody on a team, and in its thread.
+
+    Joining grants access to what the team has been saying. The sync is a
+    no-op until the thread exists, which is correct: it is created on first
+    use, and whoever opens it syncs everyone in at that moment.
+
+    Raises IntegrityError on a duplicate, which the caller turns into
+    whatever its own API promises. Does not commit -- joining a team is
+    always part of something larger, and the caller owns that transaction.
+    """
+    db.add(ProjectMember(project_id=project_id, user_id=user_id, member_role=member_role))
+    db.flush()
+    messages_service.sync_project_participants(db, project_id)
+
+
+def discard_membership(db: Session, *, project_id: uuid.UUID, member: ProjectMember) -> None:
+    """Take somebody off a team, and out of its thread.
+
+    What they said stays, still attributed: a conversation is a record, not a
+    possession of whoever happens to be on the team now.
+    """
+    db.delete(member)
+    db.flush()
+    messages_service.sync_project_participants(db, project_id)
+
+
 def add_member(
     db: Session, actor: User, project_id: uuid.UUID, data: MemberCreate
 ) -> list[MemberRead]:
@@ -499,12 +567,10 @@ def add_member(
     target = db.get(User, data.user_id)
     if target is None or not target.is_active:
         raise MemberNotFoundError
-    db.add(ProjectMember(project_id=project.id, user_id=data.user_id, member_role=data.member_role))
     try:
-        db.flush()
-        # A team thread's membership follows the team's. Joining grants access
-        # to what the team has been saying; no-op until the thread exists.
-        messages_service.sync_project_participants(db, project.id)
+        record_membership(
+            db, project_id=project.id, user_id=data.user_id, member_role=data.member_role
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -522,9 +588,5 @@ def remove_member(db: Session, actor: User, project_id: uuid.UUID, user_id: uuid
     ).scalar_one_or_none()
     if member is None:
         raise MemberNotFoundError
-    db.delete(member)
-    db.flush()
-    # Leaving revokes the thread, but not what they said in it: the messages
-    # stay, still attributed. A conversation is a record, not a possession.
-    messages_service.sync_project_participants(db, project.id)
+    discard_membership(db, project_id=project.id, member=member)
     db.commit()
