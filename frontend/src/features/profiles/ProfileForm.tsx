@@ -4,7 +4,7 @@ import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { z } from "zod";
 
 import type { Role } from "@/features/auth/types";
-import { fetchDepartments } from "@/features/directory/api-org";
+import { departmentLabel, fetchDepartments } from "@/features/directory/api-org";
 
 import type { Profile, ResearcherProfileUpdate, StudentProfileUpdate } from "./types";
 
@@ -69,14 +69,28 @@ function DepartmentField({
       <label htmlFor="department_id" className="block text-sm font-medium">
         Department
       </label>
-      <select id="department_id" className={FIELD_CLASS} {...register}>
-        <option value="">Not set</option>
-        {departments?.map((department) => (
-          <option key={department.id} value={department.id}>
-            {department.name}
-          </option>
-        ))}
-      </select>
+      {/* Not rendered until its options are. The departments arrive from
+          their own query, so on the first render this select held only "Not
+          set" -- and a <select> whose value is not among its options shows
+          the FIRST one, which is the gotcha this repository has recorded
+          once already. The form's value was correct throughout; a student
+          with a department was simply shown "Not set", and invited to
+          "correct" it by picking another, which would have moved them to a
+          different coordinator. */}
+      {departments === undefined ? (
+        <select id="department_id" className={FIELD_CLASS} disabled>
+          <option>Loading departments…</option>
+        </select>
+      ) : (
+        <select id="department_id" className={FIELD_CLASS} {...register}>
+          <option value="">Not set</option>
+          {departments.map((department) => (
+            <option key={department.id} value={department.id}>
+              {departmentLabel(department, departments)}
+            </option>
+          ))}
+        </select>
+      )}
       <p className="mt-1 text-xs text-ink-muted">
         Your department decides which coordinator reviews your work.
       </p>

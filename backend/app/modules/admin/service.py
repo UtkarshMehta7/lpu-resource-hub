@@ -27,6 +27,7 @@ from app.modules.admin.schemas import (
     AdminUserRead,
     AdminUserUpdate,
     DepartmentCreate,
+    DepartmentRead,
     DepartmentUpdate,
     SchoolCreate,
     SchoolUpdate,
@@ -347,11 +348,20 @@ def delete_school(db: Session, school: School) -> None:
     db.commit()
 
 
-def list_departments(db: Session, *, school_id: uuid.UUID | None = None) -> list[Department]:
-    query = select(Department)
+def list_departments(db: Session, *, school_id: uuid.UUID | None = None) -> list[DepartmentRead]:
+    """Departments with the name of the school that runs each one.
+
+    The school is carried because two schools may each have a department of
+    the same name, and a list that shows only the name cannot be chosen from.
+    """
+    query = select(Department, School.name).outerjoin(School, School.id == Department.school_id)
     if school_id is not None:
         query = query.where(Department.school_id == school_id)
-    return list(db.execute(query.order_by(Department.name)).scalars().all())
+    rows = db.execute(query.order_by(Department.name)).all()
+    return [
+        DepartmentRead.model_validate(department).model_copy(update={"school_name": school_name})
+        for department, school_name in rows
+    ]
 
 
 def create_department(db: Session, data: DepartmentCreate) -> Department:

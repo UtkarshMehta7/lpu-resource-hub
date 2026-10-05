@@ -291,7 +291,7 @@ def delete_school_route(school_id: uuid.UUID, db: Annotated[Session, Depends(get
 )
 def read_departments(
     db: Annotated[Session, Depends(get_db)], school_id: uuid.UUID | None = None
-) -> list[Department]:
+) -> list[DepartmentRead]:
     return list_departments(db, school_id=school_id)
 
 
@@ -379,5 +379,5 @@ def read_public_schools(db: Annotated[Session, Depends(get_db)]) -> list[School]
 )
 def read_public_departments(
     db: Annotated[Session, Depends(get_db)], school_id: uuid.UUID | None = None
-) -> list[Department]:
+) -> list[DepartmentRead]:
     return list_departments(db, school_id=school_id)

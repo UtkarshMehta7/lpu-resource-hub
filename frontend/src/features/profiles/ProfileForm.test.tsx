@@ -4,12 +4,21 @@ import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import type * as ApiOrgModule from "@/features/directory/api-org";
+
 import { ProfileForm } from "./ProfileForm";
 
 // The department picker fetches the department list; the list itself isn't
 // what these tests are about, so it stays empty.
-vi.mock("@/features/directory/api-org", () => ({
-  fetchDepartments: () => Promise.resolve([]),
+vi.mock("@/features/directory/api-org", async (importOriginal) => ({
+  // The real departmentLabel: how a department reads in the list is part of
+  // what these tests are checking, not something to stub out.
+  ...(await importOriginal<typeof ApiOrgModule>()),
+  fetchDepartments: () =>
+    Promise.resolve([
+      { id: "d-elec", name: "Electrical Engineering", school_id: "s1", school_name: "Engineering" },
+      { id: "d-cs", name: "Computer Science", school_id: "s1", school_name: "Engineering" },
+    ]),
 }));
 
 function renderForm(element: ReactElement) {
@@ -94,5 +103,41 @@ describe("ProfileForm", () => {
       links: [{ label: "Profile", url: "https://example.com/me" }],
       department_id: null,
     });
+  });
+});
+
+describe("the department picker", () => {
+  it("preselects the department the student already has", async () => {
+    // The list arrives from its own query, so on the first render this select
+    // held only "Not set" — and a <select> whose value is not among its
+    // options shows the FIRST one. A student in Electrical Engineering was
+    // shown "Not set" on their own profile, and invited to "correct" it by
+    // picking another department, which would have moved them to a different
+    // coordinator.
+    renderForm(
+      <ProfileForm
+        role="student"
+        profile={{
+          profile_type: "student",
+          department_id: "d-elec",
+          department_locked: false,
+          program: "B.Tech Electronics",
+          year: 3,
+          bio: null,
+          interests: null,
+          is_discoverable: true,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        }}
+        submitLabel="Save"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    // Wait for the options themselves: the field shows a disabled
+    // placeholder until they arrive, which is precisely what stops the value
+    // being applied against a half-built list.
+    await screen.findByRole("option", { name: "Electrical Engineering" });
+    expect(screen.getByLabelText("Department", { exact: true })).toHaveValue("d-elec");
   });
 });

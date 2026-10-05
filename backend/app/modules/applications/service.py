@@ -150,6 +150,15 @@ def apply(
         raise NotOpenError
     if opportunity.deadline < opportunity_service.today():
         raise opportunity_service.DeadlinePassedError
+    # Counted, not inferred from the status flag. FILLED is set by
+    # mark_filled_if_full inside the accept transaction, so an opportunity
+    # whose acceptances were written any other way -- a seed script, a fix
+    # applied directly to the database -- stays OPEN while being full. The
+    # deployed instance has exactly that: an opening showing "1/1 positions
+    # filled" and still inviting applications that can never be accepted,
+    # because change_status refuses on the same count.
+    if opportunity_service.accepted_count(db, opportunity.id) >= opportunity.positions:
+        raise PositionsFilledError
 
     application = Application(
         opportunity_id=opportunity.id, applicant_id=applicant.id, statement=data.statement
