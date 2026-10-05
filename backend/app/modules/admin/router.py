@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -13,6 +15,7 @@ from app.core.pagination import Page, PageParams
 from app.core.permissions import Permission, require_permission
 from app.core.rate_limit import client_ip
 from app.db.session import get_db
+from app.modules.admin import deletion
 from app.modules.admin.models import Department, School
 from app.modules.admin.policies import (
     LastActiveAdminError,
@@ -164,6 +167,42 @@ def change_user_role(
         ) from exc
 
 
+# Suspending somebody is scoped the same way removing them is, so it refuses
+# for the same reasons -- and must say so with the same status code. Without
+# this the refusal escaped as a 500.
+_ACTIVATION_ERRORS: dict[type[Exception], tuple[int, str]] = {
+    deletion.SelfDeletionError: (
+        status.HTTP_403_FORBIDDEN,
+        "You cannot deactivate your own account.",
+    ),
+    deletion.NotAllowedRoleError: (
+        status.HTTP_403_FORBIDDEN,
+        "Your role cannot change this account.",
+    ),
+    deletion.OutOfScopeError: (
+        status.HTTP_403_FORBIDDEN,
+        "You can only change people in your own department.",
+    ),
+    deletion.NoDepartmentError: (
+        status.HTTP_403_FORBIDDEN,
+        "Your account is not in a department yet, so there is nobody you are responsible for.",
+    ),
+    deletion.NotVerifiedError: (
+        status.HTTP_403_FORBIDDEN,
+        "Your researcher profile has not been verified yet, so you cannot change anyone.",
+    ),
+}
+
+
+@contextmanager
+def _activation_errors() -> Iterator[None]:
+    try:
+        yield
+    except tuple(_ACTIVATION_ERRORS) as exc:
+        code, detail = _ACTIVATION_ERRORS[type(exc)]
+        raise HTTPException(status_code=code, detail=detail) from exc
+
+
 @router.post("/{user_id}/activate", response_model=AdminUserRead)
 def activate_user(
     user_id: uuid.UUID,
@@ -172,7 +211,8 @@ def activate_user(
     actor: Annotated[User, Depends(require_permission(Permission.USER_ACTIVATE))],
 ) -> User:
     target = _load_target(db, user_id)
-    return set_active(db, actor, target, True, ip=client_ip(request))
+    with _activation_errors():
+        return set_active(db, actor, target, True, ip=client_ip(request))
 
 
 @router.post("/{user_id}/deactivate", response_model=AdminUserRead)
@@ -184,7 +224,8 @@ def deactivate_user(
 ) -> User:
     target = _load_target(db, user_id)
     try:
-        return set_active(db, actor, target, False, ip=client_ip(request))
+        with _activation_errors():
+            return set_active(db, actor, target, False, ip=client_ip(request))
     except LastActiveAdminError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

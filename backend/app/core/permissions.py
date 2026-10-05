@@ -78,6 +78,12 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             # ...and may remove the same accounts again. Which roles, and
             # whose, is DELETABLE_ROLES plus a scope check, not a permission.
             Permission.USER_DELETE,
+            # Suspending is the LESSER act, under the same authority and the
+            # same scope (assert_may_set_active). Holding delete without it
+            # left the destructive power available and the gentle one not --
+            # while the interface advised the gentle one.
+            Permission.USER_DEACTIVATE,
+            Permission.USER_ACTIVATE,
             Permission.PROJECT_CREATE,
             Permission.PUBLICATION_CREATE,
             Permission.OPPORTUNITY_CREATE,

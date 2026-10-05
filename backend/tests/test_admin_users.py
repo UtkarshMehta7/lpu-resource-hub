@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import Settings
 from app.main import create_app
-from app.modules.users.models import UserRole
+from app.modules.users.models import CoordinatorScopeType, UserRole
 from tests.conftest import SeededUser
 
 pytestmark = pytest.mark.db
@@ -26,15 +26,15 @@ def _auth_headers(user: SeededUser) -> dict[str, str]:
     return {"Authorization": f"Bearer {user.access_token}"}
 
 
-def _create_department(client: TestClient, admin: SeededUser) -> str:
+def _create_department(client: TestClient, admin: SeededUser, name: str = "Demo Department") -> str:
     school_response = client.post(
-        "/api/v1/admin/schools", headers=_auth_headers(admin), json={"name": "Demo School"}
+        "/api/v1/admin/schools", headers=_auth_headers(admin), json={"name": f"{name} School"}
     )
     school_id = school_response.json()["id"]
     department_response = client.post(
         "/api/v1/admin/departments",
         headers=_auth_headers(admin),
-        json={"school_id": school_id, "name": "Demo Department"},
+        json={"school_id": school_id, "name": name},
     )
     department_id: str = department_response.json()["id"]
     return department_id
@@ -352,3 +352,82 @@ def test_a_coordinator_keeps_their_department(
     assert response.status_code == 200, response.json()
     assert response.json()["department_id"] == department_id
     assert response.json()["coordinator_scope_id"] == department_id
+
+
+def test_a_coordinator_can_deactivate_their_own_department(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    """Whoever may remove an account may suspend one.
+
+    Deactivation was an administrator's alone, so a coordinator could
+    PERMANENTLY DELETE a student from their department and could not
+    deactivate them -- the destructive power available and the gentle one
+    not, while the page they are given advises the gentle one ("Removing an
+    account is permanent -- deactivate instead if the person has simply
+    left").
+    """
+    admin = seed_user(UserRole.ADMIN)
+    department_id = _create_department(client, admin)
+    coordinator = seed_user(
+        UserRole.RESEARCH_COORDINATOR,
+        department_id=department_id,
+        coordinator_scope_type=CoordinatorScopeType.DEPARTMENT,
+        coordinator_scope_id=department_id,
+    )
+    student = seed_user(UserRole.STUDENT, department_id=department_id)
+
+    response = client.post(
+        f"/api/v1/admin/users/{student.id}/deactivate", headers=_auth_headers(coordinator)
+    )
+
+    assert response.status_code == 200, response.json()
+    assert response.json()["is_active"] is False
+
+    reactivated = client.post(
+        f"/api/v1/admin/users/{student.id}/activate", headers=_auth_headers(coordinator)
+    )
+    assert reactivated.status_code == 200, reactivated.json()
+    assert reactivated.json()["is_active"] is True
+
+
+def test_a_coordinator_cannot_deactivate_another_department(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    """The new power carries the same scope as deletion, not a wider one."""
+    admin = seed_user(UserRole.ADMIN)
+    mine = _create_department(client, admin)
+    theirs = _create_department(client, admin, name="Marine Biology")
+    coordinator = seed_user(
+        UserRole.RESEARCH_COORDINATOR,
+        department_id=mine,
+        coordinator_scope_type=CoordinatorScopeType.DEPARTMENT,
+        coordinator_scope_id=mine,
+    )
+    outsider = seed_user(UserRole.STUDENT, department_id=theirs)
+
+    refused = client.post(
+        f"/api/v1/admin/users/{outsider.id}/deactivate", headers=_auth_headers(coordinator)
+    )
+
+    assert refused.status_code == 403, refused.json()
+
+
+def test_a_coordinator_cannot_deactivate_an_administrator(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    """Upwards is still refused: DELETABLE_ROLES decides, and it never lets a
+    coordinator reach an administrator."""
+    admin = seed_user(UserRole.ADMIN)
+    department_id = _create_department(client, admin)
+    coordinator = seed_user(
+        UserRole.RESEARCH_COORDINATOR,
+        department_id=department_id,
+        coordinator_scope_type=CoordinatorScopeType.DEPARTMENT,
+        coordinator_scope_id=department_id,
+    )
+
+    refused = client.post(
+        f"/api/v1/admin/users/{admin.id}/deactivate", headers=_auth_headers(coordinator)
+    )
+
+    assert refused.status_code == 403, refused.json()

@@ -21,11 +21,22 @@ from app.modules.users.models import User, UserRole
 
 
 def test_faculty_has_exactly_its_own_grants() -> None:
+    """Exact, so a grant cannot be widened without somebody saying why here.
+
+    USER_DEACTIVATE and USER_ACTIVATE were added deliberately: holding
+    USER_DELETE without them left the destructive power available and the
+    gentle one not, so a coordinator could permanently delete a student from
+    their department and could not suspend one -- while the page they are
+    given advises suspending. Scope is unchanged; `assert_may_set_active`
+    defers to the same rules that decide deletion.
+    """
     assert ROLE_PERMISSIONS[UserRole.FACULTY] == frozenset(
         {
             Permission.STUDENT_DISCOVER,
             Permission.USER_CREATE,
             Permission.USER_DELETE,
+            Permission.USER_DEACTIVATE,
+            Permission.USER_ACTIVATE,
             Permission.PROJECT_CREATE,
             Permission.PUBLICATION_CREATE,
             Permission.OPPORTUNITY_CREATE,
@@ -40,6 +51,10 @@ def test_coordinator_inherits_faculty_grants_on_top_of_its_own() -> None:
     inheritance mechanism with real data rather than a hypothetical."""
     assert ROLE_PERMISSIONS[UserRole.RESEARCH_COORDINATOR] == frozenset(
         {
+            # Inherited from faculty, not granted again here -- which is the
+            # inheritance this test exists to exercise.
+            Permission.USER_DEACTIVATE,
+            Permission.USER_ACTIVATE,
             Permission.TAXONOMY_MANAGE,
             Permission.PROFILE_VERIFY,
             Permission.PROJECT_REVIEW,

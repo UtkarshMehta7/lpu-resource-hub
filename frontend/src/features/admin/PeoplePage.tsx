@@ -11,7 +11,7 @@ import type { Role } from "@/features/auth/types";
 import { fetchDepartments } from "@/features/directory/api-org";
 import { toApiError } from "@/lib/api/errors";
 
-import { deleteUser, fetchDeletionImpact, fetchManageableUsers } from "./api";
+import { deleteUser, fetchDeletionImpact, fetchManageableUsers, setUserActive } from "./api";
 import { DeletionDetails } from "./DeletionDetails";
 import type { AdminUserRead } from "./types";
 import { ROLE_LABELS } from "@/features/auth/roleLabels";
@@ -65,6 +65,20 @@ export function PeoplePage() {
     mutationFn: (userId: string) => deleteUser(userId),
     onSuccess: async () => {
       setPending(null);
+      setActionError(null);
+      await queryClient.invalidateQueries({ queryKey: PEOPLE_QUERY_KEY });
+    },
+    onError: (error: unknown) => setActionError(toApiError(error).message),
+  });
+
+  // The page has always advised deactivating somebody who has simply left.
+  // Until now it offered only the permanent option, because the power was an
+  // administrator's alone -- so the advice named something the reader could
+  // not do. Scoped on the server to exactly the people they may remove.
+  const activation = useMutation({
+    mutationFn: ({ userId, isActive }: { userId: string; isActive: boolean }) =>
+      setUserActive(userId, isActive),
+    onSuccess: async () => {
       setActionError(null);
       await queryClient.invalidateQueries({ queryKey: PEOPLE_QUERY_KEY });
     },
@@ -153,18 +167,32 @@ export function PeoplePage() {
                     ) : null}
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      disabled={removal.isPending}
-                      onClick={() => {
-                        setActionError(null);
-                        setPending(item);
-                      }}
-                      className="rounded-md border border-red-300 bg-surface px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      aria-label={`Delete ${item.full_name}`}
-                    >
-                      Delete
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={activation.isPending}
+                        onClick={() => {
+                          setActionError(null);
+                          activation.mutate({ userId: item.id, isActive: !item.is_active });
+                        }}
+                        className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label={`${item.is_active ? "Deactivate" : "Reactivate"} ${item.full_name}`}
+                      >
+                        {item.is_active ? "Deactivate" : "Reactivate"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={removal.isPending}
+                        onClick={() => {
+                          setActionError(null);
+                          setPending(item);
+                        }}
+                        className="rounded-md border border-red-300 bg-surface px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label={`Delete ${item.full_name}`}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

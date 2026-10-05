@@ -16,6 +16,7 @@ from app.core.pagination import Page, PageParams
 from app.core.permissions import INSTITUTION_WIDE_ROLES
 from app.core.security import hash_password
 from app.modules.admin.accounts import generate_temporary_password
+from app.modules.admin.deletion import assert_may_set_active
 from app.modules.admin.models import Department, School
 from app.modules.admin.policies import (
     assert_not_self_password_reset,
@@ -279,6 +280,10 @@ def change_role(
 
 
 def set_active(db: Session, actor: User, target: User, is_active: bool, *, ip: str | None) -> User:
+    # Scoped, because the permission is no longer an administrator's alone:
+    # a coordinator may suspend their own department's people, and nobody
+    # else's. Same authority as removing them (see assert_may_set_active).
+    assert_may_set_active(db, actor, target)
     assert_preserves_last_active_admin(db, target, new_is_active=is_active)
 
     before = {"is_active": target.is_active}
