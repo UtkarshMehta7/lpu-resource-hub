@@ -40,7 +40,13 @@ export function BookingForm({
       setConfirmation(
         booking.status === "approved"
           ? "Booked. It's on your calendar."
-          : "Requested. A research coordinator will review it.",
+          : // Named by the room, not by a role. A booking goes to whoever
+            // may manage the facility: its custodian when one is assigned
+            // (ADR 0028), and the department's coordinator when none is. This
+            // said "a research coordinator" and was simply wrong for every
+            // facility that has a custodian — which is most of them, and the
+            // custodian's queue is where the request had actually landed.
+            `Requested. Whoever looks after ${equipment.facility_name} will review it.`,
       );
       await queryClient.invalidateQueries({ queryKey: ["availability", equipment.id] });
       await queryClient.invalidateQueries({ queryKey: ["my-bookings"] });

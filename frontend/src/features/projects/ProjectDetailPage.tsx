@@ -29,7 +29,10 @@ type PendingAction = ProjectAction | "delete";
 const ACTION_COPY: Record<PendingAction, { title: string; body: string; label: string }> = {
   submit: {
     title: "Submit for review?",
-    body: "Your department's research coordinator will review it. You can't edit it while it's under review.",
+    // Not always the coordinator since ADR 0032: a project whose team
+    // reaches into a second department is the Dean of Research's to decide,
+    // because no single coordinator can see all of it.
+    body: "A reviewer will decide on it — your department's research coordinator, or the Dean of Research if the team spans departments. You can't edit it while it's under review.",
     label: "Submit",
   },
   complete: {
