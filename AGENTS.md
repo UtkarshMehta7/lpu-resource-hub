@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 162 API operations over 131 paths, 44 tables, 28 migrations,
-30 ADRs, 27 backend modules, 1089 backend tests, 269 frontend tests,
+Current shape: 162 API operations over 131 paths, 44 tables, 29 migrations,
+31 ADRs, 27 backend modules, 1101 backend tests, 276 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -159,6 +159,15 @@ Current shape: 162 API operations over 131 paths, 44 tables, 28 migrations,
   need. The notification rides the same scoring as the page, so the two can
   never disagree, and its dedupe key is the ordered pair, so two people are
   introduced once ever.
+- **One nudge travels DOWNWARD, and only one** (ADR 0031).
+  `PROJECT_AT_RISK` is a dean or admin saying "somebody else's project is
+  slipping, please look at it"; every other kind is "my own thing is stuck"
+  and its resolver refuses an entity the sender does not own. Don't add the
+  dean to the existing kinds -- the ownership checks would refuse them, and
+  rightly. Its guards are the sender being in `INSTITUTION_WIDE_ROLES` and the
+  project actually being in trouble, asked of the same `assess` the board
+  uses. The notification reads "asked you to look at", not "is waiting on" --
+  identical wording inverts who owes whom.
 - **Nudges never name their recipient.** `POST /nudges` takes a kind and an
   entity; the service resolves who hears about it from the thing being
   chased. A recipient field would make it a way to message anyone in the

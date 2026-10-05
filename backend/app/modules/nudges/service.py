@@ -20,13 +20,18 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
+from app.core.permissions import INSTITUTION_WIDE_ROLES
 from app.modules.applications.models import Application, ApplicationStatus
 from app.modules.bookings.models import Booking, BookingStatus
+from app.modules.milestones.models import Milestone
+from app.modules.milestones.risk import NEEDS_ATTENTION, RiskInput, assess
+from app.modules.milestones.service import dependency_map
 from app.modules.notifications.models import NotificationType
 from app.modules.notifications.service import notify
 from app.modules.nudges.models import Nudge, NudgeKind
@@ -137,11 +142,65 @@ def _application_recipients(
     return [owner], f"your application to “{opportunity.title}”"
 
 
+def _at_risk_project_recipients(
+    db: Session, actor: User, entity_id: uuid.UUID
+) -> tuple[list[User], str]:
+    """A dean asking a coordinator to look at a slipping project.
+
+    The one nudge that is not about the sender's own work, so the ownership
+    check every other resolver makes is replaced by two others:
+
+    * the sender must be an institution-wide reader -- a coordinator would be
+      nudging themselves, and a project owner already has PROJECT_REVIEW;
+    * the project must actually be in trouble. "Please look at this" about a
+      project that is perfectly on track is noise, and a reader who gets one
+      such nudge discounts the next.
+
+    Risk is derived on every read (ADR 0026), so it is asked for here rather
+    than stored -- the same function the board and the project page use.
+    """
+    if actor.role not in INSTITUTION_WIDE_ROLES:
+        raise NothingToNudgeAboutError
+    project = db.get(Project, entity_id)
+    if project is None or project.deleted_at is not None:
+        raise NothingToNudgeAboutError
+    if not _project_needs_attention(db, project.id):
+        raise NothingToNudgeAboutError
+    return _approvers(db, project.department_id), f"“{project.title}”, which is slipping"
+
+
+def _project_needs_attention(db: Session, project_id: uuid.UUID) -> bool:
+    """Whether any milestone on this project is overdue, at risk or blocked."""
+    milestones = list(db.scalars(select(Milestone).where(Milestone.project_id == project_id)).all())
+    if not milestones:
+        return False
+    dependencies = dependency_map(db, [m.id for m in milestones])
+    by_id = {m.id: m for m in milestones}
+    today = date.today()
+    threshold = get_settings().milestone_at_risk_days
+    for milestone in milestones:
+        upstream = [
+            RiskInput(status=by_id[d].status, due_date=by_id[d].due_date)
+            for d in dependencies.get(milestone.id, [])
+            if d in by_id
+        ]
+        risk = assess(
+            RiskInput(status=milestone.status, due_date=milestone.due_date),
+            today=today,
+            threshold_days=threshold,
+            depends_on=upstream,
+        )
+        if risk in NEEDS_ATTENTION:
+            return True
+    return False
+
+
 _RESOLVERS = {
     NudgeKind.PROFILE_VERIFICATION: _profile_recipients,
     NudgeKind.PROJECT_REVIEW: _project_recipients,
     NudgeKind.BOOKING_APPROVAL: _booking_recipients,
     NudgeKind.APPLICATION_DECISION: _application_recipients,
+    NudgeKind.PROJECT_AT_RISK: _at_risk_project_recipients,
 }
 
 

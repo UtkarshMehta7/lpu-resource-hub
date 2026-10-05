@@ -113,9 +113,16 @@ export function describeNotification(notification: AppNotification): Notificatio
         project_review: "/coordinator/review-queue",
         booking_approval: "/coordinator/booking-queue",
         application_decision: `/opportunities/${str(payload, "entity_id")}/applicants`,
+        project_at_risk: `/projects/${str(payload, "entity_id")}`,
       };
       return {
-        text: `${str(payload, "from_name")} is waiting on ${str(payload, "subject")}`,
+        // Every other nudge is somebody chasing their own thing; an
+        // escalation is somebody senior pointing at yours, so it reads
+        // differently or the recipient misunderstands who is waiting.
+        text:
+          kind === "project_at_risk"
+            ? `${str(payload, "from_name")} asked you to look at ${str(payload, "subject")}`
+            : `${str(payload, "from_name")} is waiting on ${str(payload, "subject")}`,
         to: destination[kind] ?? null,
         detail: str(payload, "from_registration_number") || undefined,
       };

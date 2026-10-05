@@ -5,6 +5,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { useAuth } from "@/features/auth/authContext";
+import { NudgeButton } from "@/features/nudges/NudgeButton";
 import { Uid } from "@/components/ui/Uid";
 
 import { fetchAtRiskProjects } from "./api";
@@ -50,6 +52,12 @@ export function AtRiskBoardPage() {
 }
 
 function ProjectCard({ project }: { project: AtRiskProject }) {
+  const { user } = useAuth();
+  // Institution-wide readers only. A coordinator would be nudging themselves,
+  // and the server refuses it anyway -- this just stops offering a button
+  // that cannot work.
+  const canEscalate = user?.role === "dean_of_research" || user?.role === "admin";
+
   return (
     <li className="rounded-card border border-line bg-surface p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -74,6 +82,19 @@ function ProjectCard({ project }: { project: AtRiskProject }) {
       <p className="mt-1 text-xs text-ink-muted">
         {project.owner_name} · <Uid value={project.owner_registration_number} />
       </p>
+
+      {canEscalate ? (
+        <div className="mt-2">
+          {/* Reading the board and being able to do nothing about it is what
+              made this role hollow. An escalation reaches the department's
+              coordinator -- the people who can act -- and edits nothing. */}
+          <NudgeButton
+            kind="project_at_risk"
+            entityId={project.project_id}
+            label="Ask the coordinator to look"
+          />
+        </div>
+      ) : null}
 
       <ul className="mt-3 space-y-1.5">
         {project.milestones.map((milestone) => (

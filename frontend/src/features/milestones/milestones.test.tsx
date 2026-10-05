@@ -18,6 +18,9 @@ const fetchMilestones = vi.fn<() => Promise<Milestone[]>>();
 const changeMilestoneStatus = vi.fn<() => Promise<Milestone>>();
 const fetchAtRiskProjects = vi.fn<() => Promise<AtRiskProject[]>>();
 
+const useAuthMock = vi.fn(() => ({ user: { id: "u1", role: "research_coordinator" } }));
+vi.mock("@/features/auth/authContext", () => ({ useAuth: () => useAuthMock() }));
+
 vi.mock("./api", () => ({
   milestoneQueryKey: (projectId: string) => ["milestones", projectId],
   fetchMilestones: () => fetchMilestones(),
@@ -284,5 +287,52 @@ describe("describeDue", () => {
     expect(describeDue(-1)).toBe("1 day late");
     expect(describeDue(-5)).toBe("5 days late");
     expect(describeDue(9)).toBe("in 9 days");
+  });
+});
+
+const AT_RISK: AtRiskProject = {
+  project_id: "p1",
+  title: "Low-cost soil sensors",
+  owner_id: "u1",
+  owner_name: "A. Sharma",
+  owner_registration_number: "12500201",
+  department_id: "d1",
+  overdue_count: 2,
+  at_risk_count: 1,
+  blocked_count: 0,
+  milestones: [
+    {
+      id: "m1",
+      title: "Field trial",
+      due_date: "2026-02-01",
+      status: "pending",
+      risk: "overdue",
+      days_until_due: -9,
+    },
+  ],
+};
+
+const renderBoard = () => renderWith(<AtRiskBoardPage />);
+
+describe("escalating from the at-risk board", () => {
+  it("offers a dean the escalation, because reading and not acting is what made the role hollow", async () => {
+    useAuthMock.mockReturnValue({ user: { id: "d1", role: "dean_of_research" } });
+    fetchAtRiskProjects.mockResolvedValue([AT_RISK]);
+    renderBoard();
+
+    expect(
+      await screen.findByRole("button", { name: "Ask the coordinator to look" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not offer it to a coordinator, who would be nudging themselves", async () => {
+    useAuthMock.mockReturnValue({ user: { id: "c1", role: "research_coordinator" } });
+    fetchAtRiskProjects.mockResolvedValue([AT_RISK]);
+    renderBoard();
+
+    await screen.findByText(AT_RISK.title);
+    expect(
+      screen.queryByRole("button", { name: "Ask the coordinator to look" }),
+    ).not.toBeInTheDocument();
   });
 });
