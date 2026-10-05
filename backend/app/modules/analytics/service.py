@@ -15,24 +15,30 @@ from sqlalchemy.orm import Session
 
 from app.ml.features import ScoreWeights
 from app.modules.admin.models import Department, School
+from app.modules.analytics import insights
 from app.modules.analytics.schemas import (
     AdminDashboard,
     CoordinatorDashboard,
+    CustodianDashboard,
     DashboardResponse,
     DeadlineItem,
+    DeanDashboard,
     FacultyDashboard,
     StudentDashboard,
 )
 from app.modules.applications.models import Application, ApplicationStatus
 from app.modules.audit.models import AuditLog
 from app.modules.audit.schemas import AuditLogRead
+from app.modules.bookings.models import Booking, BookingStatus
 from app.modules.collaborations.models import CollaborationRequest, CollaborationStatus
+from app.modules.facilities.models import Equipment, Facility
 from app.modules.funding.models import FundingOpportunity, FundingStatus
 from app.modules.opportunities.models import Opportunity, OpportunityStatus
 from app.modules.opportunities.schemas import OpportunityCard
 from app.modules.opportunities.service import opportunity_cards
 from app.modules.profiles.models import ResearcherProfile, SavedItem, StudentProfile
 from app.modules.projects.models import Project, ProjectMember, ProjectStatus
+from app.modules.projects.policies import crosses_departments
 from app.modules.projects.schemas import ProjectCard
 from app.modules.projects.service import project_cards, review_queue
 from app.modules.publications.models import Publication, PublicationAuthor
@@ -323,6 +329,77 @@ def _admin_section(db: Session) -> AdminDashboard:
     )
 
 
+def _dean_section(db: Session, user: User) -> DeanDashboard:
+    """Institution-wide figures, each one something the dean can act on.
+
+    Built from the same helpers the analytics page uses rather than counted
+    again here, so the dashboard and the page cannot disagree about the same
+    number -- which is the kind of discrepancy nobody reports and everybody
+    stops trusting.
+    """
+    rows = insights.by_department(db)
+    platform = insights.Scope(department_id=None)
+    adherence = insights.milestone_adherence(db, platform)
+    backlog = insights.verification_backlog(db, platform)
+    statuses = insights.projects_by_status(db, platform)
+
+    pending = [
+        project
+        for project in db.execute(
+            select(Project).where(
+                Project.deleted_at.is_(None), Project.status == ProjectStatus.PENDING_REVIEW
+            )
+        )
+        .scalars()
+        .all()
+        if crosses_departments(db, project)
+    ]
+
+    return DeanDashboard(
+        departments=len(rows),
+        departments_needing_attention=sum(
+            1 for row in rows if row.milestones_overdue or row.milestones_at_risk
+        ),
+        projects_at_risk=int(adherence.get("overdue", 0)) + int(adherence.get("at_risk", 0)),
+        pending_cross_department_reviews=len(pending),
+        verification_backlog=int(backlog.get("pending", 0)),
+        active_projects=int(statuses.get("active", 0)),
+        researchers=sum(row.researchers for row in rows),
+    )
+
+
+def _custodian_section(db: Session, user: User) -> CustodianDashboard:
+    """The rooms this person holds, and what is waiting on them."""
+    facility_ids = list(
+        db.execute(select(Facility.id).where(Facility.custodian_id == user.id)).scalars().all()
+    )
+    if not facility_ids:
+        return CustodianDashboard(facilities_held=0, equipment=0, bookings_awaiting_decision=0)
+    equipment_ids = list(
+        db.execute(select(Equipment.id).where(Equipment.facility_id.in_(facility_ids)))
+        .scalars()
+        .all()
+    )
+    waiting = (
+        _scalar(
+            db,
+            select(func.count())
+            .select_from(Booking)
+            .where(
+                Booking.equipment_id.in_(equipment_ids),
+                Booking.status == BookingStatus.PENDING,
+            ),
+        )
+        if equipment_ids
+        else 0
+    )
+    return CustodianDashboard(
+        facilities_held=len(facility_ids),
+        equipment=len(equipment_ids),
+        bookings_awaiting_decision=waiting,
+    )
+
+
 def dashboard(db: Session, user: User, weights: ScoreWeights) -> DashboardResponse:
     response = DashboardResponse(role=user.role, onboarding_complete=user.onboarding_complete)
     if user.role is UserRole.STUDENT:
@@ -331,6 +408,10 @@ def dashboard(db: Session, user: User, weights: ScoreWeights) -> DashboardRespon
         response.faculty = _faculty_section(db, user)
     if user.role is UserRole.RESEARCH_COORDINATOR:
         response.coordinator = _coordinator_section(db, user)
+    if user.role is UserRole.DEAN_OF_RESEARCH:
+        response.dean = _dean_section(db, user)
+    if user.role is UserRole.FACILITY_CUSTODIAN:
+        response.custodian = _custodian_section(db, user)
     if user.role is UserRole.ADMIN:
         response.admin = _admin_section(db)
     return response

@@ -46,6 +46,11 @@ _ERROR_MAP: dict[type[Exception], tuple[int, str]] = {
     service.ProjectNotFoundError: (status.HTTP_404_NOT_FOUND, "Project not found."),
     NotOwnerError: (status.HTTP_403_FORBIDDEN, "Only the project owner can do this."),
     SelfReviewError: (status.HTTP_403_FORBIDDEN, "You cannot review your own project."),
+    service.NotReviewableError: (
+        status.HTTP_403_FORBIDDEN,
+        "This project is not yours to decide. A dean reviews work that crosses "
+        "departments; a coordinator reviews their own department's.",
+    ),
     service.OwnerNotVerifiedError: (
         status.HTTP_403_FORBIDDEN,
         "Your researcher profile must be verified before you can submit a project.",

@@ -175,3 +175,45 @@ def test_admin_dashboard_summarises_the_platform(client: TestClient, world: Worl
     assert section["open_reports"] == 0
     # Verification decisions from the fixture are already audited.
     assert len(section["recent_audit"]) > 0
+
+
+def test_a_dean_does_not_open_an_empty_dashboard(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """It had sections for student, faculty, coordinator and admin and none
+    for a dean, so the role signed in to a blank page."""
+    dean = seed_user(UserRole.DEAN_OF_RESEARCH)
+
+    response = client.get("/api/v1/me/dashboard", headers=auth(dean))
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["dean"] is not None, "a dean must have a dashboard"
+    for field in (
+        "departments",
+        "departments_needing_attention",
+        "projects_at_risk",
+        "pending_cross_department_reviews",
+        "verification_backlog",
+        "active_projects",
+        "researchers",
+    ):
+        assert field in body["dean"], field
+    # The sections that are not theirs stay absent.
+    assert body["coordinator"] is None
+    assert body["admin"] is None
+
+
+def test_a_custodian_sees_the_rooms_they_hold(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    custodian = seed_user(UserRole.FACILITY_CUSTODIAN, department_id=world.department_id)
+
+    response = client.get("/api/v1/me/dashboard", headers=auth(custodian))
+
+    assert response.status_code == 200, response.text
+    section = response.json()["custodian"]
+    assert section is not None
+    # None assigned yet, which is a real state and not an error.
+    assert section["facilities_held"] == 0
+    assert section["bookings_awaiting_decision"] == 0
