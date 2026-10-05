@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -18,6 +21,7 @@ from app.modules.analytics.analytics_schemas import (
     AcademicYearOption,
     AnalyticsOverview,
     CollaborationNetwork,
+    DepartmentComparisonRow,
     EquipmentUsage,
     InstitutionalReportRead,
     LabelledCount,
@@ -36,6 +40,18 @@ from app.modules.users.models import User
 router = APIRouter(tags=["dashboard"])
 
 
+@contextmanager
+def _scope_errors() -> Iterator[None]:
+    """A department the viewer may not read is a refusal, not their own."""
+    try:
+        yield
+    except insights.NotInScopeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only read figures for the department you oversee.",
+        ) from exc
+
+
 @router.get("/me/dashboard", response_model=DashboardResponse)
 def read_dashboard(
     db: Annotated[Session, Depends(get_db)],
@@ -49,10 +65,19 @@ def read_dashboard(
 def read_analytics_overview(
     db: Annotated[Session, Depends(get_db)],
     viewer: Annotated[User, Depends(require_permission(Permission.ANALYTICS_READ))],
+    department_id: Annotated[
+        uuid.UUID | None,
+        Query(description="Narrow to one department. Institution-wide readers only."),
+    ] = None,
 ) -> AnalyticsOverview:
-    """Aggregates for the viewer's slice: a coordinator's department, or the
-    whole platform for an admin. Counts only -- no personal data."""
-    scope = insights.scope_for(viewer)
+    """Aggregates for the viewer's slice, optionally narrowed to a department.
+
+    A coordinator's slice is their own department and nothing else. A dean or
+    an administrator reads the institution and may narrow to any department --
+    which is how the same figures are compared one against another.
+    """
+    with _scope_errors():
+        scope = insights.scope_for(viewer, department_id=department_id)
     return AnalyticsOverview(
         scope="platform" if scope.is_platform else "department",
         department_id=str(scope.department_id) if scope.department_id else None,
@@ -69,6 +94,29 @@ def read_analytics_overview(
         milestone_adherence=MilestoneAdherence(**insights.milestone_adherence(db, scope)),
         trends=[TrendPoint(**row) for row in insights.trends(db, scope)],
     )
+
+
+@router.get("/analytics/by-department", response_model=list[DepartmentComparisonRow])
+def read_department_comparison(
+    db: Annotated[Session, Depends(get_db)],
+    viewer: Annotated[User, Depends(require_permission(Permission.ANALYTICS_READ))],
+) -> list[DepartmentComparisonRow]:
+    """Every department side by side.
+
+    Institution-wide readers only -- a coordinator sees one department, so a
+    comparison would be a single row and an invitation to ask for more. This
+    is the view the Dean of Research exists for: which departments are
+    producing, and which are slipping.
+    """
+    if not insights.scope_for(viewer).is_platform:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Comparing departments is for institution-wide readers.",
+        )
+    return [
+        DepartmentComparisonRow.model_validate(row, from_attributes=True)
+        for row in insights.by_department(db)
+    ]
 
 
 @router.get("/analytics/network", response_model=CollaborationNetwork)

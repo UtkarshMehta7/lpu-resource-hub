@@ -79,6 +79,10 @@ Current shape: 162 API operations over 131 paths, 44 tables, 28 migrations,
   accounts live in 124xxxxx, so the blocks never collide. **The E2E flows sign
   in with these numbers** -- change the scheme and `frontend/e2e/flows.spec.ts`
   changes with it, or CI goes red at sign-in.
+- **A person's DEPARTMENT is shown wherever they are named**, as a name and
+  not a UUID: `department_name` rides beside `department_id` on researcher
+  cards, the researcher page and student cards, looked up once per page. The
+  researcher card used to show no department at all.
 - **The registration number is the UID and is shown wherever a person is
   named** -- via `components/ui/Uid`, never a hand-rolled span. Every
   person-bearing response schema carries `registration_number`; search matches
@@ -119,6 +123,13 @@ Current shape: 162 API operations over 131 paths, 44 tables, 28 migrations,
 - **The institutional report has ONE aggregation, three renderings** (JSON,
   CSV, PDF from the same `InstitutionalReport`). Never add a second
   aggregation for a format; the numbers would drift.
+- **A dean compares DEPARTMENTS; that is the job.** `scope_for` answered
+  either "one department" or "the whole institution", so the one question a
+  Dean of Research actually asks had no answer -- a single blended total hides
+  exactly what it is wanted for. `GET /analytics/by-department` puts them side
+  by side, and `?department_id=` narrows the overview. An institution-wide
+  reader may narrow to any department; a coordinator asking for somebody
+  else's gets 403, never their own figures quietly substituted.
 - **A metric that cannot be computed reads "not applicable", never 0.** No
   decided applications is not a 0% success rate. Every rate returns None
   rather than dividing by zero, and every table carries its definition --

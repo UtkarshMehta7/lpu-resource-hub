@@ -806,3 +806,97 @@ def test_neither_new_role_uses_the_administrator_entrance(
             },
         )
         assert response.status_code in (401, 403), f"{role}: {response.status_code}"
+
+
+# --- a dean who can actually do the job ------------------------------------
+
+
+def test_a_dean_compares_departments(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """The question a Dean of Research actually asks.
+
+    Before this the only answer available was one institution-wide total,
+    which hides precisely what it is wanted for: which departments are
+    producing and which are slipping.
+    """
+    dean = seed_user(UserRole.DEAN_OF_RESEARCH)
+
+    response = client.get("/api/v1/analytics/by-department", headers=auth(dean))
+
+    assert response.status_code == 200, response.text
+    rows = response.json()
+    assert rows, "a department exists, so the comparison cannot be empty"
+    row = rows[0]
+    for field in (
+        "department_name",
+        "researchers",
+        "students",
+        "projects_active",
+        "publications",
+        "milestones_overdue",
+        "milestones_at_risk",
+        "verification_pending",
+    ):
+        assert field in row, field
+
+
+def test_a_dean_narrows_the_overview_to_one_department(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    dean = seed_user(UserRole.DEAN_OF_RESEARCH)
+
+    whole = client.get("/api/v1/analytics/overview", headers=auth(dean))
+    narrowed = client.get(
+        "/api/v1/analytics/overview",
+        headers=auth(dean),
+        params={"department_id": world.department_id},
+    )
+
+    assert whole.status_code == 200 and narrowed.status_code == 200, narrowed.text
+    assert whole.json()["scope"] == "platform"
+    assert narrowed.json()["scope"] == "department"
+    assert narrowed.json()["department_id"] == world.department_id
+
+
+def test_a_coordinator_cannot_read_another_department(client: TestClient, world: World) -> None:
+    """Narrowing is for institution-wide readers. A coordinator asking for
+    somebody else's department is refused rather than quietly handed their
+    own -- silently substituting the answer is how somebody comes to believe
+    a figure that is not the one they asked for."""
+    other_school = client.post(
+        "/api/v1/admin/schools", headers=auth(world.admin), json={"name": "Other School"}
+    ).json()["id"]
+    other_department = client.post(
+        "/api/v1/admin/departments",
+        headers=auth(world.admin),
+        json={"school_id": other_school, "name": "Other Department"},
+    ).json()["id"]
+
+    response = client.get(
+        "/api/v1/analytics/overview",
+        headers=auth(world.coordinator),
+        params={"department_id": other_department},
+    )
+
+    assert response.status_code == 403, response.text
+
+
+def test_a_coordinator_cannot_compare_departments(client: TestClient, world: World) -> None:
+    response = client.get("/api/v1/analytics/by-department", headers=auth(world.coordinator))
+
+    assert response.status_code == 403, response.text
+
+
+def test_the_directory_names_a_person_s_department(client: TestClient, world: World) -> None:
+    """A card carrying only a UUID tells a reader none of what they came for,
+    and which department somebody belongs to is the first thing anyone asks
+    about a person."""
+    response = client.get("/api/v1/researchers", headers=auth(world.faculty))
+
+    assert response.status_code == 200, response.text
+    items = response.json()["items"]
+    assert items
+    named = [card for card in items if card.get("department_id")]
+    assert named, "the fixture should have somebody in a department"
+    assert all(card["department_name"] for card in named)

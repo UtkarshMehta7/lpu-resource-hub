@@ -58,7 +58,9 @@ export function ResearcherDetailPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{data.full_name}</h1>
           <p className="font-mono text-xs text-ink-muted">{data.registration_number}</p>
-          <p className="mt-1 text-sm text-ink-muted">{data.designation}</p>
+          <p className="mt-1 text-sm text-ink-muted">
+            {[data.designation, data.department_name].filter(Boolean).join(" · ")}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {data.verification_status === "verified" ? (

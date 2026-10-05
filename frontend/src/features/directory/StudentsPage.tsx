@@ -76,7 +76,9 @@ export function StudentsPage() {
                   />
                 </div>
                 <p className="text-sm text-ink-muted">
-                  {student.program} · Year {student.year}
+                  {[student.program, `Year ${student.year}`, student.department_name]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
                 {student.interests ? (
                   <p className="mt-2 text-sm text-ink-muted">{student.interests}</p>

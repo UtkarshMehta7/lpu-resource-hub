@@ -21,7 +21,7 @@ from typing import Any, TypedDict
 from sqlalchemy import ColumnElement, Row, Select, func, or_, select, true
 from sqlalchemy.orm import InstrumentedAttribute, Session, aliased
 
-from app.modules.admin.models import Department
+from app.modules.admin.models import Department, School
 from app.modules.applications.models import Application, ApplicationStatus
 from app.modules.bookings.models import Booking, BookingStatus
 from app.modules.collaborations.models import (
@@ -117,7 +117,32 @@ class Scope:
         return self.department_id is None
 
 
-def scope_for(user: User) -> Scope:
+class NotInScopeError(Exception):
+    """Asked for a department this viewer may not read."""
+
+
+def scope_for(user: User, *, department_id: uuid.UUID | None = None) -> Scope:
+    """Which slice this viewer sees, optionally narrowed to one department.
+
+    `department_id` is how a dean or an administrator compares one department
+    with another -- the whole job of a Dean of Research, and impossible while
+    the only answer available was a single institution-wide total. A
+    coordinator may pass their own department and nothing else; anyone else
+    asking for a department they cannot read is refused rather than quietly
+    given the figures for their own.
+    """
+    scope = _default_scope_for(user)
+    if department_id is None:
+        return scope
+    if scope.is_platform:
+        # Institution-wide readers may narrow to any department.
+        return Scope(department_id=department_id)
+    if scope.department_id != department_id:
+        raise NotInScopeError
+    return scope
+
+
+def _default_scope_for(user: User) -> Scope:
     # A dean reads the institution, which is the point of the role: figures
     # for the place as a whole, without the ability to edit what they read.
     if user.role in (UserRole.ADMIN, UserRole.DEAN_OF_RESEARCH):
@@ -597,3 +622,91 @@ def application_success_rate(
         decided=decided,
         rate=(accepted / decided) if decided else None,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class DepartmentRow:
+    """One department's figures, for comparison against the others."""
+
+    department_id: uuid.UUID
+    department_name: str
+    school_name: str | None
+    researchers: int
+    students: int
+    projects_active: int
+    publications: int
+    milestones_overdue: int
+    milestones_at_risk: int
+    verification_pending: int
+
+
+def by_department(db: Session) -> list[DepartmentRow]:
+    """Every department, side by side.
+
+    The reason the dean role existed and could not do its job: `scope_for`
+    answered either "one department" or "the whole institution", so the one
+    question a Dean of Research actually asks -- which departments are
+    producing and which are slipping -- had no answer. A single blended total
+    hides exactly what it is wanted for.
+
+    Counted per department rather than aggregated once and split, because the
+    scoped helpers already know how to count correctly and reusing them keeps
+    one definition of each figure.
+    """
+    departments = list(
+        db.execute(
+            select(Department, School.name)
+            .outerjoin(School, School.id == Department.school_id)
+            .order_by(Department.name)
+        ).all()
+    )
+
+    rows: list[DepartmentRow] = []
+    for department, school_name in departments:
+        scope = Scope(department_id=department.id)
+        statuses = projects_by_status(db, scope)
+        adherence = milestone_adherence(db, scope)
+        backlog = verification_backlog(db, scope)
+        rows.append(
+            DepartmentRow(
+                department_id=department.id,
+                department_name=department.name,
+                school_name=school_name,
+                researchers=int(
+                    db.execute(
+                        select(func.count())
+                        .select_from(User)
+                        .where(
+                            User.department_id == department.id,
+                            User.role.in_((UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR)),
+                            User.is_active.is_(True),
+                        )
+                    ).scalar_one()
+                ),
+                students=int(
+                    db.execute(
+                        select(func.count())
+                        .select_from(User)
+                        .where(
+                            User.department_id == department.id,
+                            User.role == UserRole.STUDENT,
+                            User.is_active.is_(True),
+                        )
+                    ).scalar_one()
+                ),
+                projects_active=int(statuses.get("active", 0)),
+                publications=int(
+                    db.execute(
+                        select(func.count(func.distinct(Publication.id)))
+                        .select_from(Publication)
+                        .join(PublicationAuthor, PublicationAuthor.publication_id == Publication.id)
+                        .join(User, User.id == PublicationAuthor.user_id)
+                        .where(User.department_id == department.id)
+                    ).scalar_one()
+                ),
+                milestones_overdue=int(adherence.get("overdue", 0)),
+                milestones_at_risk=int(adherence.get("at_risk", 0)),
+                verification_pending=int(backlog.get("pending", 0)),
+            )
+        )
+    return rows

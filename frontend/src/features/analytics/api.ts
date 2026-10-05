@@ -60,6 +60,33 @@ export interface PlatformSettings {
   settings: Record<string, unknown>;
 }
 
+export interface DepartmentComparisonRow {
+  department_id: string;
+  department_name: string;
+  school_name: string | null;
+  researchers: number;
+  students: number;
+  projects_active: number;
+  publications: number;
+  milestones_overdue: number;
+  milestones_at_risk: number;
+  verification_pending: number;
+}
+
+/**
+ * Every department side by side.
+ *
+ * Institution-wide readers only. This is the view the Dean of Research exists
+ * for: a single blended institutional total hides exactly what it is wanted
+ * for — which departments are producing, and which are slipping.
+ */
+export async function fetchDepartmentComparison(): Promise<DepartmentComparisonRow[]> {
+  const response = await apiClient.get<DepartmentComparisonRow[]>(
+    "/api/v1/analytics/by-department",
+  );
+  return response.data;
+}
+
 export async function fetchOverview(): Promise<AnalyticsOverview> {
   const response = await apiClient.get<AnalyticsOverview>("/api/v1/analytics/overview");
   return response.data;
