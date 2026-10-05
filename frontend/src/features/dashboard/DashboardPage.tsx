@@ -9,6 +9,8 @@ import { useAuth } from "@/features/auth/authContext";
 import {
   fetchDashboard,
   type AdminDashboard,
+  type CustodianDashboard,
+  type DeanDashboard,
   type CoordinatorDashboard,
   type FacultyDashboard,
   type StudentDashboard,
@@ -50,6 +52,8 @@ export function DashboardPage() {
       {data?.student ? <StudentSections data={data.student} /> : null}
       {data?.faculty ? <FacultySections data={data.faculty} /> : null}
       {data?.coordinator ? <CoordinatorSections data={data.coordinator} /> : null}
+      {data?.dean ? <DeanSections data={data.dean} /> : null}
+      {data?.custodian ? <CustodianSections data={data.custodian} /> : null}
       {data?.admin ? <AdminSections data={data.admin} /> : null}
     </div>
   );
@@ -289,6 +293,64 @@ function CoordinatorSections({ data }: { data: CoordinatorDashboard }) {
           }))}
           empty={<EmptyState title="Nothing to review" />}
         />
+      </Section>
+    </>
+  );
+}
+
+function DeanSections({ data }: { data: DeanDashboard }) {
+  // The dashboard had no section for a dean, so the role signed in to an
+  // empty page. Each figure is a link to the place it can be acted on —
+  // a number with nowhere to go is the same dead end in a smaller form.
+  return (
+    <>
+      <Section title="The institution" action={{ label: "Compare departments", to: "/analytics" }}>
+        <Stats
+          entries={[
+            ["departments", data.departments],
+            ["needing attention", data.departments_needing_attention],
+            ["active projects", data.active_projects],
+            ["researchers", data.researchers],
+          ]}
+        />
+      </Section>
+
+      <Section title="Slipping" action={{ label: "At-risk projects", to: "/coordinator/at-risk" }}>
+        <Stats entries={[["projects overdue or at risk", data.projects_at_risk]]} />
+      </Section>
+
+      <Section
+        title="Waiting on you"
+        action={{ label: "Review queue", to: "/coordinator/review-queue" }}
+      >
+        <Stats
+          entries={[
+            ["cross-department projects to decide", data.pending_cross_department_reviews],
+            ["researchers awaiting verification", data.verification_backlog],
+          ]}
+        />
+      </Section>
+    </>
+  );
+}
+
+function CustodianSections({ data }: { data: CustodianDashboard }) {
+  return (
+    <>
+      <Section title="In your care" action={{ label: "Facilities", to: "/facilities" }}>
+        <Stats
+          entries={[
+            ["facilities", data.facilities_held],
+            ["equipment", data.equipment],
+          ]}
+        />
+      </Section>
+
+      <Section
+        title="Waiting on you"
+        action={{ label: "Booking requests", to: "/coordinator/booking-queue" }}
+      >
+        <Stats entries={[["bookings to decide", data.bookings_awaiting_decision]]} />
       </Section>
     </>
   );

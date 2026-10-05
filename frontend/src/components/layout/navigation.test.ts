@@ -25,9 +25,13 @@ describe("navigationFor", () => {
     expect(labels).toContain("Analytics");
     expect(labels).toContain("Research report");
     expect(labels).toContain("At-risk projects");
-    // Every other Review entry is an action on somebody's work.
+    // Reviews joined this list when the dean gained authority over work that
+    // CROSSES departments (ADR 0032) -- their queue is filtered to exactly
+    // that, so the same page serves both roles.
+    expect(labels).toContain("Reviews");
+    // The queues that remain somebody else's business. Verification and
+    // bookings are departmental acts, and a dean oversees no department.
     expect(labels).not.toContain("Verification");
-    expect(labels).not.toContain("Reviews");
     expect(labels).not.toContain("Bookings");
     expect(labels).not.toContain("Accounts");
   });

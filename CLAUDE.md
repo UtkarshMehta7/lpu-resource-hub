@@ -43,7 +43,7 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 162 API operations over 131 paths, 44 tables, 29 migrations,
-31 ADRs, 27 backend modules, 1101 backend tests, 276 frontend tests,
+32 ADRs, 27 backend modules, 1107 backend tests, 278 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -159,6 +159,17 @@ Current shape: 162 API operations over 131 paths, 44 tables, 29 migrations,
   need. The notification rides the same scoring as the page, so the two can
   never disagree, and its dedupe key is the ordered pair, so two people are
   introduced once ever.
+- **A dean decides work that CROSSES departments** (ADR 0032), and nothing
+  else. `review_queue` scopes a coordinator to one department, so a project
+  whose team reaches into a second had no reviewer who could see all of it --
+  a hole in the model, not an invented gate. `may_review` in
+  `projects/policies.py` holds the rule, not the permission: holding
+  PROJECT_REVIEW says a person may review *a* project, never every project.
+  "Crosses" is computed from the team, never flagged. The queue filters
+  through the same function the decision uses, or it is a dead button.
+- **Every role needs a dashboard section**, or it signs in to a blank page.
+  The dean and the custodian had none for days. `analytics/service.py:dashboard`
+  dispatches per role; add a section there when a role is added.
 - **One nudge travels DOWNWARD, and only one** (ADR 0031).
   `PROJECT_AT_RISK` is a dean or admin saying "somebody else's project is
   slipping, please look at it"; every other kind is "my own thing is stuck"

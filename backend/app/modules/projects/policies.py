@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-from sqlalchemy import ColumnElement, or_, select, true
+from sqlalchemy import ColumnElement, func, or_, select, true
+from sqlalchemy.orm import Session
 
 from app.modules.projects.models import Project, ProjectMember, ProjectStatus
 from app.modules.users.models import CoordinatorScopeType, User, UserRole
@@ -81,4 +82,58 @@ def visibility_filter(viewer: User) -> ColumnElement[bool]:
         and viewer.coordinator_scope_id is not None
     ):
         conditions.append(Project.department_id == viewer.coordinator_scope_id)
+    if viewer.role is UserRole.DEAN_OF_RESEARCH:
+        # A dean decides work that crosses departments, so they must be able
+        # to SEE it while it is pending -- a reviewer who cannot open what
+        # they are asked to approve is no reviewer. Whether a given project
+        # actually crosses is a property of its team, which SQL here cannot
+        # see; `may_review` makes that judgement on the loaded row. This
+        # widens visibility, not authority: everything else a dean may do is
+        # still read-only.
+        conditions.append(true())
     return or_(*conditions)
+
+
+def crosses_departments(db: Session, project: Project) -> bool:
+    """Whether this project's team reaches outside its own department.
+
+    A coordinator's authority stops at their department, so a project whose
+    members sit in two of them has no reviewer who can see the whole team.
+    That is the gap the Dean of Research fills, and it is computed rather than
+    flagged so nobody has to remember to set it.
+    """
+    if project.department_id is None:
+        # Belongs to no department, so no coordinator can reach it either.
+        return True
+    outside = db.execute(
+        select(func.count())
+        .select_from(ProjectMember)
+        .join(User, User.id == ProjectMember.user_id)
+        .where(
+            ProjectMember.project_id == project.id,
+            User.department_id.is_not(None),
+            User.department_id != project.department_id,
+        )
+    ).scalar_one()
+    return bool(outside)
+
+
+def may_review(db: Session, reviewer: User, project: Project) -> bool:
+    """Whether this person may decide this project.
+
+    An admin reviews anything. A coordinator reviews their own department's
+    work. A dean reviews what crosses departments -- and nothing else, because
+    a dean deciding ordinary departmental work would quietly replace the
+    coordinator who is meant to.
+    """
+    if reviewer.role is UserRole.ADMIN:
+        return True
+    if reviewer.role is UserRole.DEAN_OF_RESEARCH:
+        return crosses_departments(db, project)
+    if reviewer.role is UserRole.RESEARCH_COORDINATOR:
+        return (
+            reviewer.coordinator_scope_type is CoordinatorScopeType.DEPARTMENT
+            and reviewer.coordinator_scope_id is not None
+            and reviewer.coordinator_scope_id == project.department_id
+        )
+    return False
