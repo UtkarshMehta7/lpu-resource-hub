@@ -416,6 +416,31 @@ def test_a_project_team_shares_a_thread(client: TestClient, world: World) -> Non
     assert again.json()["id"] == opened.json()["id"]
 
 
+def test_creating_a_project_puts_its_creator_in_the_chat(client: TestClient, world: World) -> None:
+    """You make a project and its chat is there, with you already in it.
+
+    The thread used to appear only when somebody pressed a button, so a
+    freshly created project looked like it had no chat at all.
+    """
+    project_id = client.post(
+        "/api/v1/projects",
+        headers=auth(world.faculty),
+        json={"title": "Canal silt survey", "summary": "S", "description": "D"},
+    ).json()["id"]
+
+    threads = client.get("/api/v1/me/conversations", headers=auth(world.faculty)).json()
+    mine = [thread for thread in threads if thread["subject_id"] == project_id]
+    assert len(mine) == 1, threads
+    assert mine[0]["subject_kind"] == "project"
+    assert [participant["user_id"] for participant in mine[0]["participants"]] == [
+        str(world.faculty.id)
+    ]
+    # And it takes a message without anyone opening it first.
+    assert _send(client, world.faculty, mine[0]["id"], "Starting on the survey")["body"] == (
+        "Starting on the survey"
+    )
+
+
 def test_someone_outside_the_team_cannot_open_it(client: TestClient, world: World) -> None:
     response = client.post(
         f"/api/v1/projects/{world.project_id}/conversation", headers=auth(world.other_student)
@@ -472,6 +497,65 @@ def test_leaving_a_project_revokes_the_thread_but_keeps_what_was_said(
     assert [item["body"] for item in remaining["items"]] == ["I ran the calibration"]
 
 
+def _accept_onto_the_team(client: TestClient, world: World, applicant: SeededUser) -> None:
+    """The other way onto a team: apply to the opportunity, and be accepted."""
+    application_id = client.post(
+        f"/api/v1/opportunities/{world.opportunity_id}/applications",
+        headers=auth(applicant),
+        json={"statement": "I have calibrated sensors before."},
+    ).json()["id"]
+    for status in ("under_review", "accepted"):
+        response = client.post(
+            f"/api/v1/applications/{application_id}/status",
+            headers=auth(world.faculty),
+            json={"status": status, "add_to_project": True},
+        )
+        assert response.status_code == 200, response.json()
+
+
+def test_being_accepted_into_an_opportunity_grants_the_team_thread(
+    client: TestClient, world: World
+) -> None:
+    """The third way onto a team, which used to be the one that forgot.
+
+    An owner adding a member synced the thread and so did removing one, but
+    accepting an application inserted a ProjectMember directly -- so somebody
+    accepted into an opportunity was on the team and absent from its chat.
+    """
+    thread_id = client.post(
+        f"/api/v1/projects/{world.project_id}/conversation", headers=auth(world.faculty)
+    ).json()["id"]
+    _send(client, world.faculty, thread_id, "Kick-off is Thursday")
+
+    _accept_onto_the_team(client, world, world.other_student)
+
+    page = client.get(
+        f"/api/v1/conversations/{thread_id}/messages", headers=auth(world.other_student)
+    )
+    assert page.status_code == 200, page.json()
+    assert [item["body"] for item in page.json()["items"]] == ["Kick-off is Thursday"]
+
+
+def test_an_accepted_member_is_in_the_thread_that_did_not_exist_yet(
+    client: TestClient, world: World
+) -> None:
+    """A thread is created on first use, so the sync has nothing to do when
+    the acceptance happens. Whoever opens it later syncs everyone in, which
+    is why lazy creation loses nobody."""
+    _accept_onto_the_team(client, world, world.other_student)
+
+    thread_id = client.post(
+        f"/api/v1/projects/{world.project_id}/conversation", headers=auth(world.faculty)
+    ).json()["id"]
+
+    assert (
+        client.get(
+            f"/api/v1/conversations/{thread_id}", headers=auth(world.other_student)
+        ).status_code
+        == 200
+    )
+
+
 # ---------------------------------------------------------------- deletion
 
 
@@ -499,7 +583,13 @@ def test_deleting_the_subject_takes_the_thread_with_it(client: TestClient, world
         == 204
     )
 
-    assert client.get("/api/v1/me/conversations", headers=auth(world.faculty)).json() == []
+    remaining = client.get("/api/v1/me/conversations", headers=auth(world.faculty)).json()
+    assert thread_id not in [thread["id"] for thread in remaining], "the request's thread is gone"
+    # This asserted an empty list, which held only while a project carried no
+    # thread until somebody opened one. A project now gets its thread when it
+    # is created, and that thread hangs off the project rather than off the
+    # person who was deleted -- so it is still here, and should be.
+    assert [thread["subject_kind"] for thread in remaining] == ["project"]
 
 
 # ------------------------------------------- ending what was started

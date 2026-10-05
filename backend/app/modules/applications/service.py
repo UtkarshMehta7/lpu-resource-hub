@@ -31,6 +31,7 @@ from app.modules.audit import service as audit_service
 from app.modules.opportunities import service as opportunity_service
 from app.modules.opportunities.models import Opportunity, OpportunityStatus
 from app.modules.opportunities.policies import actor_for
+from app.modules.projects import service as projects_service
 from app.modules.projects.models import ProjectMember
 from app.modules.users.models import User
 
@@ -247,12 +248,14 @@ def change_status(
                 )
             ).scalar_one_or_none()
             if already is None:
-                db.add(
-                    ProjectMember(
-                        project_id=opportunity.project_id,
-                        user_id=application.applicant_id,
-                        member_role=opportunity.opportunity_type.value.replace("_", " "),
-                    )
+                # Through projects.service, never a bare insert: joining a
+                # team joins its thread, and this path used to skip that, so
+                # an accepted applicant was on the team and not in its chat.
+                projects_service.record_membership(
+                    db,
+                    project_id=opportunity.project_id,
+                    user_id=application.applicant_id,
+                    member_role=opportunity.opportunity_type.value.replace("_", " "),
                 )
         opportunity_service.mark_filled_if_full(db, opportunity)
 
