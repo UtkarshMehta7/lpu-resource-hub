@@ -24,7 +24,7 @@ Not an object store, and not a shared blob table.
   at the least convenient moment.
 - **Not Cloudflare R2 yet.** It is the right long-term home — 10 GB free and
   no egress charge — but it needs an account, credentials in the environment
-  and an S3 client. `CLAUDE.md`'s rule is "no mandatory cloud", and a feature
+  and an S3 client. `AGENTS.md`'s rule is "no mandatory cloud", and a feature
   that cannot be run by cloning the repository fails it.
 - **Not a shared `stored_blobs` table.** A shared table invites
   de-duplication by hash, and de-duplication means a blob outliving the

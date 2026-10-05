@@ -1,4 +1,4 @@
-# CLAUDE.md: LPU Research Intelligence & Collaboration Hub
+# AGENTS.md: LPU Research Intelligence & Collaboration Hub
 
 ## What this is
 Prototype research discovery & collaboration platform for the LPU ecosystem.
@@ -451,7 +451,7 @@ Frontend (frontend/): npm run typecheck && npm run lint && npm run format:check 
 Run: npm run dev
 
 ## Workflow for every step
-1. Read CLAUDE.md, docs/architecture.md, and the step prompt.
+1. Read AGENTS.md, docs/architecture.md, and the step prompt.
 2. Give a concise PLAN (files, models, endpoints, migrations, tests, deviations). STOP for approval.
 3. Implement only that step on branch feat/step-N-<name>.
 4. Run all checks + the step's verification list. Fix root causes.

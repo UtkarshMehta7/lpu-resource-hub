@@ -1,17 +1,17 @@
-# LPU Research Hub: Full Roadmap & Claude Code Prompts
+# LPU Research Hub: Full Roadmap & Build Prompts
 
 How to use this file:
 
-1. **Copy Part A into `CLAUDE.md` at the repo root** and commit it. Claude Code reads that file automatically in every session, so the project rules never need repeating.
-2. **Run one step per session.** Paste that step's prompt from Part C. Claude plans, you approve, Claude implements, verifies and reports.
+1. **Copy Part A into `AGENTS.md` at the repo root** and commit it. A coding assistant reads that file automatically in every session, so the project rules never need repeating.
+2. **Run one step per session.** Paste that step's prompt from Part C. The assistant plans, you approve, then it implements, verifies and reports.
 3. **Review and test each step before starting the next one.** Every step ends with one focused commit, or a short series of them.
 
 ---
 
-## PART A: `CLAUDE.md` (put this in the repo root)
+## PART A: `AGENTS.md` (put this in the repo root)
 
 ```markdown
-# CLAUDE.md: LPU Research Intelligence & Collaboration Hub
+# AGENTS.md: LPU Research Intelligence & Collaboration Hub
 
 ## What this is
 Prototype research discovery & collaboration platform for the LPU ecosystem.
@@ -56,7 +56,7 @@ Frontend (frontend/): npm run typecheck && npm run lint && npm run format:check 
 Run: npm run dev
 
 ## Workflow for every step
-1. Read CLAUDE.md, docs/architecture.md, and the step prompt.
+1. Read AGENTS.md, docs/architecture.md, and the step prompt.
 2. Give a concise PLAN (files, models, endpoints, migrations, tests, deviations). STOP for approval.
 3. Implement only that step on branch feat/step-N-<name>.
 4. Run all checks + the step's verification list. Fix root causes.
@@ -100,7 +100,7 @@ Milestones:
 ### Common header (start every step prompt with this)
 
 ```
-Read CLAUDE.md and docs/architecture.md first. They are the source of truth.
+Read AGENTS.md and docs/architecture.md first. They are the source of truth.
 We are implementing STEP N ONLY. Do not build ahead.
 First give me a concise implementation plan (files, models, migrations, endpoints,
 UI pages, tests, any deviation with reason). Then STOP and wait for my approval.
@@ -548,7 +548,7 @@ one per session, PLAN first.
 ### Step 17: Scoped conversation threads (chat)
 
 ```
-Add scoped conversation threads to the LPU Research Hub. Read CLAUDE.md and
+Add scoped conversation threads to the LPU Research Hub. Read AGENTS.md and
 docs/architecture.md first; do not restate their rules back to me.
 
 WHY: collaboration_requests.message is a single Text column. Two people
@@ -586,7 +586,7 @@ DELIVER:
    404 (not 403 - they must not learn the thread exists), that a declined
    request has no thread, and that a hidden message stays in the thread as
    hidden rather than vanishing.
-3. Run every check in CLAUDE.md. Report PASSED / FAILED / NOT VERIFIED
+3. Run every check in AGENTS.md. Report PASSED / FAILED / NOT VERIFIED
    honestly, and say plainly what you did not verify in a browser.
 ```
 
@@ -597,4 +597,4 @@ DELIVER:
 - **Verify a step:** "Run the full verification for Step N again from a clean state and report PASSED/FAILED/NOT VERIFIED for each item. Fix nothing yet; just report."
 - **Fix failures:** "Fix the failed checks from your last report at the root cause. Don't disable rules or skip tests. Re-run everything."
 - **Review before merge:** "Review the diff of feat/step-N against main for security issues, RBAC gaps, missing tests, and scope creep. List the findings, then wait."
-- **Resume after interruption:** "Read CLAUDE.md, the README roadmap and `git log`. Tell me which step we're on, what's done and what's left in it, then continue with the remaining plan items only."
+- **Resume after interruption:** "Read AGENTS.md, the README roadmap and `git log`. Tell me which step we're on, what's done and what's left in it, then continue with the remaining plan items only."

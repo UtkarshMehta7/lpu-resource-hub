@@ -527,7 +527,7 @@ lpu-research-hub/
 │   ├── development.md           # day-to-day workflow and conventions
 │   ├── rbac-matrix.md           # full role -> permission design
 │   └── adr/0001-foundation-decisions.md … 0006-research-projects.md
-├── CLAUDE.md
+├── AGENTS.md
 ├── lpu-roadmap-prompts.md
 ├── .editorconfig
 ├── .gitignore
