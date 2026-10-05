@@ -33,6 +33,8 @@ from app.modules.projects.policies import (
     assert_not_own_project,
     assert_owner,
     assert_transition,
+    crosses_departments,
+    may_review,
     visibility_filter,
 )
 from app.modules.projects.schemas import (
@@ -54,6 +56,15 @@ class ProjectNotFoundError(Exception):
 
 class UnknownTagError(Exception):
     """A skill or research-area id in the request does not exist."""
+
+
+class NotReviewableError(Exception):
+    """This reviewer may not decide this particular project.
+
+    Holding PROJECT_REVIEW says a person may review *a* project, never every
+    project -- the same distinction FACILITY_MANAGE needed. A dean reviews
+    what crosses departments; a coordinator, their own department's work.
+    """
 
 
 class OwnerNotVerifiedError(Exception):
@@ -293,6 +304,13 @@ def review_queue(db: Session, reviewer: User) -> list[ProjectCard]:
     query = select(Project).where(
         Project.deleted_at.is_(None), Project.status == ProjectStatus.PENDING_REVIEW
     )
+    if reviewer.role is UserRole.DEAN_OF_RESEARCH:
+        # Only what crosses departments. Filtered after the query rather than
+        # inside it because "crosses" is a property of the team, and the same
+        # function decides the queue and the decision -- a queue that offered
+        # a project the review call would refuse is a dead button.
+        projects = db.execute(query.order_by(Project.updated_at)).scalars().all()
+        return _to_cards(db, [p for p in projects if crosses_departments(db, p)])
     if reviewer.role is not UserRole.ADMIN:
         if (
             reviewer.coordinator_scope_type is not CoordinatorScopeType.DEPARTMENT
@@ -378,6 +396,10 @@ def review_project(
     # pending project outside their department is a 404.
     project = _load_visible(db, reviewer, project_id)
     assert_not_own_project(reviewer, project)
+    if not may_review(db, reviewer, project):
+        # A dean deciding ordinary departmental work would quietly replace the
+        # coordinator who is meant to.
+        raise NotReviewableError
     before = {"status": project.status.value}
     target = ProjectStatus.ACTIVE if data.decision == "approve" else ProjectStatus.DRAFT
     _change_status(project, target, "reviewer")

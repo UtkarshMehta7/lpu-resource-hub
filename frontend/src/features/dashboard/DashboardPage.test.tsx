@@ -126,3 +126,65 @@ describe("DashboardPage", () => {
     expect(screen.queryByText("Upcoming deadlines")).toBeNull();
   });
 });
+
+describe("the roles outside the provisioning chain", () => {
+  it("gives a dean a dashboard instead of an empty page", async () => {
+    // It had sections for student, faculty, coordinator and admin and none
+    // for a dean, so the role signed in to nothing at all.
+    fetchMock.mockResolvedValue({
+      role: "dean_of_research",
+      onboarding_complete: true,
+      student: null,
+      faculty: null,
+      coordinator: null,
+      admin: null,
+      custodian: null,
+      dean: {
+        departments: 8,
+        departments_needing_attention: 3,
+        projects_at_risk: 7,
+        pending_cross_department_reviews: 2,
+        verification_backlog: 5,
+        active_projects: 11,
+        researchers: 44,
+      },
+    });
+    renderDashboard();
+
+    expect(await screen.findByText("The institution")).toBeInTheDocument();
+    expect(screen.getByText("Slipping")).toBeInTheDocument();
+    // Every figure links to where it can be acted on.
+    expect(screen.getByRole("link", { name: "Compare departments" })).toHaveAttribute(
+      "href",
+      "/analytics",
+    );
+    expect(screen.getByRole("link", { name: "At-risk projects" })).toHaveAttribute(
+      "href",
+      "/coordinator/at-risk",
+    );
+    expect(screen.getByRole("link", { name: "Review queue" })).toHaveAttribute(
+      "href",
+      "/coordinator/review-queue",
+    );
+  });
+
+  it("gives a custodian the rooms they hold", async () => {
+    fetchMock.mockResolvedValue({
+      role: "facility_custodian",
+      onboarding_complete: true,
+      student: null,
+      faculty: null,
+      coordinator: null,
+      admin: null,
+      dean: null,
+      custodian: { facilities_held: 2, equipment: 6, bookings_awaiting_decision: 3 },
+    });
+    renderDashboard();
+
+    expect(await screen.findByText("In your care")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Booking requests" })).toHaveAttribute(
+      "href",
+      "/coordinator/booking-queue",
+    );
+  });
+});

@@ -120,13 +120,15 @@ export const router = createBrowserRouter([
               { path: "analytics", element: <AnalyticsPage /> },
               { path: "analytics/report", element: <InstitutionalReportPage /> },
               { path: "coordinator/at-risk", element: <AtRiskBoardPage /> },
+              // A dean decides cross-department work, so the review queue is
+              // theirs too; the server filters it to what they may decide.
+              { path: "coordinator/review-queue", element: <ReviewQueuePage /> },
             ],
           },
           {
             element: <RoleRoute allow={["research_coordinator", "admin"]} />,
             children: [
               { path: "coordinator/verification-queue", element: <VerificationQueuePage /> },
-              { path: "coordinator/review-queue", element: <ReviewQueuePage /> },
               { path: "admin/reports", element: <ModerationQueuePage /> },
               { path: "coordinator/duplicates", element: <DuplicateQueuePage /> },
               // Creating a facility is department-level, so a custodian --

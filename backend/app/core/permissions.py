@@ -113,7 +113,19 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
     # specification is that institutional figures are visible to someone
     # senior without that person acquiring the ability to edit the records
     # they are reading.
-    UserRole.DEAN_OF_RESEARCH: frozenset({Permission.ANALYTICS_READ}),
+    UserRole.DEAN_OF_RESEARCH: frozenset(
+        {
+            Permission.ANALYTICS_READ,
+            # Reviewing work that CROSSES departments, and only that. A
+            # coordinator oversees one department, so a project whose team
+            # spans two has no reviewer who can see all of it -- a hole in the
+            # model rather than an invented gate (ADR 0032). The scope is
+            # enforced in projects/policies.py, not here: holding
+            # PROJECT_REVIEW says a person may review *a* project, never every
+            # project -- the same distinction FACILITY_MANAGE needed.
+            Permission.PROJECT_REVIEW,
+        }
+    ),
     UserRole.ADMIN: frozenset(
         {
             Permission.USER_CREATE,
