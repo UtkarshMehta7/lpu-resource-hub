@@ -198,7 +198,13 @@ test("student requests a slot and the coordinator approves it", async ({ browser
     .click();
   await student.getByLabel(/what do you need it for/i).fill("Calibrating probes for field trials.");
   await student.getByRole("button", { name: "Request this slot" }).click();
-  await expect(student.getByText(/coordinator will review it/i)).toBeVisible();
+  // Named by the room, not by a role: a booking goes to the facility's
+  // custodian when it has one and to the department's coordinator when it
+  // does not, so the confirmation can no longer name either. This facility
+  // has no custodian, and the coordinator approves it below.
+  await expect(
+    student.getByText(new RegExp(`whoever looks after ${FACILITY} will review it`, "i")),
+  ).toBeVisible();
 
   const coordinator = await sessionFor(browser, COORDINATOR);
   await coordinator.goto("/coordinator/booking-queue");
