@@ -643,5 +643,5 @@ Provider-agnostic: static frontend hosting (e.g. Vercel or Netlify), a Python we
 
 ## License
 
-All rights reserved — see [LICENSE](LICENSE). This is an academic submission, not an
-open-source release; reading the repository grants no licence of any kind.
+Copyright © 2026 Utkarsh Mehta. All rights reserved — see [LICENSE](LICENSE).
+Access to this repository confers no licence of any kind.
