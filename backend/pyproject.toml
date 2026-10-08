@@ -6,7 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "lpu-research-hub-backend"
 version = "0.1.0"
 description = "Backend API for the LPU Research Intelligence & Collaboration Hub (prototype)."
-license = "MIT"
+# Deliberately not an SPDX open-source identifier: this is not distributed
+# under one. The notice itself is in LICENSE at the repository root, which is
+# outside this package, so it is named here rather than pointed at.
+license = { text = "All rights reserved — see LICENSE at the repository root" }
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.135,<1.0",

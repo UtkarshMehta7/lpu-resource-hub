@@ -643,4 +643,5 @@ Provider-agnostic: static frontend hosting (e.g. Vercel or Netlify), a Python we
 
 ## License
 
-[MIT](LICENSE). Replace it if your university or course requires a different licence.
+All rights reserved — see [LICENSE](LICENSE). This is an academic submission, not an
+open-source release; reading the repository grants no licence of any kind.

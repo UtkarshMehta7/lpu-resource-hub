@@ -24,7 +24,12 @@
     - No Makefile or task runner.
 14. **Axios now, TanStack Query later.** Axios is the approved client and has one instance with error normalisation. TanStack Query, React Hook Form, Zod and Vitest arrive in Step 1 with the features that need them.
 15. **Direct cross-origin calls in development.** No Vite proxy. This exercises the same CORS path a separately hosted frontend will use.
-16. **MIT licence.** Replace it if the course or university requires another.
+16. **All rights reserved.** Originally MIT, changed on 8 October 2026 while the
+    university's IP cell considers the work. MIT was not itself the risk -- it grants
+    copyright permissions and is silent on patents, where Apache 2.0 carries an express
+    patent grant and would have been worse. What the change removes is the argument for
+    an *implied* patent licence arising from permission to "use" and "sell". It is not
+    retroactive: copies taken under MIT keep what MIT gave them.
 
 ## Consequences
 
