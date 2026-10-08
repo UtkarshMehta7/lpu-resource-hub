@@ -48,13 +48,46 @@ function isAuthEndpoint(url: string | undefined): boolean {
 // second concurrent call would sign the user out.
 let refreshPromise: Promise<string | null> | null = null;
 
+/** Per-origin, so every tab of the app contends for the same one. */
+const REFRESH_LOCK = "lpu-research-hub:auth-refresh";
+
+/**
+ * Serialises the refresh across TABS as well as within one.
+ *
+ * `refreshPromise` above dedupes only inside a single tab, and the refresh
+ * token lives in a cookie every tab shares. Two tabs waking together each
+ * sent the same token; whichever arrived second presented one the first had
+ * already rotated out, which the backend reads as replay and answers by
+ * revoking the whole family -- signing both tabs out mid-use, with nothing on
+ * screen to explain it. The lock makes the second tab wait and then refresh
+ * with the cookie the first left behind, which is an ordinary rotation.
+ *
+ * Where the Web Locks API is absent (jsdom, older Safari) this runs
+ * unserialised: that is the behaviour we already had, not a new regression.
+ */
+function withRefreshLock(run: () => Promise<string>): Promise<string> {
+  const locks: LockManager | undefined = navigator.locks;
+  if (!locks) {
+    return run();
+  }
+  return locks.request(REFRESH_LOCK, run);
+}
+
+/** One POST, inside whatever serialisation the caller arranged. */
+async function postRefresh(): Promise<string> {
+  const response = await apiClient.post<AccessTokenResponse>("/api/v1/auth/refresh");
+  setAuthState({ accessToken: response.data.access_token, user: response.data.user });
+  return response.data.access_token;
+}
+
 export function refreshAccessToken(): Promise<string | null> {
   refreshPromise ??= (async () => {
     try {
-      const response = await apiClient.post<AccessTokenResponse>("/api/v1/auth/refresh");
-      setAuthState({ accessToken: response.data.access_token, user: response.data.user });
-      return response.data.access_token;
+      return await withRefreshLock(postRefresh);
     } catch {
+      // Either the cookie is gone or the lock could not be taken. Both mean
+      // we have no access token to offer, and the caller reads null as
+      // "signed out" rather than having to handle a rejection.
       clearAuthState();
       return null;
     } finally {

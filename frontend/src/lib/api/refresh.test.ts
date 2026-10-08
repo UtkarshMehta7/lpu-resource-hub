@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearAuthState } from "@/features/auth/tokenStore";
 
@@ -17,6 +17,10 @@ describe("refreshAccessToken", () => {
   beforeEach(() => {
     clearAuthState();
     vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("makes one request when called concurrently", async () => {
@@ -44,5 +48,39 @@ describe("refreshAccessToken", () => {
     vi.spyOn(apiClient, "post").mockRejectedValue(new Error("401"));
 
     expect(await refreshAccessToken()).toBeNull();
+  });
+
+  it("waits for another tab's refresh before sending its own", async () => {
+    // Two tabs share one rotating cookie. Whichever POSTs second with a token
+    // the first already rotated out is read as replay, and the backend revokes
+    // the whole family -- both tabs are signed out mid-use. The Web Lock makes
+    // the second tab wait, so its refresh is an ordinary rotation instead.
+    let release = (): void => {};
+    const heldByAnotherTab = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const request = vi.fn(async (_name: string, run: () => Promise<string>) => {
+      await heldByAnotherTab;
+      return run();
+    });
+    vi.stubGlobal("navigator", { locks: { request } });
+    const post = vi.spyOn(apiClient, "post").mockResolvedValue(TOKEN_RESPONSE);
+
+    const pending = refreshAccessToken();
+    await Promise.resolve();
+    expect(post).not.toHaveBeenCalled();
+
+    release();
+
+    expect(await pending).toBe("new-token");
+    expect(request).toHaveBeenCalledWith("lpu-research-hub:auth-refresh", expect.any(Function));
+  });
+
+  it("still refreshes where the Web Locks API is absent", async () => {
+    vi.stubGlobal("navigator", {});
+    const post = vi.spyOn(apiClient, "post").mockResolvedValue(TOKEN_RESPONSE);
+
+    expect(await refreshAccessToken()).toBe("new-token");
+    expect(post).toHaveBeenCalledTimes(1);
   });
 });

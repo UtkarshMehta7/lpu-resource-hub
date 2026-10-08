@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+    # "labeled" is not in the default set, and without it the e2e opt-in
+    # below cannot be opted into: adding the label fires no event, so the
+    # Playwright job only ever ran after an unrelated push.
+    types: [opened, synchronize, reopened, labeled]
 
 concurrency:
   # A new push to the same branch cancels the run it supersedes.
