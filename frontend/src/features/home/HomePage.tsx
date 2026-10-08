@@ -3,6 +3,8 @@ import { Link, Navigate } from "react-router-dom";
 import { Crest, UNIVERSITY_NAME, UNIVERSITY_SHORT } from "@/components/layout/Brand";
 import { useAuth } from "@/features/auth/authContext";
 
+import { ResearchShowcase } from "./ResearchShowcase";
+
 const AUDIENCES = [
   {
     role: "Students",
@@ -134,15 +136,18 @@ export function HomePage() {
         </div>
       </section>
 
+      <ResearchShowcase />
+
       <section aria-labelledby="problem-heading" className="mx-auto max-w-3xl text-center">
         <h2 id="problem-heading" className="text-2xl font-semibold tracking-tight">
-          Good work is invisible across department boundaries
+          All of that, and it is still invisible across a department boundary
         </h2>
         <p className="mt-4 text-ink-muted">
-          A student who wants to work on sensing has no way to discover the lab two buildings away.
-          Equipment sits idle because nobody outside its department knows it exists. Funding
-          deadlines pass unnoticed. This platform makes each of those searchable, bookable and
-          traceable.
+          Output at this scale is spread over dozens of departments, and almost none of it is
+          discoverable from the next building. A student who wants to work on sensing cannot find
+          the lab two doors down. Equipment sits idle because nobody outside its department knows it
+          exists. Funding deadlines pass unnoticed. This platform makes each of those searchable,
+          bookable and traceable.
         </p>
       </section>
 
