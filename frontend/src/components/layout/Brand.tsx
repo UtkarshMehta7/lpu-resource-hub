@@ -13,6 +13,10 @@ export const UNIVERSITY_SHORT = "LPU";
 export const PRODUCT_NAME = "Research Intelligence & Collaboration Hub";
 export const PRODUCT_SHORT = "LPU Research Hub";
 
+/** Who built it. Shown in the footer of every page, beside the disclaimer. */
+export const AUTHOR_NAME = "Utkarsh Mehta";
+export const AUTHOR_LINKEDIN = "https://www.linkedin.com/in/utkarshmehta0709";
+
 /**
  * The university crest. Served from public/, so no bundler import.
  *

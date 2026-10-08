@@ -43,7 +43,7 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 174 API operations over 140 paths, 48 tables, 33 migrations,
-36 ADRs, 30 backend modules, 1213 backend tests, 312 frontend tests,
+36 ADRs, 30 backend modules, 1213 backend tests, 315 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)

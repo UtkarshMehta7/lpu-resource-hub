@@ -1,6 +1,8 @@
 import { Link, Outlet } from "react-router-dom";
 
 import {
+  AUTHOR_LINKEDIN,
+  AUTHOR_NAME,
   Monogram,
   PRODUCT_NAME,
   UNIVERSITY_NAME,
@@ -23,10 +25,25 @@ export function AppLayout() {
             {UNIVERSITY_SHORT} prototype). Not an official {UNIVERSITY_SHORT} system unless formally
             adopted. All names and records shown are fictional demo data.
           </p>
-          {/* The administration entrance, findable without knowing the URL. */}
-          <Link to="/admin/login" className="text-xs text-ink-muted hover:underline">
-            Administration
-          </Link>
+          <div className="flex items-center gap-4">
+            {/* Authorship, on every page. Muted enough not to compete with the
+                disclaimer beside it, and a real link rather than a name in
+                passing -- somebody who wants to find the author should be one
+                click away, not left searching. */}
+            <a
+              href={AUTHOR_LINKEDIN}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-xs text-ink-muted transition hover:text-brand-700 hover:underline"
+              aria-label={`Developed by ${AUTHOR_NAME} — LinkedIn profile, opens in a new tab`}
+            >
+              Developed by <span className="font-medium text-ink">{AUTHOR_NAME}</span>
+            </a>
+            {/* The administration entrance, findable without knowing the URL. */}
+            <Link to="/admin/login" className="text-xs text-ink-muted hover:underline">
+              Administration
+            </Link>
+          </div>
         </div>
       </footer>
     </div>
