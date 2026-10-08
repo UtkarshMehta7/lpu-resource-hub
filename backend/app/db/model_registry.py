@@ -31,6 +31,11 @@ from app.modules.milestones.models import (  # noqa: F401
 from app.modules.notifications.models import Notification  # noqa: F401
 from app.modules.nudges.models import Nudge  # noqa: F401
 from app.modules.opportunities.models import Opportunity, OpportunitySkill  # noqa: F401
+from app.modules.patents.models import (  # noqa: F401
+    Patent,
+    PatentInventor,
+    ProjectPatent,
+)
 from app.modules.profiles.models import (  # noqa: F401
     ResearcherProfile,
     SavedItem,

@@ -7,14 +7,30 @@ import { CloseIcon } from "@/components/ui/icons";
 
 const FIELD = "w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm";
 
-/** Ordered author list: platform researchers or external names, reorderable. */
+/**
+ * Ordered contributor list: platform researchers or external names,
+ * reorderable.
+ *
+ * `noun` exists because a patent's contributors are INVENTORS, and on a
+ * patent that is a legal word rather than a stylistic one -- naming the wrong
+ * set can invalidate the grant. The widget is otherwise identical, and a
+ * second copy of it would be two lists of the same thing.
+ */
 export function AuthorListEditor({
   rows,
   onChange,
+  noun = "Author",
+  nounPlural,
 }: {
   rows: AuthorRow[];
   onChange: (rows: AuthorRow[]) => void;
+  /** Capitalised singular, e.g. "Inventor". */
+  noun?: string;
+  /** Capitalised plural; defaults to `noun` + "s". */
+  nounPlural?: string;
 }) {
+  const plural = nounPlural ?? `${noun}s`;
+  const lower = noun.toLowerCase();
   const update = (key: string, patch: Partial<AuthorRow>) =>
     onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   const move = (index: number, delta: number) => {
@@ -28,14 +44,14 @@ export function AuthorListEditor({
 
   return (
     <fieldset>
-      <legend className="block text-sm font-medium">Authors (in order)</legend>
+      <legend className="block text-sm font-medium">{plural} (in order)</legend>
       <ol className="mt-2 space-y-2">
         {rows.map((row, index) => (
           <li key={row.key} className="rounded-md border border-line bg-surface p-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="w-5 text-xs text-ink-muted">{index + 1}.</span>
               <select
-                aria-label={`Author ${index + 1} type`}
+                aria-label={`${noun} ${index + 1} type`}
                 value={row.kind}
                 onChange={(event) =>
                   update(row.key, {
@@ -47,12 +63,12 @@ export function AuthorListEditor({
                 className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm"
               >
                 <option value="user">Researcher on the platform</option>
-                <option value="external">External author</option>
+                <option value="external">External {lower}</option>
               </select>
               <div className="min-w-48 flex-1">
                 {row.kind === "external" ? (
                   <input
-                    aria-label={`Author ${index + 1} name`}
+                    aria-label={`${noun} ${index + 1} name`}
                     value={row.name}
                     placeholder="Full name"
                     onChange={(event) => update(row.key, { name: event.target.value })}
@@ -71,14 +87,14 @@ export function AuthorListEditor({
                   </span>
                 ) : (
                   <ResearcherSearch
-                    label={`Author ${index + 1} researcher`}
+                    label={`${noun} ${index + 1} researcher`}
                     onPick={(r) => update(row.key, { userId: r.user_id, name: r.full_name })}
                   />
                 )}
               </div>
               <button
                 type="button"
-                aria-label={`Move author ${index + 1} up`}
+                aria-label={`Move ${lower} ${index + 1} up`}
                 disabled={index === 0}
                 onClick={() => move(index, -1)}
                 className="px-1 text-sm disabled:opacity-30"
@@ -87,7 +103,7 @@ export function AuthorListEditor({
               </button>
               <button
                 type="button"
-                aria-label={`Move author ${index + 1} down`}
+                aria-label={`Move ${lower} ${index + 1} down`}
                 disabled={index === rows.length - 1}
                 onClick={() => move(index, 1)}
                 className="px-1 text-sm disabled:opacity-30"
@@ -96,7 +112,7 @@ export function AuthorListEditor({
               </button>
               <button
                 type="button"
-                aria-label={`Remove author ${index + 1}`}
+                aria-label={`Remove ${lower} ${index + 1}`}
                 onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
                 className="px-1 text-sm text-red-700"
               >
@@ -119,7 +135,7 @@ export function AuthorListEditor({
           onClick={() => onChange([...rows, newAuthorRow("external")])}
           className="rounded-md border border-line bg-surface px-2 py-1 text-xs"
         >
-          + External author
+          + External {lower}
         </button>
       </div>
     </fieldset>

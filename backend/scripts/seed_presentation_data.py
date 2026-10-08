@@ -66,6 +66,7 @@ from app.modules.opportunities.models import (
     OpportunityStatus,
     OpportunityType,
 )
+from app.modules.patents.models import Patent, PatentInventor, PatentStatus
 from app.modules.profiles.models import (
     ResearcherAvailability,
     ResearcherProfile,
@@ -405,6 +406,7 @@ class Summary:
     custodians: int = 0
     deans: int = 0
     duplicate_pairs: int = 0
+    patents: int = 0
     notes: list[str] = field(default_factory=list)
 
 
@@ -1258,6 +1260,113 @@ def _seed_duplicate_publications(db: Session, summary: Summary) -> None:
     db.flush()
 
 
+# --- patents ----------------------------------------------------------------
+
+#: (title, jurisdiction, status, abstract).
+#:
+#: Four shapes on purpose, so the board is not four rows of the same word:
+#: one granted, one published and waiting, one freshly filed, one refused.
+#: The milestones seed had to learn the same lesson -- every record in one
+#: state demonstrates that state and nothing else.
+PATENT_PLAN: list[tuple[str, str, PatentStatus, str]] = [
+    (
+        "A tracked borewell robot with a self-centring gripper",
+        "IN",
+        PatentStatus.GRANTED,
+        "A compact tracked robot that descends a borewell and retrieves a trapped child, "
+        "using a gripper that centres itself against an irregular shaft wall.",
+    ),
+    (
+        "Low-energy seawater desalination using waste food heat",
+        "IN",
+        PatentStatus.PUBLISHED,
+        "A desalination stage driven by heat recovered from canteen food waste, "
+        "cutting the external energy a small plant needs.",
+    ),
+    (
+        "A bottleneck cap assembly that reseals under pressure",
+        "IN",
+        PatentStatus.FILED,
+        "A cap for a carbonated-drink bottle that re-forms its seal as internal "
+        "pressure rises, rather than relying on thread tension alone.",
+    ),
+    (
+        "A biofilter for arsenic removal from tube-well water",
+        "IN",
+        PatentStatus.REJECTED,
+        "A packed-bed biofilter using locally cultured bacteria to strip arsenic "
+        "from tube-well supplies in the Punjab plain.",
+    ),
+]
+
+
+def _seed_patents(db: Session, summary: Summary) -> None:
+    """Patents for the register, the review queue and the prior-art check.
+
+    Idempotent on the title. One is left PENDING so the coordinator's queue is
+    not empty on a fresh install -- the custodian role shipped fully enforced
+    and with nothing to look after, and that is the failure this avoids.
+    """
+    faculty = (
+        db.execute(
+            select(User)
+            .where(User.role == UserRole.FACULTY, User.is_active.is_(True))
+            .order_by(User.registration_number)
+        )
+        .scalars()
+        .first()
+    )
+    student = (
+        db.execute(
+            select(User)
+            .where(User.role == UserRole.STUDENT, User.is_active.is_(True))
+            .order_by(User.registration_number)
+        )
+        .scalars()
+        .first()
+    )
+    if faculty is None:
+        summary.notes.append("No faculty found; patents skipped.")
+        return
+
+    for index, (title, jurisdiction, status, abstract) in enumerate(PATENT_PLAN):
+        if db.execute(select(Patent).where(Patent.title == title)).scalar_one_or_none():
+            continue
+        filed = TODAY - timedelta(days=540 - index * 90)
+        published = filed + timedelta(days=180)
+        granted = published + timedelta(days=200)
+        patent = Patent(
+            title=title,
+            abstract=abstract,
+            jurisdiction=jurisdiction,
+            application_number=f"20264100{index + 1:04d}",
+            filing_date=filed,
+            status=status,
+            assignee="Lovely Professional University",
+            created_by=faculty.id,
+            # One pending, so the queue demonstrates itself; the rest decided.
+            verification_status=(
+                VerificationStatus.PENDING if index == 2 else VerificationStatus.VERIFIED
+            ),
+        )
+        if status in (PatentStatus.PUBLISHED, PatentStatus.GRANTED):
+            patent.publication_date = published
+            patent.publication_number = f"IN20264100{index + 1:04d}A"
+        if status is PatentStatus.GRANTED:
+            patent.grant_date = granted
+            patent.grant_number = f"IN{445000 + index}"
+        db.add(patent)
+        db.flush()
+
+        # A student inventor on every one: that is the point of opening the
+        # form to them, and the register should show it.
+        inventors = [faculty] + ([student] if student is not None else [])
+        for order, person in enumerate(inventors, start=1):
+            db.add(PatentInventor(patent_id=patent.id, user_id=person.id, inventor_order=order))
+        summary.patents += 1
+    db.flush()
+
+
 def seed(db: Session) -> Summary:
     summary = Summary()
     admin = (
@@ -1274,6 +1383,7 @@ def seed(db: Session) -> Summary:
     _seed_custodians_and_dean(db, summary)
     _seed_milestones(db, summary)
     _seed_duplicate_publications(db, summary)
+    _seed_patents(db, summary)
     _seed_applications(db, summary)
     _seed_saved_items(db, summary)
     _seed_moderation(db, summary)
@@ -1328,6 +1438,7 @@ def main() -> int:
     print(f"  custodians:     {summary.custodians}")
     print(f"  deans:          {summary.deans}")
     print(f"  duplicate pairs:{summary.duplicate_pairs}")
+    print(f"  patents:       {summary.patents}")
     for note in summary.notes:
         print(f"  note: {note}")
     print("\nPasswords follow first-name + 123456 (Aryan Verma -> Aryan123456).")

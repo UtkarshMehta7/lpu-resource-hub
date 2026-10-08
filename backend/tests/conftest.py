@@ -112,6 +112,7 @@ TABLES_TO_CLEAN = (
     "bookings, equipment, facilities, saved_items, content_reports, collaboration_requests, "
     "application_events, applications, opportunity_skills, opportunities, "
     "project_publications, publication_authors, publications, "
+    "project_patents, patent_inventors, patents, "
     "project_members, project_skills, project_research_areas, projects, "
     "refresh_tokens, audit_logs, tag_suggestions, tag_aliases, user_skills, "
     "user_research_areas, student_profiles, researcher_profiles, research_areas, "
