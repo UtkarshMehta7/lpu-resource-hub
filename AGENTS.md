@@ -426,6 +426,10 @@ Current shape: 165 API operations over 134 paths, 45 tables, 30 migrations,
   because the other five jobs stayed green. Anchor the URL assertion
   (`/\/admin$/`): an unanchored `/\/admin/` also matches /admin/login, so
   a failed sign-in passes and the test dies later, somewhere confusing.
+- **The `e2e` label needs `types: [... labeled]` on the workflow.** The
+  default `pull_request` types are opened/synchronize/reopened, so adding the
+  label fired nothing and the Playwright job only ran after an unrelated push
+  -- an opt-in nobody could opt into.
 - **Check `gh run list` after pushing.** Backend and frontend passing is
   not the suite passing.
 
