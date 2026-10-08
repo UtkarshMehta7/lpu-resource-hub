@@ -58,10 +58,12 @@ def auth(user: SeededUser) -> dict[str, str]:
 
 
 def a_patent(**overrides: object) -> dict[str, object]:
+    """A patent already filed somewhere -- the "record it" entry point."""
     body: dict[str, object] = {
         "title": "A borewell rescue robot with a self-centring gripper",
         "abstract": "A tracked robot that descends a borewell and retrieves a child.",
         "jurisdiction": "IN",
+        "already_filed": True,
         "filing_date": FILED,
         "application_number": f"2026{uuid.uuid4().hex[:8]}",
         "assignee": "Lovely Professional University",
@@ -69,6 +71,27 @@ def a_patent(**overrides: object) -> dict[str, object]:
     }
     body.update(overrides)
     return body
+
+
+def a_disclosure(**overrides: object) -> dict[str, object]:
+    """An invention put to the university -- the "file it for me" entry point."""
+    body: dict[str, object] = {
+        "title": "A borewell rescue robot with a self-centring gripper",
+        "jurisdiction": "IN",
+        "problem_statement": "Children fall into uncovered borewells and cannot be reached.",
+        "novelty": "The gripper centres itself against an irregular shaft wall.",
+        "known_prior_art": "Rigid-arm retrieval rigs, which jam in a non-circular shaft.",
+        "funding_source": "DST SERB core research grant",
+        "inventors": [{"external_name": "A. Inventor"}],
+    }
+    body.update(overrides)
+    return body
+
+
+def disclose(client: TestClient, user: SeededUser, **overrides: object) -> dict[str, object]:
+    response = client.post("/api/v1/patents", json=a_disclosure(**overrides), headers=auth(user))
+    assert response.status_code == 201, response.text
+    return response.json()
 
 
 def create(client: TestClient, user: SeededUser, **overrides: object) -> dict[str, object]:
@@ -122,7 +145,7 @@ def test_everyone_signed_in_can_read_patents(
 # --- the record itself -------------------------------------------------------
 
 
-def test_a_new_record_starts_filed_whatever_the_office_has_done(
+def test_a_recorded_patent_starts_filed_whatever_the_office_has_done(
     client: TestClient, seed_user: Callable[..., SeededUser]
 ) -> None:
     # A granted patent is recorded by filing it and moving it along, so the
@@ -131,6 +154,158 @@ def test_a_new_record_starts_filed_whatever_the_office_has_done(
     assert patent["status"] == "filed"
     assert patent["grant_date"] is None
     assert sorted(patent["next_statuses"]) == ["published", "rejected", "withdrawn"]
+    # Nothing was put to the university, so there is no docket to quote.
+    assert patent["reference"] is None
+
+
+def test_an_invention_put_to_the_university_starts_disclosed_with_a_docket(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    disclosure = disclose(client, seed_user(UserRole.STUDENT))
+    assert disclosure["status"] == "disclosed"
+    assert disclosure["filing_date"] is None
+    assert disclosure["reference"].startswith("LPU/IDF/")
+    # The inventor may withdraw it and nothing else; assessing is the IP cell's.
+    assert disclosure["next_statuses"] == ["withdrawn"]
+
+
+def test_dockets_are_allocated_in_sequence_and_never_reused(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    # An inventor quotes this down a phone; a reference that has ever been
+    # quoted must never point at a different invention.
+    student = seed_user(UserRole.STUDENT)
+    first = disclose(client, student)["reference"]
+    second = disclose(client, student, title="A different invention entirely")["reference"]
+    assert int(second.rsplit("/", 1)[1]) == int(first.rsplit("/", 1)[1]) + 1
+
+
+def test_a_disclosure_may_not_carry_a_filing_date(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    # Nothing inside the university has one: the office sets it.
+    response = client.post(
+        "/api/v1/patents",
+        json=a_disclosure(filing_date=FILED),
+        headers=auth(seed_user(UserRole.STUDENT)),
+    )
+    assert response.status_code == 422
+
+
+def test_recording_an_already_filed_patent_needs_its_filing_date(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    body = a_patent()
+    del body["filing_date"]
+    response = client.post("/api/v1/patents", json=body, headers=auth(seed_user(UserRole.FACULTY)))
+    assert response.status_code == 422
+
+
+def test_the_ip_cell_walks_a_disclosure_through_to_filing(
+    client: TestClient, seed_user: Callable[..., SeededUser], department: uuid.UUID
+) -> None:
+    student = seed_user(UserRole.STUDENT, department_id=department)
+    cell = seed_user(UserRole.RESEARCH_COORDINATOR, department_id=department)
+    disclosure = disclose(client, student)
+    url = f"/api/v1/patents/{disclosure['id']}/status"
+
+    assessing = client.post(url, json={"status": "under_assessment"}, headers=auth(cell))
+    assert assessing.status_code == 200
+
+    approved = client.post(
+        url,
+        json={"status": "approved_to_file", "note": "Patentable; worth the fee."},
+        headers=auth(cell),
+    )
+    assert approved.status_code == 200
+    assert approved.json()["assessment_note"] == "Patentable; worth the fee."
+    assert approved.json()["assessed_by_name"] == f"Seeded {cell.role.value}"
+
+    filed = client.post(
+        url,
+        json={"status": "filed", "on": "2026-03-01", "number": "202641000999"},
+        headers=auth(student),
+    )
+    assert filed.status_code == 200
+    assert filed.json()["filing_date"] == "2026-03-01"
+    assert filed.json()["application_number"] == "202641000999"
+
+
+def test_an_inventor_cannot_assess_their_own_disclosure(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    # The move exists; it is simply not theirs. 403, not 409.
+    student = seed_user(UserRole.STUDENT)
+    disclosure = disclose(client, student)
+    response = client.post(
+        f"/api/v1/patents/{disclosure['id']}/status",
+        json={"status": "under_assessment"},
+        headers=auth(student),
+    )
+    assert response.status_code == 403
+
+
+def test_declining_without_a_reason_is_refused(
+    client: TestClient, seed_user: Callable[..., SeededUser], department: uuid.UUID
+) -> None:
+    # "No" with no reason is what stops the next person disclosing.
+    student = seed_user(UserRole.STUDENT, department_id=department)
+    cell = seed_user(UserRole.RESEARCH_COORDINATOR, department_id=department)
+    disclosure = disclose(client, student)
+    url = f"/api/v1/patents/{disclosure['id']}/status"
+    client.post(url, json={"status": "under_assessment"}, headers=auth(cell))
+
+    bare = client.post(url, json={"status": "declined"}, headers=auth(cell))
+    assert bare.status_code == 422
+
+    reasoned = client.post(
+        url,
+        json={"status": "declined", "note": "Disclosed at a conference last year."},
+        headers=auth(cell),
+    )
+    assert reasoned.status_code == 200
+    assert reasoned.json()["assessment_note"] == "Disclosed at a conference last year."
+
+
+def test_an_assessment_can_be_sent_back_for_more_detail(
+    client: TestClient, seed_user: Callable[..., SeededUser], department: uuid.UUID
+) -> None:
+    student = seed_user(UserRole.STUDENT, department_id=department)
+    cell = seed_user(UserRole.RESEARCH_COORDINATOR, department_id=department)
+    disclosure = disclose(client, student)
+    url = f"/api/v1/patents/{disclosure['id']}/status"
+    client.post(url, json={"status": "under_assessment"}, headers=auth(cell))
+    back = client.post(
+        url,
+        json={"status": "disclosed", "note": "Please say what the gripper does differently."},
+        headers=auth(cell),
+    )
+    assert back.status_code == 200
+    assert back.json()["status"] == "disclosed"
+
+
+def test_a_public_disclosure_date_is_carried_through_to_the_assessor(
+    client: TestClient, seed_user: Callable[..., SeededUser]
+) -> None:
+    # The field that most often decides whether a patent is possible at all.
+    disclosure = disclose(
+        client,
+        seed_user(UserRole.STUDENT),
+        public_disclosure_date="2025-11-02",
+        public_disclosure_note="Presented as a poster at a departmental symposium.",
+    )
+    assert disclosure["public_disclosure_date"] == "2025-11-02"
+    assert "poster" in disclosure["public_disclosure_note"]
+
+
+def test_a_disclosure_appears_in_the_ip_cells_queue(
+    client: TestClient, seed_user: Callable[..., SeededUser], department: uuid.UUID
+) -> None:
+    student = seed_user(UserRole.STUDENT, department_id=department)
+    cell = seed_user(UserRole.RESEARCH_COORDINATOR, department_id=department)
+    disclosure = disclose(client, student)
+    queue = client.get("/api/v1/patent-review-queue", headers=auth(cell))
+    assert disclosure["id"] in [row["id"] for row in queue.json()]
 
 
 def test_an_administrators_record_needs_no_verification(

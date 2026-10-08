@@ -30,7 +30,7 @@ from app.core.rate_limit import client_ip, enforce_search_rate_limit
 from app.db.session import get_db
 from app.modules.patents import priorart, service
 from app.modules.patents.models import PatentStatus
-from app.modules.patents.policies import InvalidTransitionError
+from app.modules.patents.policies import InvalidTransitionError, NotAllowedActorError
 from app.modules.patents.schemas import (
     PatentCreate,
     PatentDecision,
@@ -73,6 +73,14 @@ _ERROR_MAP: dict[type[Exception], tuple[int, str]] = {
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         "Say the date the office issued it: that status cannot exist without one.",
     ),
+    service.MissingDecisionNoteError: (
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "Say why. Declining without a reason is what stops the next person disclosing.",
+    ),
+    NotAllowedActorError: (
+        status.HTTP_403_FORBIDDEN,
+        "That step is not yours to take on this record.",
+    ),
     service.OutOfScopeError: (
         status.HTTP_403_FORBIDDEN,
         "You can only decide records from your own department.",
@@ -83,7 +91,7 @@ _ERROR_MAP: dict[type[Exception], tuple[int, str]] = {
     ),
     InvalidTransitionError: (
         status.HTTP_409_CONFLICT,
-        "That is not a move the patent process allows from its current state.",
+        "That is not a move the process allows from its current state.",
     ),
 }
 
@@ -160,6 +168,7 @@ def search_prior_art(
 
 @router.get("/patent-review-queue", response_model=list[PatentRead])
 def read_review_queue(db: DbSession, reviewer: Reviewer) -> list[PatentRead]:
+    """Records waiting on this reviewer: disclosures to assess, records to check."""
     return service.review_queue(db, reviewer)
 
 
