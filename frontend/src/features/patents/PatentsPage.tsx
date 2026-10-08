@@ -58,8 +58,8 @@ export function PatentsPage({ mine = false }: { mine?: boolean }) {
         title={mine ? "My patents" : "Patents"}
         description={
           mine
-            ? "Patents you invented or recorded, at every stage from filing to grant."
-            : "Inventions filed from this university, with where each one has got to at the patent office."
+            ? "Inventions you disclosed, invented or recorded, at every stage from disclosure to grant."
+            : "Inventions from this university, from the ones put to the IP cell this week to the ones granted years ago."
         }
         actions={
           <>
@@ -68,7 +68,7 @@ export function PatentsPage({ mine = false }: { mine?: boolean }) {
                 My patents
               </ButtonLink>
             ) : null}
-            {canRecord ? <ButtonLink to="/patents/new">Record a patent</ButtonLink> : null}
+            {canRecord ? <ButtonLink to="/patents/new">File a patent</ButtonLink> : null}
           </>
         }
       />
@@ -114,7 +114,7 @@ export function PatentsPage({ mine = false }: { mine?: boolean }) {
           title="No patents yet"
           description={
             canRecord
-              ? "Record the first one. A coordinator checks it before it counts."
+              ? "Put the first invention to the university, or record one already filed. Either way a coordinator checks it."
               : "Nothing has been recorded that matches."
           }
         />
@@ -143,7 +143,9 @@ export function PatentsPage({ mine = false }: { mine?: boolean }) {
               {patent.inventors.map((inventor) => inventor.name).join(", ")}
             </p>
             <p className="mt-1 text-xs text-ink-muted">
-              {officeLabel(patent.jurisdiction)} · filed {patent.filing_date}
+              {officeLabel(patent.jurisdiction)}
+              {patent.reference ? ` · ${patent.reference}` : ""}
+              {patent.filing_date ? ` · filed ${patent.filing_date}` : " · not filed yet"}
               {patent.grant_number ? ` · granted as ${patent.grant_number}` : ""}
             </p>
           </li>

@@ -8,7 +8,14 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { Uid } from "@/components/ui/Uid";
 
 import { fetchReviewQueue } from "./api";
-import { officeLabel, STATUS_LABEL, STATUS_TONE } from "./labels";
+import {
+  BEFORE_THE_OFFICE,
+  officeLabel,
+  STATUS_LABEL,
+  STATUS_TONE,
+  VERIFICATION_LABEL,
+  VERIFICATION_TONE,
+} from "./labels";
 
 /**
  * Patent records waiting on this reviewer.
@@ -26,8 +33,8 @@ export function PatentReviewQueuePage() {
   return (
     <div>
       <PageHeader
-        title="Patents to check"
-        description="Records entered by people in your department. You are checking the numbers, dates and inventors — not whether the invention deserves a patent."
+        title="Patents and disclosures"
+        description="Two kinds of waiting, in one place: inventions put to the university for assessment, and records whose numbers nobody has checked yet. Both are from your department."
       />
 
       {isPending ? <SkeletonList rows={3} /> : null}
@@ -36,7 +43,7 @@ export function PatentReviewQueuePage() {
       {data && data.length === 0 ? (
         <EmptyState
           title="Nothing waiting"
-          description="Every patent recorded in your department has been checked."
+          description="Every disclosure has been assessed and every record checked."
         />
       ) : null}
 
@@ -50,18 +57,38 @@ export function PatentReviewQueuePage() {
               >
                 {patent.title}
               </Link>
-              <StatusPill tone={STATUS_TONE[patent.status]}>
-                {STATUS_LABEL[patent.status]}
-              </StatusPill>
+              <div className="flex shrink-0 gap-2">
+                <StatusPill tone={STATUS_TONE[patent.status]}>
+                  {STATUS_LABEL[patent.status]}
+                </StatusPill>
+                {patent.verification_status === "pending" ? (
+                  <StatusPill tone={VERIFICATION_TONE.pending}>
+                    {VERIFICATION_LABEL.pending}
+                  </StatusPill>
+                ) : null}
+              </div>
             </div>
+            <p className="mt-1 text-sm font-medium text-brand-700">
+              {BEFORE_THE_OFFICE.has(patent.status)
+                ? "Decide whether the university files this"
+                : "Check the numbers, dates and inventors"}
+            </p>
+            {patent.public_disclosure_date ? (
+              <p className="mt-1 text-sm text-amber-800">
+                Already public on {patent.public_disclosure_date} — may affect novelty.
+              </p>
+            ) : null}
             <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
-              Recorded by {patent.creator_name}
+              {BEFORE_THE_OFFICE.has(patent.status) ? "Disclosed" : "Recorded"} by{" "}
+              {patent.creator_name}
               {patent.inventors[0]?.registration_number ? (
                 <Uid value={patent.inventors[0].registration_number} />
               ) : null}
             </p>
             <p className="mt-1 text-xs text-ink-muted">
-              {officeLabel(patent.jurisdiction)} · filed {patent.filing_date}
+              {officeLabel(patent.jurisdiction)}
+              {patent.reference ? ` · ${patent.reference}` : ""}
+              {patent.filing_date ? ` · filed ${patent.filing_date}` : ""}
               {patent.application_number ? ` · application ${patent.application_number}` : ""}
             </p>
           </li>

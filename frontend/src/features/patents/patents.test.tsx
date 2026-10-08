@@ -4,7 +4,16 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { STATUS_LABEL, officeLabel, VERIFICATION_LABEL } from "./labels";
+import {
+  BEFORE_THE_OFFICE,
+  DATE_LABEL,
+  DISCLOSURE_WARNING,
+  NOTE_REQUIRED,
+  NUMBER_LABEL,
+  officeLabel,
+  STATUS_LABEL,
+  VERIFICATION_LABEL,
+} from "./labels";
 import { PriorArtPanel } from "./PriorArtPanel";
 import type { PriorArtResult } from "./types";
 
@@ -168,5 +177,57 @@ describe("labels", () => {
     expect(STATUS_LABEL.granted).toBe("Granted");
     expect(VERIFICATION_LABEL.verified).toBe("Verified");
     expect(VERIFICATION_LABEL.pending).toBe("Awaiting review");
+  });
+});
+
+describe("the disclosure pipeline", () => {
+  it("labels every stage of the pipeline, university half and office half", () => {
+    // The two halves are one pipeline on one record, so the labels have to
+    // read as one sequence rather than as two vocabularies.
+    expect(STATUS_LABEL.disclosed).toBe("Disclosed");
+    expect(STATUS_LABEL.under_assessment).toBe("Under assessment");
+    expect(STATUS_LABEL.approved_to_file).toBe("Approved to file");
+    expect(STATUS_LABEL.declined).toBe("Not taken forward");
+    expect(STATUS_LABEL.filed).toBe("Filed");
+  });
+
+  it("knows which stages are still inside the university", () => {
+    // A record that has not been filed has no numbers to show, and the detail
+    // page asks this before rendering the office's paperwork.
+    for (const stage of [
+      "disclosed",
+      "under_assessment",
+      "approved_to_file",
+      "declined",
+    ] as const) {
+      expect(BEFORE_THE_OFFICE.has(stage)).toBe(true);
+    }
+    for (const stage of ["filed", "published", "granted", "lapsed"] as const) {
+      expect(BEFORE_THE_OFFICE.has(stage)).toBe(false);
+    }
+  });
+
+  it("requires a reason to decline, and only to decline", () => {
+    // "No" without a reason is what stops the next person disclosing at all.
+    expect(NOTE_REQUIRED.has("declined")).toBe(true);
+    expect(NOTE_REQUIRED.has("approved_to_file")).toBe(false);
+    expect(NOTE_REQUIRED.has("granted")).toBe(false);
+  });
+
+  it("names the date and number the office issues at each office stage", () => {
+    expect(DATE_LABEL.filed).toBe("Filing date");
+    expect(NUMBER_LABEL.granted).toBe("Grant number");
+    // Nothing inside the university has either.
+    expect(DATE_LABEL.disclosed).toBeUndefined();
+    expect(NUMBER_LABEL.under_assessment).toBeUndefined();
+  });
+
+  it("warns about a public disclosure without pretending to give legal advice", () => {
+    // Filing after a paper or poster is the commonest way a university loses
+    // patent rights. The interface's job is to surface it while it can still
+    // be acted on, and to send the question to the people who can answer it.
+    expect(DISCLOSURE_WARNING).toMatch(/novelty/i);
+    expect(DISCLOSURE_WARNING).toMatch(/differ sharply between patent offices/i);
+    expect(DISCLOSURE_WARNING).toMatch(/IP cell/i);
   });
 });

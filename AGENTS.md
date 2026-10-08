@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 174 API operations over 140 paths, 48 tables, 32 migrations,
-35 ADRs, 30 backend modules, 1203 backend tests, 307 frontend tests,
+Current shape: 174 API operations over 140 paths, 48 tables, 33 migrations,
+36 ADRs, 30 backend modules, 1213 backend tests, 312 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -105,6 +105,34 @@ Current shape: 174 API operations over 140 paths, 48 tables, 32 migrations,
   rejected/withdrawn/lapsed), numbers that mean nothing outside their
   jurisdiction, and an assignee. **Inventors, not authors** -- a legal word on
   a patent, so the shared list widget takes a `noun` rather than being copied.
+- **An invention is filed WITH the university, not only recorded after**
+  (ADR 0036, amending 0035). Four stages sit in front of FILED --
+  `disclosed -> under_assessment -> approved_to_file | declined` -- and
+  `filing_date` is NULL for all of them, because the office issues it. ONE
+  record, one pipeline: a separate disclosures table splits one invention
+  across two rows and then has to answer which row owns the inventor list.
+  `already_filed` on create chooses between exactly two entry points and is not
+  a status field by the back door.
+- **Two actors on the patent pipeline, and the order of the checks matters.**
+  The university's half is the IP cell's, the office's half is the inventor's
+  to record. A move that does NOT EXIST is 409 whoever asks; a move that exists
+  but is somebody else's is 403. Checked in that order, or an inventor is told
+  that `granted -> disclosed` is merely above their pay grade.
+  `next_statuses` is computed per reader, so the interface cannot offer a step
+  the service would refuse.
+- **`public_disclosure_date` is the field that earns the feature.** A paper,
+  poster, thesis or demo before filing is the commonest way a university loses
+  patent rights outright. Captured at disclosure and flagged on the record and
+  in the queue -- with wording that sends the question to the IP cell, because
+  grace periods differ sharply between offices and this platform is not
+  qualified to say which applies. Declining REQUIRES a reason, in the service
+  and as a CHECK: "no" without one is what stops the next person disclosing.
+- **A CHECK cannot reference an enum value added in the same transaction.**
+  Postgres refuses the literal ("new enum values must be committed before they
+  can be used"), so migration 0033's constraints compare `status::text`. That
+  is what keeps the pipeline in one migration instead of two. `op.drop_constraint`
+  takes the BARE name -- the naming convention adds the `ck_patents_` prefix,
+  and passing the full name yields `ck_patents_ck_patents_...`.
 - **Two workflows run on a patent and they are kept apart.** `status` is what
   the patent OFFICE did; `verification_status` is whether this institution has
   checked the RECORD. A granted patent can still be entered with the wrong

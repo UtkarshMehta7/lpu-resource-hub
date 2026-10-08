@@ -5,7 +5,24 @@
  * the schemas they mirror -- see backend/app/modules/patents/schemas.py.
  */
 
-export type PatentStatus = "filed" | "published" | "granted" | "lapsed" | "rejected" | "withdrawn";
+/**
+ * Where the invention has got to, from disclosure through to grant.
+ *
+ * The first four are the UNIVERSITY's: an inventor discloses, the IP cell
+ * assesses, and the university decides whether to file. The rest are the
+ * patent office's. One pipeline, because it is one invention.
+ */
+export type PatentStatus =
+  | "disclosed"
+  | "under_assessment"
+  | "approved_to_file"
+  | "declined"
+  | "filed"
+  | "published"
+  | "granted"
+  | "lapsed"
+  | "rejected"
+  | "withdrawn";
 
 /** Reused from the researcher profiles: the same four words mean the same thing. */
 export type VerificationStatus = "unverified" | "pending" | "verified" | "rejected";
@@ -26,17 +43,34 @@ export interface Patent {
   id: string;
   title: string;
   abstract: string | null;
+  /** The IP cell's docket, e.g. "LPU/IDF/2026/0007" — what an inventor
+   *  quotes when chasing it. Null on a patent recorded as already filed. */
+  reference: string | null;
   /** A two-letter patent-office code (WIPO ST.3), never a country name. */
   jurisdiction: string;
   application_number: string | null;
   publication_number: string | null;
   grant_number: string | null;
-  filing_date: string;
+  /** Null for everything still inside the university: the office sets it. */
+  filing_date: string | null;
   publication_date: string | null;
   grant_date: string | null;
   status: PatentStatus;
   assignee: string | null;
   url: string | null;
+  // --- the disclosure, as the IP cell assesses it
+  problem_statement: string | null;
+  novelty: string | null;
+  known_prior_art: string | null;
+  /** The field that most often decides whether a patent is possible at all. */
+  public_disclosure_date: string | null;
+  public_disclosure_note: string | null;
+  funding_source: string | null;
+  commercial_potential: string | null;
+  assessment_note: string | null;
+  assessed_by: string | null;
+  assessed_by_name: string | null;
+  assessed_at: string | null;
   created_by: string;
   creator_name: string;
   verification_status: VerificationStatus;
@@ -62,9 +96,24 @@ export interface PatentInput {
   abstract?: string | null;
   jurisdiction: string;
   application_number?: string | null;
-  filing_date: string;
+  /**
+   * Which way in. False puts the invention to the university and it starts at
+   * `disclosed` with no filing date; true records a patent filed elsewhere,
+   * which needs one. Not a status field by the back door — it chooses between
+   * exactly two entry points, and every move after that goes through the
+   * transition table.
+   */
+  already_filed?: boolean;
+  filing_date?: string | null;
   assignee?: string | null;
   url?: string | null;
+  problem_statement?: string | null;
+  novelty?: string | null;
+  known_prior_art?: string | null;
+  public_disclosure_date?: string | null;
+  public_disclosure_note?: string | null;
+  funding_source?: string | null;
+  commercial_potential?: string | null;
   inventors: InventorInput[];
   project_ids?: string[];
 }
@@ -73,6 +122,8 @@ export interface PatentTransition {
   status: PatentStatus;
   on?: string | null;
   number?: string | null;
+  /** The IP cell's reasoning. Required to decline. */
+  note?: string | null;
 }
 
 // --- prior art -------------------------------------------------------------
@@ -82,7 +133,7 @@ export interface SimilarPatent {
   title: string;
   jurisdiction: string;
   status: PatentStatus;
-  filing_date: string;
+  filing_date: string | null;
   grant_number: string | null;
   score: number;
 }
