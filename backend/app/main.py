@@ -53,6 +53,7 @@ from app.modules.notifications.handlers import register_notification_handlers
 from app.modules.notifications.router import router as notifications_router
 from app.modules.nudges.router import router as nudges_router
 from app.modules.opportunities.router import router as opportunities_router
+from app.modules.patents.router import router as patents_router
 from app.modules.profiles.router import router as profiles_router
 from app.modules.projects.router import router as projects_router
 from app.modules.publications.router import router as publications_router
@@ -181,6 +182,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(profiles_router, prefix=API_V1_PREFIX)
     app.include_router(researchers_router, prefix=API_V1_PREFIX)
     app.include_router(projects_router, prefix=API_V1_PREFIX)
+    app.include_router(patents_router, prefix=API_V1_PREFIX)
     app.include_router(publications_router, prefix=API_V1_PREFIX)
     app.include_router(opportunities_router, prefix=API_V1_PREFIX)
     app.include_router(applications_router, prefix=API_V1_PREFIX)

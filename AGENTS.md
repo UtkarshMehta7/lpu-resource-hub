@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 165 API operations over 134 paths, 45 tables, 30 migrations,
-34 ADRs, 28 backend modules, 1155 backend tests, 299 frontend tests,
+Current shape: 174 API operations over 140 paths, 48 tables, 32 migrations,
+35 ADRs, 30 backend modules, 1203 backend tests, 307 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -97,6 +97,47 @@ Current shape: 165 API operations over 134 paths, 45 tables, 30 migrations,
   first (`GET /users/{id}/deletion-impact`) and shown before it is confirmed.
   Deactivate for someone who has left; delete for an account that should
   never have existed (it frees the registration number).
+- **A PATENT is not a publication** (ADR 0035), and it is its own table for a
+  reason that is not taste: analytics counts `publications` with no type
+  filter in nineteen modules, so an eighth `PublicationType` would have folded
+  patents into every publication figure on the platform. It also has a
+  lifecycle the office drives (filed -> published -> granted, or
+  rejected/withdrawn/lapsed), numbers that mean nothing outside their
+  jurisdiction, and an assignee. **Inventors, not authors** -- a legal word on
+  a patent, so the shared list widget takes a `noun` rather than being copied.
+- **Two workflows run on a patent and they are kept apart.** `status` is what
+  the patent OFFICE did; `verification_status` is whether this institution has
+  checked the RECORD. A granted patent can still be entered with the wrong
+  numbers. Collapsing them would say a coordinator's approval and a grant were
+  the same event. A status claiming an event carries that event's date, as a
+  CHECK and as a sentence -- the milestones' "done is never undated" again.
+- **Students may record patents, and that is the point** (`PATENT_CREATE` is
+  the first thing a student may create). Student inventors are ordinary here.
+  The safeguard is the approval queue, not withholding the form. A dean and a
+  custodian may NOT -- ADR 0028 makes both deliberately read-only -- but either
+  can still be NAMED as an inventor, so nobody loses the credit.
+- **Prior art says what it did NOT search.** No open worldwide patent register
+  can be read without a key: EPO OPS 403, USPTO 401, PatentsView retired its
+  keyless endpoint, PATENTSCOPE 403, PQAI 401. All tested, not assumed -- the
+  ADR 0025 wall again. So the check does three honest things: looks for the
+  same invention already recorded here, searches the open literature (a paper
+  is prior art, and OpenAlex and Crossref are keyless), and hands the query to
+  the registers that can answer it. The panel states it has not searched the
+  world, and a test asserts that sentence exists. An unreachable source is
+  REPORTED -- a short list read as a clean result is the worst thing this
+  feature can produce.
+- **The two prior-art lookups run concurrently, with their own budget.**
+  Crossref's `query.bibliographic` regularly exceeds ten seconds, which is the
+  whole budget the frontend's HTTP client gives the request, so sequential
+  calls could never both fit and the slow one always lost. Six seconds each in
+  parallel; that one request also gets a longer client timeout, because it is
+  a deliberate act with a spinner on it.
+- **Reusing an enum means `create_type=False` in the migration.** `patents`
+  reuses the profiles' `verification_status` rather than minting a second one
+  saying the same four words. Autogenerate does not know that and emitted a
+  CREATE TYPE, which fails against any database that already has profiles.
+  The downgrade must drop the type the migration DID create, or a downgrade
+  then upgrade fails the same way.
 - **Chat must never break collaboration.** Opening a thread on acceptance
   runs in a savepoint and swallows SQLAlchemyError: the acceptance is the
   older, more important act. Shipping the code before its migration made

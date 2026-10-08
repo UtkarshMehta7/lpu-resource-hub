@@ -33,6 +33,12 @@ export const NAV: NavItem[] = [
   { to: "/researchers", label: "Researchers", group: "Discover", keywords: "faculty directory" },
   { to: "/projects", label: "Projects", group: "Discover", keywords: "research work" },
   { to: "/publications", label: "Publications", group: "Discover", keywords: "papers doi" },
+  {
+    to: "/patents",
+    label: "Patents",
+    group: "Discover",
+    keywords: "ipr invention filing granted espacenet prior art intellectual property",
+  },
   { to: "/opportunities", label: "Opportunities", group: "Discover", keywords: "openings apply" },
   { to: "/facilities", label: "Facilities", group: "Discover", keywords: "labs equipment rooms" },
   { to: "/funding", label: "Funding", group: "Discover", keywords: "grants calls money" },
@@ -140,6 +146,13 @@ export const NAV: NavItem[] = [
     group: "Review",
     roles: ["research_coordinator", "admin"],
     keywords: "moderation flagged",
+  },
+  {
+    to: "/coordinator/patents",
+    label: "Patents to check",
+    group: "Review",
+    roles: ["research_coordinator", "admin"],
+    keywords: "ipr verify approve invention filing",
   },
   {
     to: "/coordinator/duplicates",

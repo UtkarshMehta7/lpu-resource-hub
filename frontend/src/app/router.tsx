@@ -55,6 +55,10 @@ import { MyApplicationsPage } from "@/features/opportunities/MyApplicationsPage"
 import { OpportunitiesPage } from "@/features/opportunities/OpportunitiesPage";
 import { OpportunityDetailPage } from "@/features/opportunities/OpportunityDetailPage";
 import { OpportunityFormPage } from "@/features/opportunities/OpportunityFormPage";
+import { PatentDetailPage } from "@/features/patents/PatentDetailPage";
+import { PatentFormPage } from "@/features/patents/PatentFormPage";
+import { PatentReviewQueuePage } from "@/features/patents/PatentReviewQueuePage";
+import { PatentsPage } from "@/features/patents/PatentsPage";
 import { PublicationDetailPage } from "@/features/publications/PublicationDetailPage";
 import { PublicationFormPage } from "@/features/publications/PublicationFormPage";
 import { PublicationsPage } from "@/features/publications/PublicationsPage";
@@ -85,6 +89,7 @@ export const router = createBrowserRouter([
           { path: "projects/:projectId", element: <ProjectDetailPage /> },
           { path: "projects/:projectId/edit", element: <ProjectFormPage /> },
           { path: "publications", element: <PublicationsPage /> },
+          { path: "patents", element: <PatentsPage /> },
           { path: "opportunities", element: <OpportunitiesPage /> },
           { path: "opportunities/mine", element: <OpportunitiesPage mine /> },
           { path: "opportunities/:opportunityId", element: <OpportunityDetailPage /> },
@@ -108,6 +113,8 @@ export const router = createBrowserRouter([
           { path: "funding/:fundingId", element: <FundingDetailPage /> },
           { path: "me/notifications", element: <NotificationsPage /> },
           { path: "publications/mine", element: <PublicationsPage mine /> },
+          { path: "patents/mine", element: <PatentsPage mine /> },
+          { path: "patents/:patentId", element: <PatentDetailPage /> },
           { path: "publications/:publicationId", element: <PublicationDetailPage /> },
           { path: "publications/:publicationId/edit", element: <PublicationFormPage /> },
           { path: "profile", element: <ProfilePage /> },
@@ -128,6 +135,7 @@ export const router = createBrowserRouter([
           {
             element: <RoleRoute allow={["research_coordinator", "admin"]} />,
             children: [
+              { path: "coordinator/patents", element: <PatentReviewQueuePage /> },
               { path: "coordinator/verification-queue", element: <VerificationQueuePage /> },
               { path: "admin/reports", element: <ModerationQueuePage /> },
               { path: "coordinator/duplicates", element: <DuplicateQueuePage /> },
@@ -170,6 +178,18 @@ export const router = createBrowserRouter([
               { path: "projects/new", element: <ProjectFormPage /> },
               { path: "publications/new", element: <PublicationFormPage /> },
               { path: "opportunities/new", element: <OpportunityFormPage /> },
+            ],
+          },
+          {
+            // Students invent too, and the approval queue is the safeguard
+            // rather than withholding the form. A dean and a custodian are
+            // absent on purpose: both are deliberately read-only (ADR 0028),
+            // and either can still be NAMED as an inventor by whoever records
+            // the patent.
+            element: <RoleRoute allow={["student", "faculty", "research_coordinator", "admin"]} />,
+            children: [
+              { path: "patents/new", element: <PatentFormPage /> },
+              { path: "patents/:patentId/edit", element: <PatentFormPage /> },
             ],
           },
           {

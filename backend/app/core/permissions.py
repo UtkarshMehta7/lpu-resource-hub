@@ -36,6 +36,15 @@ class Permission(StrEnum):
     PROJECT_CREATE = "project:create"
     PROJECT_REVIEW = "project:review"
     PUBLICATION_CREATE = "publication:create"
+    #: Recording a patent of one's own. Separate from publication:create
+    #: because it is held by STUDENTS as well: a student inventor is ordinary
+    #: here, and the university's own showcase is full of them. The safeguard
+    #: is not withholding the form -- it is that every record a non-admin
+    #: enters waits for a coordinator (patent:verify) before it counts.
+    PATENT_CREATE = "patent:create"
+    #: Vouching for a patent RECORD -- that the numbers, dates and inventors
+    #: are right. Not the grant, which only a patent office decides.
+    PATENT_VERIFY = "patent:verify"
     #: Curating the institution's publication records: finding duplicates
     #: and deciding what to do about them. Separate from publication:create
     #: because writing your own record and merging somebody else's are
@@ -67,7 +76,15 @@ ROLE_HIERARCHY: dict[UserRole, UserRole | None] = {
 }
 
 _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
-    UserRole.STUDENT: frozenset({Permission.APPLICATION_SUBMIT, Permission.COLLABORATION_SEND}),
+    UserRole.STUDENT: frozenset(
+        {
+            Permission.APPLICATION_SUBMIT,
+            Permission.COLLABORATION_SEND,
+            # Students invent. Theirs waits for a coordinator like everyone
+            # else's; see Permission.PATENT_CREATE.
+            Permission.PATENT_CREATE,
+        }
+    ),
     # First FACULTY-level grant: RESEARCH_COORDINATOR inherits it for free.
     UserRole.FACULTY: frozenset(
         {
@@ -86,6 +103,9 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.USER_ACTIVATE,
             Permission.PROJECT_CREATE,
             Permission.PUBLICATION_CREATE,
+            # FACULTY does not inherit STUDENT, so this is granted twice on
+            # purpose rather than once by inheritance.
+            Permission.PATENT_CREATE,
             Permission.OPPORTUNITY_CREATE,
             # Faculty apply only to COLLABORATION openings (checked in the service).
             Permission.APPLICATION_SUBMIT,
@@ -103,6 +123,7 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.BOOKING_APPROVE,
             Permission.FUNDING_MANAGE,
             Permission.PUBLICATION_DEDUPLICATE,
+            Permission.PATENT_VERIFY,
         }
     ),
     # Looks after the facilities assigned to them. Which facilities is an
@@ -154,6 +175,8 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.BOOKING_APPROVE,
             Permission.FUNDING_MANAGE,
             Permission.PUBLICATION_DEDUPLICATE,
+            Permission.PATENT_CREATE,
+            Permission.PATENT_VERIFY,
         }
     ),
 }

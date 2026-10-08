@@ -39,6 +39,9 @@ def test_faculty_has_exactly_its_own_grants() -> None:
             Permission.USER_ACTIVATE,
             Permission.PROJECT_CREATE,
             Permission.PUBLICATION_CREATE,
+            # Granted here AND to STUDENT, because FACULTY does not inherit
+            # STUDENT -- the hierarchy runs coordinator -> faculty only.
+            Permission.PATENT_CREATE,
             Permission.OPPORTUNITY_CREATE,
             Permission.APPLICATION_SUBMIT,
             Permission.COLLABORATION_SEND,
@@ -64,11 +67,15 @@ def test_coordinator_inherits_faculty_grants_on_top_of_its_own() -> None:
             Permission.BOOKING_APPROVE,
             Permission.FUNDING_MANAGE,
             Permission.PUBLICATION_DEDUPLICATE,
+            # Vouching that a patent RECORD is right -- the numbers, dates and
+            # inventors. Not the grant, which only a patent office decides.
+            Permission.PATENT_VERIFY,
             Permission.USER_CREATE,  # inherited from FACULTY
             Permission.USER_DELETE,  # inherited from FACULTY
             Permission.STUDENT_DISCOVER,  # inherited from FACULTY
             Permission.PROJECT_CREATE,  # inherited from FACULTY
             Permission.PUBLICATION_CREATE,  # inherited from FACULTY
+            Permission.PATENT_CREATE,  # inherited from FACULTY
             Permission.OPPORTUNITY_CREATE,  # inherited from FACULTY
             Permission.APPLICATION_SUBMIT,  # inherited from FACULTY
             Permission.COLLABORATION_SEND,  # inherited from FACULTY
@@ -99,13 +106,25 @@ def test_admin_has_exactly_its_own_grants() -> None:
             Permission.BOOKING_APPROVE,
             Permission.FUNDING_MANAGE,
             Permission.PUBLICATION_DEDUPLICATE,
+            Permission.PATENT_CREATE,
+            Permission.PATENT_VERIFY,
         }
     )
 
 
-def test_student_can_only_apply_and_request_collaboration() -> None:
+def test_a_student_may_apply_collaborate_and_record_a_patent() -> None:
+    """PATENT_CREATE is the first thing a student may CREATE, and it is
+    deliberate: student inventors are ordinary, and the university's own
+    showcase is built on them. The safeguard is not withholding the form --
+    it is that every record a non-admin enters waits for a coordinator
+    (PATENT_VERIFY) before it counts. Publications stay faculty-only, because
+    nothing reviews those."""
     assert ROLE_PERMISSIONS[UserRole.STUDENT] == frozenset(
-        {Permission.APPLICATION_SUBMIT, Permission.COLLABORATION_SEND}
+        {
+            Permission.APPLICATION_SUBMIT,
+            Permission.COLLABORATION_SEND,
+            Permission.PATENT_CREATE,
+        }
     )
 
 
