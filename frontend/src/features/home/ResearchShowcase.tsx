@@ -151,7 +151,7 @@ export function ResearchShowcase() {
 
       <div className="rounded-card border border-line bg-surface px-6 py-6 text-sm">
         <div className="flex items-start gap-4">
-          <Crest className="hidden size-12 shrink-0 rounded-full bg-white p-1 ring-1 ring-brand-100 sm:block" />
+          <Crest className="hidden size-12 shrink-0 rounded-full bg-white p-0.5 ring-1 ring-brand-100 sm:block" />
           <div>
             <h3 className="font-semibold">Where these figures come from</h3>
             <p className="mt-1 text-ink-muted">
