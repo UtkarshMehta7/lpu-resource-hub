@@ -1291,6 +1291,13 @@ PATENT_PLAN: list[tuple[str, str, PatentStatus, str]] = [
         "pressure rises, rather than relying on thread tension alone.",
     ),
     (
+        "A low-cost spirometer calibrated for paediatric lung volumes",
+        "IN",
+        PatentStatus.DISCLOSED,
+        "A spirometer whose flow head is sized for children, so a reading taken in a "
+        "district clinic is not extrapolated from an adult curve.",
+    ),
+    (
         "A biofilter for arsenic removal from tube-well water",
         "IN",
         PatentStatus.REJECTED,
@@ -1332,6 +1339,12 @@ def _seed_patents(db: Session, summary: Summary) -> None:
     for index, (title, jurisdiction, status, abstract) in enumerate(PATENT_PLAN):
         if db.execute(select(Patent).where(Patent.title == title)).scalar_one_or_none():
             continue
+        before_the_office = status in (
+            PatentStatus.DISCLOSED,
+            PatentStatus.UNDER_ASSESSMENT,
+            PatentStatus.APPROVED_TO_FILE,
+            PatentStatus.DECLINED,
+        )
         filed = TODAY - timedelta(days=540 - index * 90)
         published = filed + timedelta(days=180)
         granted = published + timedelta(days=200)
@@ -1339,8 +1352,10 @@ def _seed_patents(db: Session, summary: Summary) -> None:
             title=title,
             abstract=abstract,
             jurisdiction=jurisdiction,
-            application_number=f"20264100{index + 1:04d}",
-            filing_date=filed,
+            # Nothing inside the university has an application number or a
+            # filing date: the office issues both.
+            application_number=None if before_the_office else f"20264100{index + 1:04d}",
+            filing_date=None if before_the_office else filed,
             status=status,
             assignee="Lovely Professional University",
             created_by=faculty.id,
@@ -1349,6 +1364,28 @@ def _seed_patents(db: Session, summary: Summary) -> None:
                 VerificationStatus.PENDING if index == 2 else VerificationStatus.VERIFIED
             ),
         )
+        if before_the_office:
+            # The disclosure as the IP cell receives it, including the one
+            # field that most often decides whether a patent is possible.
+            patent.reference = f"LPU/IDF/{TODAY.year}/{index + 1:04d}"
+            patent.problem_statement = (
+                "Paediatric spirometry in district clinics is read off adult reference "
+                "curves, so a mild obstruction is routinely missed."
+            )
+            patent.novelty = (
+                "A flow head sized for paediatric tidal volumes, with the correction "
+                "applied in the instrument rather than afterwards on paper."
+            )
+            patent.known_prior_art = (
+                "Adult spirometers with paediatric software corrections, which do not "
+                "change the flow head and so keep the same measurement error."
+            )
+            patent.funding_source = "Internal seed grant"
+            patent.commercial_potential = (
+                "District health centres and paediatric outpatient clinics."
+            )
+            patent.public_disclosure_date = TODAY - timedelta(days=45)
+            patent.public_disclosure_note = "Shown as a poster at a departmental research day."
         if status in (PatentStatus.PUBLISHED, PatentStatus.GRANTED):
             patent.publication_date = published
             patent.publication_number = f"IN20264100{index + 1:04d}A"

@@ -51,15 +51,32 @@ from app.modules.profiles.models import VerificationStatus
 
 
 class PatentStatus(StrEnum):
-    """Where the application has got to.
+    """Where the invention has got to, from disclosure through to grant.
+
+    ADR 0035 first called this "what the patent office did", which was too
+    narrow: the office is the second half of the journey, and the half that
+    decides whether a patent ever exists happens here. An inventor discloses,
+    the IP cell assesses, the university decides whether to file -- and only
+    then does an office have an opinion. Modelling that as a separate table
+    would have split one invention across two records and asked which of them
+    owned the inventor list.
 
     Stored rather than derived. Derivation was considered -- a grant date
     implies a grant, the way a milestone's risk is derived from its dates
-    (ADR 0026) -- but it cannot express REJECTED, WITHDRAWN or LAPSED, none of
-    which has a date that distinguishes it from the others. A rule that
-    answers three of six states is worse than no rule.
+    (ADR 0026) -- but it cannot express DECLINED, REJECTED, WITHDRAWN or
+    LAPSED, none of which has a date that distinguishes it from the others.
+
+    The first four are the university's; the rest are the office's.
     """
 
+    #: Submitted to the IP cell. The record exists, nothing is filed.
+    DISCLOSED = "disclosed"
+    #: The IP cell is assessing patentability and commercial merit.
+    UNDER_ASSESSMENT = "under_assessment"
+    #: The university has agreed to file. Nothing is lodged yet.
+    APPROVED_TO_FILE = "approved_to_file"
+    #: The university will not file. Terminal, with a reason recorded.
+    DECLINED = "declined"
     FILED = "filed"
     PUBLISHED = "published"
     GRANTED = "granted"
@@ -82,6 +99,19 @@ class Patent(Base):
             name="published_has_a_publication_date",
         ),
         CheckConstraint("jurisdiction ~ '^[A-Z]{2}$'", name="jurisdiction_is_a_st3_code"),
+        # Nothing before FILED has a filing date, and nothing from FILED
+        # onwards lacks one. The pre-office stages are the university's own.
+        CheckConstraint(
+            # Cast to text, matching migration 0033: the enum literals cannot
+            # be referenced in the transaction that adds them.
+            "(status::text IN ('disclosed', 'under_assessment', 'approved_to_file', "
+            "'declined')) = (filing_date IS NULL)",
+            name="filing_date_exactly_when_filed",
+        ),
+        CheckConstraint(
+            "status::text <> 'declined' OR assessment_note IS NOT NULL",
+            name="declining_gives_a_reason",
+        ),
         # A number is unique within the office that issued it and nowhere
         # else: IN 202141000001 and US 202141000001 are different patents.
         # Partial, because most records carry only some of the three.
@@ -119,8 +149,9 @@ class Patent(Base):
     application_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
     publication_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
     grant_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    #: Every application has one; it is what establishes priority.
-    filing_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    #: Set when the application is actually lodged; it establishes priority.
+    #: Null for everything still inside the university.
+    filing_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     publication_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     grant_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[PatentStatus] = mapped_column(
@@ -134,6 +165,36 @@ class Patent(Base):
     )
     #: Who holds the right. Usually the university; sometimes a sponsor.
     assignee: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    #: The IP cell's docket, e.g. "LPU/IDF/2026/0007". Human-quotable, which
+    #: is the whole point: an inventor chasing their disclosure says this, not
+    #: a UUID. Allocated on disclosure and never reused.
+    reference: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True)
+    #: What the invention solves, how, and why it is not obvious. Three
+    #: questions rather than one description box, because an assessor reads
+    #: for exactly these and a single box buries them.
+    problem_statement: Mapped[str | None] = mapped_column(Text, nullable=True)
+    novelty: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Prior art the inventor already knows of. Declaring it is a duty in most
+    #: jurisdictions, and concealing it can invalidate a granted patent.
+    known_prior_art: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: **The field that most often decides whether a patent is possible at
+    #: all.** A paper, poster, thesis or demo before filing can destroy
+    #: novelty outright; grace periods are narrow where they exist and absent
+    #: in much of the world. Captured at disclosure so the IP cell sees it
+    #: before it is too late to act on, not after.
+    public_disclosure_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    public_disclosure_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Sponsor or grant. Public funding usually carries ownership and
+    #: reporting obligations, and the IP cell has to know before it files.
+    funding_source: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    commercial_potential: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Why the IP cell decided as it did. Required to decline: "no" without a
+    #: reason is the thing that stops people disclosing next time.
+    assessment_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    assessed_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    assessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True

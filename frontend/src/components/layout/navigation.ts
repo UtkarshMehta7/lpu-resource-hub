@@ -37,7 +37,8 @@ export const NAV: NavItem[] = [
     to: "/patents",
     label: "Patents",
     group: "Discover",
-    keywords: "ipr invention filing granted espacenet prior art intellectual property",
+    keywords:
+      "ipr invention filing granted espacenet prior art intellectual property disclosure idf",
   },
   { to: "/opportunities", label: "Opportunities", group: "Discover", keywords: "openings apply" },
   { to: "/facilities", label: "Facilities", group: "Discover", keywords: "labs equipment rooms" },
@@ -149,10 +150,10 @@ export const NAV: NavItem[] = [
   },
   {
     to: "/coordinator/patents",
-    label: "Patents to check",
+    label: "Patents & disclosures",
     group: "Review",
     roles: ["research_coordinator", "admin"],
-    keywords: "ipr verify approve invention filing",
+    keywords: "ipr verify approve assess invention disclosure filing ip cell",
   },
   {
     to: "/coordinator/duplicates",

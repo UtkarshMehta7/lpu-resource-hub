@@ -49,12 +49,48 @@ class _PatentFields(BaseModel):
         return value
 
 
-class PatentCreate(_PatentFields):
+class _DisclosureFields(BaseModel):
+    """What the IP cell needs in order to assess, and nothing it does not.
+
+    Three questions rather than one description box: an assessor reads for the
+    problem, the inventive step and the known art, and a single box buries all
+    three. `public_disclosure_date` is the one that most often decides whether
+    a patent is possible at all.
+    """
+
+    problem_statement: str | None = Field(default=None, max_length=20000)
+    novelty: str | None = Field(default=None, max_length=20000)
+    known_prior_art: str | None = Field(default=None, max_length=20000)
+    public_disclosure_date: date | None = None
+    public_disclosure_note: str | None = Field(default=None, max_length=2000)
+    funding_source: str | None = Field(default=None, max_length=300)
+    commercial_potential: str | None = Field(default=None, max_length=20000)
+
+
+class PatentCreate(_PatentFields, _DisclosureFields):
+    """Two ways in, one record.
+
+    `already_filed` says which: an invention being put to the university for
+    the first time starts at DISCLOSED with no filing date, while a patent
+    that was filed elsewhere is recorded as FILED and needs one. It is not a
+    `status` field by the back door -- it chooses between exactly two entry
+    points, and every move after that goes through the transition table.
+    """
+
     title: str = Field(min_length=1, max_length=500)
     jurisdiction: str = Field(min_length=2, max_length=2)
-    filing_date: date
+    already_filed: bool = False
+    filing_date: date | None = None
     inventors: list[InventorInput] = Field(min_length=1, max_length=100)
     project_ids: list[uuid.UUID] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _filing_date_iff_filed(self) -> Self:
+        if self.already_filed and self.filing_date is None:
+            raise ValueError("a patent already filed needs its filing date")
+        if not self.already_filed and self.filing_date is not None:
+            raise ValueError("nothing filed yet has a filing date; the office sets it")
+        return self
 
     @field_validator("jurisdiction")
     @classmethod
@@ -65,25 +101,28 @@ class PatentCreate(_PatentFields):
         return code
 
 
-class PatentUpdate(_PatentFields):
+class PatentUpdate(_PatentFields, _DisclosureFields):
     title: str | None = Field(default=None, min_length=1, max_length=500)
-    filing_date: date | None = None
     inventors: list[InventorInput] | None = Field(default=None, min_length=1, max_length=100)
     project_ids: list[uuid.UUID] | None = None
 
 
 class PatentTransition(BaseModel):
-    """A move along the patent office's lifecycle.
+    """A move along the pipeline, by whoever is entitled to make it.
 
-    `on` and `number` are what the office issued with the move: a publication
-    date and number, or a grant date and number. Required for the statuses
-    that cannot exist without them -- the database says the same thing with a
-    CHECK, and this is what turns that into a sentence.
+    `on` and `number` are what the office issued: a filing, publication or
+    grant date and its number. Required for the statuses that cannot exist
+    without them -- the database says the same with a CHECK, and this turns
+    that into a sentence.
+
+    `note` is the IP cell's reasoning. Required to decline, because "no"
+    without a reason is what stops the next person disclosing at all.
     """
 
     status: PatentStatus
     on: date | None = None
     number: str | None = Field(default=None, max_length=64)
+    note: str | None = Field(default=None, max_length=5000)
 
 
 class PatentDecision(BaseModel):
@@ -109,11 +148,25 @@ class PatentRead(BaseModel):
     id: uuid.UUID
     title: str
     abstract: str | None
+    #: The IP cell's docket, e.g. "LPU/IDF/2026/0007" -- what an inventor
+    #: quotes when chasing it. Absent on a patent recorded as already filed.
+    reference: str | None
     jurisdiction: str
+    problem_statement: str | None
+    novelty: str | None
+    known_prior_art: str | None
+    public_disclosure_date: date | None
+    public_disclosure_note: str | None
+    funding_source: str | None
+    commercial_potential: str | None
+    assessment_note: str | None
+    assessed_by: uuid.UUID | None
+    assessed_by_name: str | None
+    assessed_at: datetime | None
     application_number: str | None
     publication_number: str | None
     grant_number: str | None
-    filing_date: date
+    filing_date: date | None
     publication_date: date | None
     grant_date: date | None
     status: PatentStatus
@@ -128,8 +181,9 @@ class PatentRead(BaseModel):
     verification_note: str | None
     inventors: list[InventorRead]
     projects: list[LinkedProject]
-    #: The statuses this record may move to next, so the interface never
-    #: offers a button the service would refuse.
+    #: What **this reader** may do next -- never what somebody else may. The
+    #: interface renders exactly these, so it cannot offer a button the
+    #: service would refuse.
     next_statuses: list[PatentStatus]
     created_at: datetime
 
@@ -144,7 +198,7 @@ class SimilarPatent(BaseModel):
     title: str
     jurisdiction: str
     status: PatentStatus
-    filing_date: date
+    filing_date: date | None
     grant_number: str | None
     score: float
 

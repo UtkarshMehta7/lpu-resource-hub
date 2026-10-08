@@ -12,20 +12,24 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import Select, delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.pagination import Page, PageParams
+from app.core.permissions import ROLE_PERMISSIONS, Permission
 from app.modules.audit import service as audit_service
 from app.modules.patents.models import Patent, PatentInventor, PatentStatus, ProjectPatent
 from app.modules.patents.policies import (
+    BEFORE_THE_OFFICE,
     DATE_REQUIRED,
-    TRANSITIONS,
-    assert_transition_allowed,
+    NOTE_REQUIRED,
+    NUMBER_FIELD,
+    assert_may_move,
     initial_verification,
+    next_statuses,
 )
 from app.modules.patents.schemas import (
     InventorInput,
@@ -65,6 +69,10 @@ class ProjectLinkError(Exception):
 
 class MissingTransitionDateError(Exception):
     """That status cannot be entered without the date the office issued."""
+
+
+class MissingDecisionNoteError(Exception):
+    """Declining without a reason is what stops the next person disclosing."""
 
 
 class OutOfScopeError(Exception):
@@ -141,6 +149,30 @@ def _commit_or_duplicate(db: Session) -> None:
         raise
 
 
+def _may_review(actor: User) -> bool:
+    return Permission.PATENT_VERIFY in ROLE_PERMISSIONS[actor.role]
+
+
+def _allocate_reference(db: Session, when: date) -> str:
+    """The IP cell's docket: LPU/IDF/2026/0007.
+
+    Human-quotable on purpose -- an inventor chasing their disclosure says
+    this down a phone, and nobody reads a UUID aloud. Allocated per calendar
+    year from the highest already issued, so a deleted record leaves a gap
+    rather than letting the next one reuse its number; a reference that has
+    ever been quoted must never point at a different invention.
+
+    A unique index is the real guard: two disclosures in the same second get
+    the same count, and the loser retries.
+    """
+    prefix = f"LPU/IDF/{when.year}/"
+    highest = db.execute(
+        select(func.max(Patent.reference)).where(Patent.reference.like(f"{prefix}%"))
+    ).scalar_one_or_none()
+    nxt = int(highest.rsplit("/", 1)[1]) + 1 if highest else 1
+    return f"{prefix}{nxt:04d}"
+
+
 # --- building responses ------------------------------------------------------
 
 
@@ -177,7 +209,9 @@ def _visible_projects(db: Session, viewer: User, patent_id: uuid.UUID) -> list[L
 
 
 def _to_read(db: Session, viewer: User, patent: Patent) -> PatentRead:
-    wanted = [i for i in (patent.created_by, patent.verified_by) if i is not None]
+    wanted = [
+        i for i in (patent.created_by, patent.verified_by, patent.assessed_by) if i is not None
+    ]
     names: dict[uuid.UUID, str] = {
         user_id: full_name
         for user_id, full_name in db.execute(
@@ -200,6 +234,18 @@ def _to_read(db: Session, viewer: User, patent: Patent) -> PatentRead:
         url=patent.url,
         created_by=patent.created_by,
         creator_name=names.get(patent.created_by, ""),
+        reference=patent.reference,
+        problem_statement=patent.problem_statement,
+        novelty=patent.novelty,
+        known_prior_art=patent.known_prior_art,
+        public_disclosure_date=patent.public_disclosure_date,
+        public_disclosure_note=patent.public_disclosure_note,
+        funding_source=patent.funding_source,
+        commercial_potential=patent.commercial_potential,
+        assessment_note=patent.assessment_note,
+        assessed_by=patent.assessed_by,
+        assessed_by_name=names.get(patent.assessed_by) if patent.assessed_by else None,
+        assessed_at=patent.assessed_at,
         verification_status=patent.verification_status,
         verified_by=patent.verified_by,
         verified_by_name=names.get(patent.verified_by) if patent.verified_by else None,
@@ -207,7 +253,11 @@ def _to_read(db: Session, viewer: User, patent: Patent) -> PatentRead:
         verification_note=patent.verification_note,
         inventors=_inventors(db, patent.id),
         projects=_visible_projects(db, viewer, patent.id),
-        next_statuses=sorted(TRANSITIONS[patent.status]),
+        next_statuses=next_statuses(
+            patent.status,
+            is_creator=patent.created_by == viewer.id,
+            reviewer=_may_review(viewer),
+        ),
         created_at=patent.created_at,
     )
 
@@ -223,26 +273,42 @@ def _load(db: Session, patent_id: uuid.UUID) -> Patent:
 
 
 def create_patent(db: Session, creator: User, data: PatentCreate) -> PatentRead:
+    """Two ways in, one record.
+
+    An invention being put to the university starts at DISCLOSED and gets a
+    docket; a patent already filed elsewhere is recorded as FILED. Everything
+    after that goes through the transition table, so no caller can ever place
+    a record at an arbitrary stage.
+    """
     _validate_inventors(db, data.inventors)
     _validate_project_links(db, creator, data.project_ids)
+    status = PatentStatus.FILED if data.already_filed else PatentStatus.DISCLOSED
     patent = Patent(
         title=data.title,
         abstract=data.abstract,
         jurisdiction=data.jurisdiction,
         application_number=data.application_number,
         filing_date=data.filing_date,
-        # A new record is always at the start of the office's lifecycle. A
-        # patent that is already granted is recorded by filing it and then
-        # moving it along, so every record carries its own history.
-        status=PatentStatus.FILED,
+        status=status,
         assignee=data.assignee,
         url=data.url,
         created_by=creator.id,
         verification_status=initial_verification(creator),
+        problem_statement=data.problem_statement,
+        novelty=data.novelty,
+        known_prior_art=data.known_prior_art,
+        public_disclosure_date=data.public_disclosure_date,
+        public_disclosure_note=data.public_disclosure_note,
+        funding_source=data.funding_source,
+        commercial_potential=data.commercial_potential,
     )
     if patent.verification_status is VerificationStatus.VERIFIED:
         patent.verified_by = creator.id
         patent.verified_at = datetime.now(UTC)
+    # A docket belongs to work the university is being asked to file. A patent
+    # recorded as already filed somewhere else never entered that queue.
+    if status is PatentStatus.DISCLOSED:
+        patent.reference = _allocate_reference(db, date.today())
     db.add(patent)
     try:
         db.flush()
@@ -270,11 +336,24 @@ def update_patent(db: Session, actor: User, patent_id: uuid.UUID, data: PatentUp
     if data.project_ids is not None:
         _validate_project_links(db, actor, data.project_ids)
 
-    for field in ("title", "filing_date"):
-        value = getattr(data, field)
-        if value is not None:
-            setattr(patent, field, value)
-    for field in ("abstract", "assignee", "application_number", "url"):
+    if data.title is not None:
+        patent.title = data.title
+    # filing_date is NOT editable here: it moves only through the transition
+    # that records the filing, so a record cannot claim a priority date the
+    # office never gave it.
+    for field in (
+        "abstract",
+        "assignee",
+        "application_number",
+        "url",
+        "problem_statement",
+        "novelty",
+        "known_prior_art",
+        "public_disclosure_date",
+        "public_disclosure_note",
+        "funding_source",
+        "commercial_potential",
+    ):
         if field in data.model_fields_set:
             setattr(patent, field, getattr(data, field))
 
@@ -299,22 +378,35 @@ def update_patent(db: Session, actor: User, patent_id: uuid.UUID, data: PatentUp
 def move_status(
     db: Session, actor: User, patent_id: uuid.UUID, data: PatentTransition
 ) -> PatentRead:
-    """Record what the patent office did. Only the creator keeps the record."""
+    """Move the invention along, if this person is entitled to that move."""
     patent = _load(db, patent_id)
-    if patent.created_by != actor.id:
-        raise NotCreatorError
-    assert_transition_allowed(patent.status, data.status)
+    assert_may_move(
+        patent.status,
+        data.status,
+        is_creator=patent.created_by == actor.id,
+        reviewer=_may_review(actor),
+    )
 
     date_field = DATE_REQUIRED.get(data.status)
     if date_field is not None and data.on is None and getattr(patent, date_field) is None:
         raise MissingTransitionDateError
+    if data.status in NOTE_REQUIRED and not (data.note or "").strip():
+        raise MissingDecisionNoteError
+
     if date_field is not None and data.on is not None:
         setattr(patent, date_field, data.on)
-    if data.number is not None:
-        if data.status is PatentStatus.PUBLISHED:
-            patent.publication_number = data.number
-        elif data.status is PatentStatus.GRANTED:
-            patent.grant_number = data.number
+    number_field = NUMBER_FIELD.get(data.status)
+    if number_field is not None and data.number is not None:
+        setattr(patent, number_field, data.number)
+
+    # The IP cell's reasoning, recorded against whoever gave it. Kept apart
+    # from verification_note, which answers a different question entirely:
+    # "are these numbers right", not "should we file this".
+    if data.status in BEFORE_THE_OFFICE and _may_review(actor):
+        if data.note is not None:
+            patent.assessment_note = data.note
+        patent.assessed_by = actor.id
+        patent.assessed_at = datetime.now(UTC)
 
     patent.status = data.status
     _commit_or_duplicate(db)
@@ -449,16 +541,21 @@ def list_patents(
 
 
 def review_queue(db: Session, actor: User) -> list[PatentRead]:
-    """Records waiting on this person, and only ones they could actually decide.
+    """What is waiting on this person, and only what they could act on.
+
+    Two kinds, deliberately in one queue: disclosures the IP cell has not
+    assessed, and records whose numbers nobody has checked. Both are "this
+    needs you", and splitting them into two pages would have meant two places
+    to forget to look.
 
     Filtered through the same scope rule the decision enforces, or it is a
     dead button -- the mistake the project review queue was written to avoid.
     """
-    query = (
-        select(Patent)
-        .join(User, User.id == Patent.created_by)
-        .where(Patent.verification_status == VerificationStatus.PENDING)
+    waiting = or_(
+        Patent.status.in_([PatentStatus.DISCLOSED, PatentStatus.UNDER_ASSESSMENT]),
+        Patent.verification_status == VerificationStatus.PENDING,
     )
+    query = select(Patent).join(User, User.id == Patent.created_by).where(waiting)
     if actor.role is not UserRole.ADMIN:
         query = query.where(User.department_id == actor.department_id)
     rows = db.execute(query.order_by(Patent.created_at)).scalars().all()

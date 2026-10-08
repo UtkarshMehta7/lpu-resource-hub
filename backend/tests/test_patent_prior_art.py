@@ -151,6 +151,7 @@ def test_it_finds_a_patent_already_recorded_here(
         json={
             "title": "A borewell rescue robot with a self-centring gripper",
             "jurisdiction": "IN",
+            "already_filed": True,
             "filing_date": "2026-02-01",
             "application_number": f"2026{uuid.uuid4().hex[:8]}",
             "inventors": [{"external_name": "A. Inventor"}],
@@ -174,6 +175,7 @@ def test_an_unrelated_title_matches_nothing_here(
         json={
             "title": "A borewell rescue robot with a self-centring gripper",
             "jurisdiction": "IN",
+            "already_filed": True,
             "filing_date": "2026-02-01",
             "inventors": [{"external_name": "A. Inventor"}],
         },
