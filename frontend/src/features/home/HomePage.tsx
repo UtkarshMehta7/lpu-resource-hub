@@ -109,7 +109,7 @@ export function HomePage() {
         />
         <div className="relative mx-auto max-w-3xl">
           <div className="flex justify-center">
-            <Crest className="size-24 rounded-full bg-white p-2 shadow-sm ring-1 ring-brand-100" />
+            <Crest className="size-28 rounded-full bg-white p-1 shadow-sm ring-1 ring-brand-100" />
           </div>
           <p className="mt-5 text-sm font-semibold uppercase tracking-wide text-brand-700">
             {UNIVERSITY_NAME}

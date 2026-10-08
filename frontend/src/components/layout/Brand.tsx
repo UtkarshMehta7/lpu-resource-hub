@@ -13,15 +13,24 @@ export const UNIVERSITY_SHORT = "LPU";
 export const PRODUCT_NAME = "Research Intelligence & Collaboration Hub";
 export const PRODUCT_SHORT = "LPU Research Hub";
 
-/** The university crest. Served from public/, so no bundler import. */
+/**
+ * The university crest. Served from public/, so no bundler import.
+ *
+ * The file is cropped to the mark itself. It used to carry a 30px white
+ * margin on all four sides of a 600px frame, so every placement paid for
+ * padding it had not asked for -- on the landing page that margin stacked on
+ * top of the ring and the element's own padding, and the crest sat in a white
+ * band half its own width. Padding belongs to the placement, never to the
+ * asset.
+ */
 export function Crest({ className = "size-9" }: { className?: string }) {
   return (
     <img
       src="/lpu-logo.png"
       alt=""
       aria-hidden="true"
-      width={600}
-      height={600}
+      width={540}
+      height={540}
       className={`shrink-0 object-contain ${className}`}
     />
   );
