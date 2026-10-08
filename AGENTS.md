@@ -43,7 +43,7 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 165 API operations over 134 paths, 45 tables, 30 migrations,
-33 ADRs, 28 backend modules, 1155 backend tests, 285 frontend tests,
+34 ADRs, 28 backend modules, 1155 backend tests, 294 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -393,6 +393,15 @@ Current shape: 165 API operations over 134 paths, 45 tables, 30 migrations,
 - **Don't reuse a label for a filter and an action on the same screen.**
   "Different works" was both a status chip and a button, so four tests matched
   the wrong element -- and a reader would have had the same trouble.
+- **Refresh is single-flighted across TABS, not just within one** (ADR 0034).
+  Refresh tokens rotate and re-presenting a rotated one revokes the whole
+  family, which is how a stolen token is contained. `refreshPromise` in
+  `lib/api/client.ts` dedupes inside one tab; the cookie is shared by all of
+  them, so two tabs waking together both POSTed it and the second was read as
+  replay -- signing both out mid-use, with nothing on screen to explain it.
+  That was the "unexplained session expiry". `navigator.locks` now serialises
+  them. Never refresh from outside that lock, which is exactly how it was
+  finally caught.
 - **Autogenerate does not see enum values.** It compares tables, not enum
   members, so `ALTER TYPE ... ADD VALUE IF NOT EXISTS` is written by hand
   (migrations 0017, 0019). A test DB already stamped at that revision will
