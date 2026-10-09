@@ -108,17 +108,42 @@ def test_it_always_hands_over_the_registers_it_cannot_search(
     assert all("borewell" in registry["url"].lower() for registry in result["registries"][:3])
 
 
-def test_a_source_being_down_is_reported_not_hidden(
+def test_a_source_being_down_is_named_not_merely_counted(
     client: TestClient, seed_user: Callable[..., SeededUser], patch_client: Callable[..., None]
 ) -> None:
     # A short list presented as a clean result is the worst outcome here: it
-    # reads as "nothing like this exists".
+    # reads as "nothing like this exists". Naming the source that failed is
+    # what lets the reader judge the gap -- the two indexes do not cover the
+    # same ground, so "one of them" is not an answer.
     patch_client(httpx.Response(200, json=OPENALEX_PAYLOAD), httpx.Response(500))
     result = ask(client, seed_user(UserRole.FACULTY), "A borewell rescue robot")
 
-    assert result["literature_unavailable"] is True
+    assert result["unavailable_sources"] == ["Crossref"]
     # The source that did answer is still used.
     assert len(result["related_works"]) == 1
+
+
+def test_the_other_source_failing_names_the_other_source(
+    client: TestClient, seed_user: Callable[..., SeededUser], patch_client: Callable[..., None]
+) -> None:
+    # The pairing must not be hardcoded the wrong way round, which a single
+    # one-sided test would never catch.
+    patch_client(httpx.Response(503), httpx.Response(200, json=CROSSREF_PAYLOAD))
+    result = ask(client, seed_user(UserRole.FACULTY), "A borewell rescue robot")
+
+    assert result["unavailable_sources"] == ["OpenAlex"]
+    # Both of Crossref's works survive; losing OpenAlex loses only its own.
+    assert len(result["related_works"]) == 2
+
+
+def test_both_sources_down_names_both(
+    client: TestClient, seed_user: Callable[..., SeededUser], patch_client: Callable[..., None]
+) -> None:
+    patch_client(httpx.Response(503), httpx.Response(503))
+    result = ask(client, seed_user(UserRole.FACULTY), "A borewell rescue robot")
+
+    assert result["unavailable_sources"] == ["OpenAlex", "Crossref"]
+    assert result["related_works"] == []
 
 
 def test_the_same_paper_from_two_indexes_is_one_row(
@@ -136,7 +161,7 @@ def test_the_same_paper_from_two_indexes_is_one_row(
         "A tracked robot for borewell child rescue",
         "Gripper design for confined-space retrieval",
     ]
-    assert result["literature_unavailable"] is False
+    assert result["unavailable_sources"] == []
 
 
 def test_it_finds_a_patent_already_recorded_here(

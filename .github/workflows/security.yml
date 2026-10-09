@@ -46,6 +46,16 @@ jobs:
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest
+    # gitleaks-action lists the pull request's commits to scan just those, and
+    # the API refuses that with 403 "Resource not accessible by integration"
+    # unless the token carries pull-requests: read. The top-level block grants
+    # contents only; a job-level block REPLACES it rather than adding to it, so
+    # contents: read is repeated here or the checkout loses its own permission.
+    # This passed until gitleaks-action@v2 -- a moving tag -- started making
+    # that call.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:

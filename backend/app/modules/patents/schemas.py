@@ -232,9 +232,11 @@ class PriorArtResult(BaseModel):
     similar_patents: list[SimilarPatent]
     related_works: list[RelatedWork]
     registries: list[RegistrySearch]
-    #: True when an external index could not be reached. The caller must say
-    #: so rather than present a short list as a clean result.
-    literature_unavailable: bool
+    #: The literature sources that refused or did not answer in time, by name.
+    #: Empty means every source answered. The caller must say which ones are
+    #: missing rather than present a short list as a clean result -- naming
+    #: them is what lets a reader judge what the gap covers.
+    unavailable_sources: list[str]
 
 
 class PriorArtQuery(BaseModel):

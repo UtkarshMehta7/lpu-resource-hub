@@ -16,8 +16,17 @@ import { officeLabel, STATUS_LABEL, STATUS_TONE } from "./labels";
  * so the honest shape is: show what we can actually check, and hand the
  * query to the registers that can check the rest. An empty result here means
  * "we found nothing in two open indexes", not "this is novel", and the
- * wording says exactly that.
+ * wording says exactly that. A source that did not answer is named, because
+ * "an index was unreachable" leaves the reader unable to tell what the gap
+ * covers.
  */
+/** "OpenAlex", or "OpenAlex and Crossref" -- named, never counted. */
+function formatSources(names: string[]): string {
+  const last = names[names.length - 1] ?? "";
+  if (names.length <= 1) return last;
+  return `${names.slice(0, -1).join(", ")} and ${last}`;
+}
+
 export function PriorArtPanel({
   title,
   abstract,
@@ -97,13 +106,13 @@ export function PriorArtPanel({
               A published paper is prior art exactly as another patent is, and it is what most often
               defeats a claim of novelty.
             </p>
-            {result.literature_unavailable ? (
+            {result.unavailable_sources.length > 0 ? (
               <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                One of the literature indexes could not be reached, so this list is incomplete. Run
-                the check again before relying on it.
+                {formatSources(result.unavailable_sources)} could not be reached, so this list is
+                incomplete. Run the check again before relying on it.
               </p>
             ) : null}
-            {result.related_works.length === 0 && !result.literature_unavailable ? (
+            {result.related_works.length === 0 && result.unavailable_sources.length === 0 ? (
               <p className="mt-2 text-sm text-ink-muted">
                 Nothing close came back from OpenAlex or Crossref.
               </p>
