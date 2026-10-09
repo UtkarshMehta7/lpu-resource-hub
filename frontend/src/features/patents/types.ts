@@ -162,5 +162,8 @@ export interface PriorArtResult {
    *  means every source answered. The screen must name them rather than let
    *  a partial list read as "nothing like this exists" -- which source is
    *  missing tells the reader what the gap covers. */
-  unavailable_sources: string[];
+  /** Absent when the API predates this field -- the browser gets a new bundle
+   *  from the CDN minutes before the API finishes rebuilding, so the panel
+   *  reads this through a helper that defaults it to empty. */
+  unavailable_sources?: string[];
 }
