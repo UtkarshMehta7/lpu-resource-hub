@@ -43,7 +43,7 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 174 API operations over 140 paths, 48 tables, 33 migrations,
-36 ADRs, 30 backend modules, 1213 backend tests, 315 frontend tests,
+37 ADRs, 28 backend modules, 1215 backend tests, 316 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -152,8 +152,13 @@ Current shape: 174 API operations over 140 paths, 48 tables, 33 migrations,
   is prior art, and OpenAlex and Crossref are keyless), and hands the query to
   the registers that can answer it. The panel states it has not searched the
   world, and a test asserts that sentence exists. An unreachable source is
-  REPORTED -- a short list read as a clean result is the worst thing this
-  feature can produce.
+  REPORTED **by name** (ADR 0037) -- a short list read as a clean result is
+  the worst thing this feature can produce, and "one of the indexes" withholds
+  the one fact that says how big the hole is. OpenAlex and Crossref do not
+  cover the same ground. `unavailable_sources: list[str]`, never a boolean,
+  and never a second derived flag beside it. `SOURCES` fixes the order and the
+  zip is `strict=True`, so a third source added without extending it fails
+  loudly rather than mislabelling which one was down.
 - **The two prior-art lookups run concurrently, with their own budget.**
   Crossref's `query.bibliographic` regularly exceeds ten seconds, which is the
   whole budget the frontend's HTTP client gives the request, so sequential

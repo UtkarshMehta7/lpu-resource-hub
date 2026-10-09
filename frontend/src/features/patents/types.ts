@@ -158,7 +158,9 @@ export interface PriorArtResult {
   similar_patents: SimilarPatent[];
   related_works: RelatedWork[];
   registries: RegistrySearch[];
-  /** True when an index could not be reached: the list is partial and the
-   *  screen must say so rather than read as "nothing like this exists". */
-  literature_unavailable: boolean;
+  /** The literature sources that refused or did not answer, by name. Empty
+   *  means every source answered. The screen must name them rather than let
+   *  a partial list read as "nothing like this exists" -- which source is
+   *  missing tells the reader what the gap covers. */
+  unavailable_sources: string[];
 }

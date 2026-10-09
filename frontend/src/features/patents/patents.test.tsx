@@ -34,7 +34,7 @@ function result(overrides: Partial<PriorArtResult> = {}): PriorArtResult {
     similar_patents: [],
     related_works: [],
     registries: REGISTRIES,
-    literature_unavailable: false,
+    unavailable_sources: [],
     ...overrides,
   };
 }
@@ -81,16 +81,28 @@ describe("PriorArtPanel", () => {
     }
   });
 
-  it("says when a literature index was unreachable", async () => {
+  it("names the literature index that was unreachable", async () => {
     // A short list presented as a clean result reads as "nothing like this
-    // exists", which is the opposite of what happened.
-    searchMock.mockResolvedValue(result({ literature_unavailable: true }));
+    // exists", which is the opposite of what happened -- and "an index"
+    // does not tell the reader what the gap covers.
+    searchMock.mockResolvedValue(result({ unavailable_sources: ["Crossref"] }));
     renderPanel();
 
     await userEvent.click(screen.getByRole("button", { name: /check prior art/i }));
 
     expect(
-      await screen.findByText(/could not be reached, so this list is incomplete/i),
+      await screen.findByText(/Crossref could not be reached, so this list is incomplete/i),
+    ).toBeInTheDocument();
+  });
+
+  it("names both indexes when both were unreachable", async () => {
+    searchMock.mockResolvedValue(result({ unavailable_sources: ["OpenAlex", "Crossref"] }));
+    renderPanel();
+
+    await userEvent.click(screen.getByRole("button", { name: /check prior art/i }));
+
+    expect(
+      await screen.findByText(/OpenAlex and Crossref could not be reached/i),
     ).toBeInTheDocument();
   });
 

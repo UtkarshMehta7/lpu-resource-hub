@@ -23,7 +23,10 @@ So it does three honest things instead:
    publication de-duplication already runs on.
 2. **Searches the open literature.** A published paper is prior art in
    exactly the way another patent is, and it is what most often destroys
-   novelty. OpenAlex and Crossref are keyless and already wired up.
+   novelty. OpenAlex and Crossref are keyless and already wired up. Each is
+   named in the result when it does not answer: "one index was unreachable"
+   leaves the reader unable to judge what the gap covers, and the two do not
+   cover the same ground.
 3. **Hands the query to the registers that can answer it**, pre-built, so
    the worldwide search happens where it is actually possible.
 """
@@ -211,6 +214,14 @@ def _crossref(client: httpx.Client, query: str, mailto: str) -> list[RelatedWork
 #: A source: takes a client, a query and a contact address; returns works.
 Fetcher = Callable[[httpx.Client, str, str], list[RelatedWork]]
 
+#: The literature sources, in the order the result reports them. Named,
+#: because a reader who is told only that "an index" failed cannot tell
+#: whether the gap is bibliographic metadata or the open-access record.
+SOURCES: Final[tuple[tuple[str, Fetcher], ...]] = (
+    ("OpenAlex", _openalex),
+    ("Crossref", _crossref),
+)
+
 
 def _dedupe(works: list[RelatedWork]) -> list[RelatedWork]:
     """One row per work. A DOI settles it; otherwise the normalised title does.
@@ -243,7 +254,7 @@ def search(
     similar = _similar_patents(db, title, exclude_id)
 
     related: list[RelatedWork] = []
-    unavailable = False
+    unavailable: list[str] = []
     mailto = settings.import_contact_email
     query = probe[:400]
 
@@ -261,22 +272,27 @@ def search(
             build_client(mailto, timeout=SOURCE_TIMEOUT) as client,
             ThreadPoolExecutor(max_workers=2) as pool,
         ):
-            for answer in pool.map(fetch, (_openalex, _crossref)):
+            # `pool.map` keeps the input order, so each answer belongs to the
+            # source at the same position in SOURCES.
+            answers = pool.map(fetch, (source for _, source in SOURCES))
+            for (name, _), answer in zip(SOURCES, answers, strict=True):
                 if answer is None:
                     # One source being down is not a reason to lose the other,
-                    # but the caller must be told the list is partial -- a
+                    # but the caller must be told WHICH one is missing -- a
                     # short list read as a clean result is the worst thing
-                    # this feature can produce.
-                    unavailable = True
+                    # this feature can produce, and "an index" does not say
+                    # what the gap covers.
+                    unavailable.append(name)
                 else:
                     related.extend(answer)
     except httpx.HTTPError:
-        unavailable = True
+        # The client itself could not be built or opened, so nothing was asked.
+        unavailable = [name for name, _ in SOURCES]
 
     return PriorArtResult(
         searched=title,
         similar_patents=similar,
         related_works=_dedupe(related),
         registries=_registries(title),
-        literature_unavailable=unavailable,
+        unavailable_sources=unavailable,
     )
