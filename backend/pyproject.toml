@@ -18,7 +18,13 @@ dependencies = [
     "sqlalchemy>=2.0.40,<2.1",
     "psycopg[binary]>=3.2,<4.0",
     "alembic>=1.16,<2.0",
-    "pyjwt>=2.10,<3.0",
+    # 2.15.0 is the floor, not 2.10: PYSEC-2026-4141 and PYSEC-2026-4183
+    # affect every release below it. Neither is reachable here -- tokens are
+    # HS256 against a local secret and nothing calls PyJWKClient or
+    # from_jwk -- but pip-audit fails the Security job on any advisory, so a
+    # resolve landing on 2.14 would break the build for a reason nobody
+    # could act on from the error.
+    "pyjwt>=2.15,<3.0",
     "argon2-cffi>=23.1,<26.0",
     "email-validator>=2.2,<3.0",
     # Recommendations (Step 9): TF-IDF + cosine similarity, run locally.
