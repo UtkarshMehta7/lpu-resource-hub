@@ -6,6 +6,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 
 import { searchPriorArt } from "./api";
 import { officeLabel, STATUS_LABEL, STATUS_TONE } from "./labels";
+import type { PriorArtResult } from "./types";
 
 /**
  * Prior art for a patent being drafted.
@@ -20,6 +21,21 @@ import { officeLabel, STATUS_LABEL, STATUS_TONE } from "./labels";
  * "an index was unreachable" leaves the reader unable to tell what the gap
  * covers.
  */
+/**
+ * The names a result reports as unreachable.
+ *
+ * Read defensively because the browser gets the new bundle from the CDN in
+ * seconds while the API is still rebuilding its image, so for a few minutes
+ * this code talks to a deployment that has never heard of the field. Reading
+ * `.length` off the `undefined` that comes back would throw inside render and
+ * take the whole panel down -- an additive change breaking the feature that
+ * was already working, which is the failure AGENTS.md records against the
+ * conversation thread.
+ */
+function unreachable(result: PriorArtResult): string[] {
+  return result.unavailable_sources ?? [];
+}
+
 /** "OpenAlex", or "OpenAlex and Crossref" -- named, never counted. */
 function formatSources(names: string[]): string {
   const last = names[names.length - 1] ?? "";
@@ -106,13 +122,13 @@ export function PriorArtPanel({
               A published paper is prior art exactly as another patent is, and it is what most often
               defeats a claim of novelty.
             </p>
-            {result.unavailable_sources.length > 0 ? (
+            {unreachable(result).length > 0 ? (
               <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                {formatSources(result.unavailable_sources)} could not be reached, so this list is
+                {formatSources(unreachable(result))} could not be reached, so this list is
                 incomplete. Run the check again before relying on it.
               </p>
             ) : null}
-            {result.related_works.length === 0 && result.unavailable_sources.length === 0 ? (
+            {result.related_works.length === 0 && unreachable(result).length === 0 ? (
               <p className="mt-2 text-sm text-ink-muted">
                 Nothing close came back from OpenAlex or Crossref.
               </p>

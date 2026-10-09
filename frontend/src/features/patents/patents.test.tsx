@@ -95,6 +95,21 @@ describe("PriorArtPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("survives an API that predates the field, rather than taking the panel down", async () => {
+    // The CDN serves this bundle minutes before the API finishes rebuilding,
+    // so for a short window the field is simply absent. Reading .length off
+    // that undefined would throw inside render and lose the whole panel.
+    const stale = result();
+    delete (stale as { unavailable_sources?: string[] }).unavailable_sources;
+    searchMock.mockResolvedValue(stale);
+    renderPanel();
+
+    await userEvent.click(screen.getByRole("button", { name: /check prior art/i }));
+
+    expect(await screen.findByText(/Published research that may count/i)).toBeInTheDocument();
+    expect(screen.queryByText(/could not be reached/i)).not.toBeInTheDocument();
+  });
+
   it("names both indexes when both were unreachable", async () => {
     searchMock.mockResolvedValue(result({ unavailable_sources: ["OpenAlex", "Crossref"] }));
     renderPanel();
