@@ -4,6 +4,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/authContext";
 
 import { MessagesLink } from "@/features/messages/MessagesLink";
+import { AnnouncementsLink } from "@/features/announcements/AnnouncementsLink";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 
 import { MenuIcon, SearchIcon } from "@/components/ui/icons";
@@ -62,6 +63,7 @@ export function Header() {
                   ⌘K
                 </kbd>
               </button>
+              <AnnouncementsLink />
               <MessagesLink />
               <NotificationBell />
               <button

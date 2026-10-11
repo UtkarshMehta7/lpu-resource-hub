@@ -58,6 +58,11 @@ class Permission(StrEnum):
     FACILITY_MANAGE = "facility:manage"
     BOOKING_APPROVE = "booking:approve"
     FUNDING_MANAGE = "funding:manage"
+    #: Saying one thing to everybody. The only permission on the platform that
+    #: addresses an audience rather than a record, which is why it is held by
+    #: three roles and not granted through inheritance: FACULTY must not pick
+    #: it up when RESEARCH_COORDINATOR has it.
+    ANNOUNCEMENT_POST = "announcement:post"
 
 
 # A role inherits everything its parent can do. ADMIN's powers are listed
@@ -124,6 +129,10 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.FUNDING_MANAGE,
             Permission.PUBLICATION_DEDUPLICATE,
             Permission.PATENT_VERIFY,
+            # Carries across their own department, never the institution --
+            # the reach is derived from the poster, not named in the request
+            # (announcements/policies.py: reach_of).
+            Permission.ANNOUNCEMENT_POST,
         }
     ),
     # Looks after the facilities assigned to them. Which facilities is an
@@ -151,6 +160,11 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             # PROJECT_REVIEW says a person may review *a* project, never every
             # project -- the same distinction FACILITY_MANAGE needed.
             Permission.PROJECT_REVIEW,
+            # The one thing a dean may WRITE, and it writes no record: an
+            # institution-wide notice. The role exists so somebody senior can
+            # see the whole institution; being unable to tell it anything was
+            # the other half of that job missing.
+            Permission.ANNOUNCEMENT_POST,
         }
     ),
     UserRole.ADMIN: frozenset(
@@ -177,6 +191,7 @@ _OWN_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
             Permission.PUBLICATION_DEDUPLICATE,
             Permission.PATENT_CREATE,
             Permission.PATENT_VERIFY,
+            Permission.ANNOUNCEMENT_POST,
         }
     ),
 }

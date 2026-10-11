@@ -344,6 +344,20 @@ ENDPOINTS = (
         "/api/v1/students",
         frozenset({UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR, UserRole.ADMIN}),
     ),
+    # Announcements: reading the board is for every signed-in role, and
+    # posting is for the three that address an audience. The dean also posts,
+    # but ALL_ROLES does not include that role, so the dean's grant is
+    # asserted in tests/test_announcements.py instead.
+    Endpoint("GET", "/api/v1/announcements", frozenset(ALL_ROLES)),
+    Endpoint("GET", "/api/v1/announcements/unread-count", frozenset(ALL_ROLES)),
+    # POST /api/v1/announcements is deliberately absent, for the same reason
+    # as PUT /me/profile above: one row cannot express it. Both permitted
+    # roles are authorised, and they then get DIFFERENT codes -- an admin
+    # addresses the institution and gets 201, while a coordinator seeded here
+    # oversees no department and gets the 409 that says "authorised, but with
+    # nobody to address". tests/test_announcements.py covers the posting rule
+    # across all six roles, including the dean and the custodian that
+    # ALL_ROLES leaves out.
 )
 
 

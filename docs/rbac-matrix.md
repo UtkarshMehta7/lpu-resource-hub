@@ -87,6 +87,8 @@ refused on self and audited.
 | `funding:manage` | | | ✅ (university-wide) | ✅ | 12 |
 | `analytics:read` | | | ✅ (own dept figures) | ✅ (platform) | 14 |
 | `publication:deduplicate` | | | ✅ | ✅ | 29 |
+| `announcement:post` | | | ✅ (own department) | ✅ (institution) | 38 |
+| *(no permission)* reading the notice board | ✅ | ✅ | ✅ | ✅ | 38 |
 
 Every authenticated, active user (any role) can read their own profile via
 `GET /api/v1/me`, read their own `GET/PUT /me/profile`, set their own
@@ -149,12 +151,19 @@ a query filter, used by the booking queue so a listing can never show a
 request the approve call would then refuse. A booking on somebody else's
 facility is a `404`.
 
-A dean reads and changes nothing: `analytics:read` is the whole grant, and
+A dean changes no record. `analytics:read` is the reading grant, and
 `insights.scope_for` puts them in the same institution-wide scope as an
 admin. They reach `/analytics`, `/analytics/report` and the at-risk board
 (whose gate moved from `project:review` to `analytics:read`, since looking at
 the board is reading, not reviewing) — and no other queue, because every
 other one is an action on somebody's work.
+
+They also hold **`announcement:post`** (ADR 0038), which is the one thing the
+role writes. A notice is not a record: it creates no publication, patent,
+project or profile and alters none. The role exists so somebody senior can see
+the whole institution, and being unable to tell it anything was the other half
+of that job missing. A dean's notice is institution-wide, because
+`INSTITUTION_WIDE_ROLES` is what `reach_of` keys on.
 
 ## Curating publication records (ADR 0029)
 

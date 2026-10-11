@@ -60,6 +60,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Name searches offer candidates to choose between instead of guessing, every imported work links to its source, importing returns a profile for re-verification, and anyone waiting can nudge whoever must act ([ADR 0027](docs/adr/0027-choosing-yourself-and-nudging.md)) | Done |
 | Institutional research report for a full academic year, on screen and exportable to PDF and CSV, with six new analytics metrics and every figure carrying its definition ([reporting](docs/reporting.md), [analytics](docs/analytics.md)) | Done |
 | A project's chat exists from the moment it is created and its membership follows the team — however somebody joined, including by being accepted into an opportunity — and teams share PDFs, Word documents, images and archives up to 5 MB, typed from their bytes and downloadable only by a participant ([ADR 0033](docs/adr/0033-files-in-a-conversation.md)) | Done |
+| A notice board the whole institution reads: an administrator or the Dean of Research addresses everybody, a research coordinator their own department, with text, labelled links and attached files — and an unread count that costs one row per notice rather than one per account ([ADR 0038](docs/adr/0038-the-institution-can-say-one-thing-to-everybody.md)) | Done |
 
 ## Technology stack
 
@@ -378,6 +379,14 @@ dead button.
 | `GET /api/v1/analytics/institutional-report/export?format=pdf\|csv` | coordinator, admin | The same aggregation as a file, so the numbers cannot differ from the screen. |
 | `GET /api/v1/analytics/academic-years` | coordinator, admin | Real years to choose from, rather than a free-text box inviting typos. |
 | `POST /api/v1/nudges` | any signed-in user | Remind whoever must act that something of **yours** is still waiting. The sender never names the recipient; one nudge per thing per day. |
+| `GET /api/v1/announcements` | any signed-in user | The notice board — what the university and your own department have announced, newest first. Filters `q`, `unread_only`, `mine`. Every role reads it; the server scopes what each one sees. |
+| `GET /api/v1/announcements/unread-count` | any signed-in user | Drives the header badge. A `NOT EXISTS` against the read markers, so a post costs one row however large the institution. |
+| `POST /api/v1/announcements` | coordinator, dean, admin (`announcement:post`) | Writes a **draft**. There is no `audience` field: an admin or dean addresses the institution, a coordinator their own department, derived from the caller. |
+| `POST /api/v1/announcements/{id}/publish` | the author | Puts it on the board and dates it. From here it is readable and no longer editable by anyone. |
+| `POST /api/v1/announcements/{id}/withdraw` | the author, or any admin | Takes it off the board; the record stays. An admin may withdraw somebody else's notice and never rewrite it. |
+| `POST/DELETE /api/v1/announcements/{id}/attachments` | the author, while it is a draft | PDF, images, Word documents and archives up to 5 MB, typed from their **bytes**. |
+| `GET /api/v1/announcements/{id}/attachments/{aid}` | anyone the notice is addressed to | Re-runs the notice's visibility check and scopes the id to the notice; there is no public path to the bytes. |
+| `POST /api/v1/announcements/{id}/read` | any signed-in user | Records that you have seen it. Idempotent, so two tabs cannot race. |
 | `GET /api/v1/me/milestones` | any signed-in user | What the caller owes, across projects, soonest first. |
 | `GET /api/v1/coordinator/at-risk-projects` | coordinator, admin | Projects with slipping milestones, most overdue first. |
 | `PUT /api/v1/me/skills` | any signed-in user | `[{skill_id, proficiency}]`, replaces the whole set. |

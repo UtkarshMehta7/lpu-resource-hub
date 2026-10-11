@@ -31,9 +31,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.permissions import ROLE_PERMISSIONS, Permission
 from app.core.security import MIN_PASSWORD_LENGTH, hash_password, is_common_password
 from app.db.session import create_db_engine, create_session_factory
 from app.modules.admin.models import Department, School
+from app.modules.announcements.models import (
+    Announcement,
+    AnnouncementLink,
+    AnnouncementStatus,
+)
+from app.modules.announcements.policies import NoScopeToPostError, reach_of
 from app.modules.facilities.models import Equipment, Facility, MaintenanceStatus
 from app.modules.funding.models import FundingOpportunity
 from app.modules.milestones.models import (
@@ -195,6 +202,7 @@ class SeedSummary:
     milestones: int = 0
     facilities: int = 0
     equipment: int = 0
+    announcements: int = 0
 
     def render(self) -> str:
         return (
@@ -209,7 +217,8 @@ class SeedSummary:
             f"  projects:       {self.projects}\n"
             f"  milestones:     {self.milestones}\n"
             f"  facilities:     {self.facilities}\n"
-            f"  equipment:      {self.equipment}"
+            f"  equipment:      {self.equipment}\n"
+            f"  announcements:  {self.announcements}"
         )
 
 
@@ -580,6 +589,126 @@ DEMO_PROJECTS: tuple[tuple[str, str, tuple[tuple[str, int], ...]], ...] = (
 )
 
 
+#: Notices for the board, each as
+#: (subject, body, days ago it was posted, [(link label, url)]).
+#:
+#: Deliberately a MIX of reaches: the first two are institution-wide (posted
+#: by the admin and the dean) and the third is departmental, so a fresh
+#: install shows both kinds and a student in department 0 sees one more notice
+#: than a student elsewhere. Seeded with every notice already published --
+#: a draft is invisible to everybody but its author, so seeding drafts would
+#: leave the board looking empty again, which is the failure
+#: MILESTONE_SHAPES and the facility seed were both written to avoid.
+DEMO_ANNOUNCEMENTS: tuple[tuple[str, str, str, int, tuple[tuple[str, str], ...]], ...] = (
+    (
+        "admin",
+        "Invention disclosure window for this quarter closes on the 30th",
+        "Fictional demo notice. Send completed disclosure forms to the IP cell "
+        "before the end of the month. Record the invention on the platform first "
+        "-- the prior-art check and the inventor list come from that record, and "
+        "the cell asks for both.",
+        3,
+        (("The disclosure form", "https://example.org/demo-disclosure-form"),),
+    ),
+    (
+        "dean",
+        "Annual research report: departments to confirm their figures by Friday",
+        "Fictional demo notice. The institutional report is generated from the "
+        "records on this platform, so anything missing from a department's "
+        "publications, patents or projects will be missing from the report. "
+        "Coordinators, please check your department's analytics page.",
+        1,
+        (
+            ("Analytics", "https://example.org/demo-analytics"),
+            ("Last year's report", "https://example.org/demo-report"),
+        ),
+    ),
+    (
+        "coordinator",
+        "Department seminar moved to Thursday, 3 pm, Block 34",
+        "Fictional demo notice. This week's seminar has moved from Wednesday to "
+        "Thursday at 3 pm in Block 34. Students presenting should bring their "
+        "slides on a drive.",
+        0,
+        (),
+    ),
+)
+
+
+def _seed_announcements(
+    db: Session,
+    summary: SeedSummary,
+    *,
+    admin: User,
+    dean: User,
+    coordinator: User | None,
+) -> None:
+    """Idempotent: a notice is identified by its subject.
+
+    The posters are a deliberate spread across all three roles that may post,
+    because the reach is DERIVED from the poster (ADR 0038) -- seeding them
+    all as the admin would make every demo notice institution-wide and
+    demonstrate the department scope not at all.
+
+    The audience comes from `policies.reach_of`, the same function the service
+    calls, rather than being decided again here. A script writing straight to
+    the database carries the invariants the services carry, and this one found
+    a real reason to: in a database where the demo numbers had collided,
+    `demo.coordinator01` was a STUDENT, and deciding the audience locally
+    wrote a departmental notice as institution-wide with a student's name on
+    it -- a row the API could not have produced, because a student holds no
+    ANNOUNCEMENT_POST at all. A poster who may not post is skipped and
+    counted, never quietly promoted.
+    """
+    existing = {subject for (subject,) in db.execute(select(Announcement.subject)).all()}
+    now = datetime.now(UTC)
+    posters: dict[str, User | None] = {
+        "admin": admin,
+        "dean": dean,
+        "coordinator": coordinator,
+    }
+    for poster_key, subject, body, days_ago, links in DEMO_ANNOUNCEMENTS:
+        if subject in existing:
+            continue
+        poster = posters[poster_key]
+        if poster is None:
+            continue
+        if Permission.ANNOUNCEMENT_POST not in ROLE_PERMISSIONS[poster.role]:
+            print(
+                f"  skipped announcement {subject!r}: "
+                f"{poster.email} is a {poster.role.value} and cannot post one"
+            )
+            continue
+        try:
+            audience, department_id = reach_of(poster)
+        except NoScopeToPostError:
+            print(
+                f"  skipped announcement {subject!r}: {poster.email} has no department to address"
+            )
+            continue
+        notice = Announcement(
+            subject=subject,
+            body=body,
+            audience=audience,
+            department_id=department_id,
+            posted_by=poster.id,
+            posted_by_role=poster.role,
+            posted_by_name=poster.full_name,
+            status=AnnouncementStatus.PUBLISHED,
+            # A published notice carries its date, as a CHECK and as a
+            # sentence. Set here rather than left to the service, because a
+            # seed writes the row directly.
+            published_at=now - timedelta(days=days_ago),
+        )
+        db.add(notice)
+        db.flush()
+        for position, (label, url) in enumerate(links):
+            db.add(
+                AnnouncementLink(announcement_id=notice.id, label=label, url=url, position=position)
+            )
+        summary.announcements += 1
+
+
 def _seed_projects(
     db: Session, summary: SeedSummary, owners: list[User], rng: random.Random
 ) -> None:
@@ -735,7 +864,7 @@ def seed(db: Session, password_hash: str) -> SeedSummary:
     )
     # No department: a dean reads the whole institution, and
     # INSTITUTION_WIDE_ROLES is what lets them exist without one.
-    _seed_user(
+    dean = _seed_user(
         db,
         existing_users,
         summary,
@@ -808,6 +937,13 @@ def seed(db: Session, password_hash: str) -> SeedSummary:
         summary.profiles += 1
 
     _seed_funding(db, summary, admin)
+    _seed_announcements(
+        db,
+        summary,
+        admin=admin,
+        dean=dean,
+        coordinator=_coordinator_for(coordinators, departments[0]),
+    )
     _seed_projects(db, summary, faculty, rng)
 
     db.commit()

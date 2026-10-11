@@ -70,6 +70,11 @@ def test_coordinator_inherits_faculty_grants_on_top_of_its_own() -> None:
             # Vouching that a patent RECORD is right -- the numbers, dates and
             # inventors. Not the grant, which only a patent office decides.
             Permission.PATENT_VERIFY,
+            # Addressing their own department. The grant sits on THIS rung
+            # rather than faculty's on purpose: inheritance runs upward, so a
+            # faculty-level grant would have given every faculty member an
+            # institutional voice for free (ADR 0038).
+            Permission.ANNOUNCEMENT_POST,
             Permission.USER_CREATE,  # inherited from FACULTY
             Permission.USER_DELETE,  # inherited from FACULTY
             Permission.STUDENT_DISCOVER,  # inherited from FACULTY
@@ -108,6 +113,7 @@ def test_admin_has_exactly_its_own_grants() -> None:
             Permission.PUBLICATION_DEDUPLICATE,
             Permission.PATENT_CREATE,
             Permission.PATENT_VERIFY,
+            Permission.ANNOUNCEMENT_POST,
         }
     )
 
