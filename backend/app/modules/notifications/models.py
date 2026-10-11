@@ -34,6 +34,13 @@ class NotificationType(StrEnum):
     MILESTONE_OVERDUE = "milestone_overdue"
     #: Somebody is waiting on the recipient to verify, review or decide.
     NUDGE_RECEIVED = "nudge_received"
+    #: Somebody below you has put a request to you by name (ADR 0039). The
+    #: only notification whose recipient the SENDER chose, which is why the
+    #: routing table and the department check stand behind it.
+    REQUEST_RECEIVED = "request_received"
+    #: The recipient answered -- resolved or declined. Declining always
+    #: carries a reason, so this is never a bare "no".
+    REQUEST_DECIDED = "request_decided"
     #: Two people whose expertise overlaps and who have never co-authored.
     #: Sent once per pairing, ever.
     COLLABORATION_SUGGESTION = "collaboration_suggestion"

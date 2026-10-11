@@ -312,6 +312,52 @@ def may_delete_role(actor_role: UserRole, target_role: UserRole) -> bool:
     return target_role in DELETABLE_ROLES[actor_role]
 
 
+# A personal request travels UPWARD, and this table is the only authority on
+# how far. It is the one place on the platform where a sender NAMES their
+# recipient, which is the deliberate opposite of a nudge: `POST /nudges` takes
+# a kind and an entity and resolves who hears about it from the thing being
+# chased, precisely so it cannot become a way to message anyone in the
+# institution (ADR 0031).
+#
+# A request needs the opposite, because "my supervisor has not signed my form"
+# is addressed to a person and nobody else can act on it. So the recipient
+# field comes back, and this table plus a department check is what stops it
+# being the general messaging route nudges refused to be:
+#
+#   * a sender may only address roles ABOVE their own -- never a peer, never
+#     downward, never themselves;
+#   * and only within their own department, unless the recipient answers to
+#     the institution rather than a department (`INSTITUTION_WIDE_ROLES`),
+#     since a dean and an administrator belong to none.
+#
+# An administrator addresses nobody: they are the top of the institution, and
+# a request from them is an instruction, which is a different thing.
+REQUEST_RECIPIENT_ROLES: dict[UserRole, frozenset[UserRole]] = {
+    UserRole.STUDENT: frozenset({UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR}),
+    UserRole.FACULTY: frozenset(
+        {UserRole.RESEARCH_COORDINATOR, UserRole.DEAN_OF_RESEARCH, UserRole.ADMIN}
+    ),
+    # A custodian looks after rooms and answers to the department that owns
+    # them, so their escalation path is a coordinator's -- the same scope
+    # their facilities have.
+    UserRole.FACILITY_CUSTODIAN: frozenset(
+        {UserRole.RESEARCH_COORDINATOR, UserRole.DEAN_OF_RESEARCH, UserRole.ADMIN}
+    ),
+    UserRole.RESEARCH_COORDINATOR: frozenset({UserRole.DEAN_OF_RESEARCH, UserRole.ADMIN}),
+    UserRole.DEAN_OF_RESEARCH: frozenset({UserRole.ADMIN}),
+    UserRole.ADMIN: frozenset(),
+}
+
+
+def request_recipient_roles(sender_role: UserRole) -> frozenset[UserRole]:
+    """The roles this role may put a request to."""
+    return REQUEST_RECIPIENT_ROLES[sender_role]
+
+
+def may_request_from(sender_role: UserRole, recipient_role: UserRole) -> bool:
+    return recipient_role in REQUEST_RECIPIENT_ROLES[sender_role]
+
+
 def require_permission(permission: Permission) -> Callable[..., User]:
     """FastAPI dependency factory: 401 if unauthenticated, 403 if lacking `permission`."""
 
