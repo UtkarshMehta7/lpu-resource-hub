@@ -67,7 +67,14 @@ function NoticeCard({ notice }: { notice: Announcement }) {
   );
 }
 
-/** The notice board: what the institution and your department have said. */
+/**
+ * The searchable history of everything announced to you.
+ *
+ * The LATEST notices are on the dashboard, which is where everybody meets
+ * the board (ADR 0038). This page is the archive behind it -- for finding
+ * the circular from last term, which is why the search box is the first
+ * thing on it and there is no attempt to repeat the dashboard's job.
+ */
 export function AnnouncementsPage({ mine = false }: { mine?: boolean }) {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -100,11 +107,11 @@ export function AnnouncementsPage({ mine = false }: { mine?: boolean }) {
   return (
     <div>
       <PageHeader
-        title={mine ? "My announcements" : "Announcements"}
+        title={mine ? "My announcements" : "All announcements"}
         description={
           mine
             ? "Notices you have posted, including drafts nobody else can see yet."
-            : "Notices from the university and from your department. Everything addressed to you appears here."
+            : "Everything the university and your department have announced to you, oldest kept as well as newest. The latest few are on your dashboard."
         }
         actions={
           <>
@@ -160,13 +167,17 @@ export function AnnouncementsPage({ mine = false }: { mine?: boolean }) {
         ) : null}
         {data && data.items.length === 0 ? (
           <EmptyState
-            title={unreadOnly ? "Nothing unread" : "No announcements yet"}
+            title={
+              q ? "Nothing matches that" : unreadOnly ? "Nothing unread" : "No announcements yet"
+            }
             description={
-              unreadOnly
-                ? "You have read everything addressed to you."
-                : mine
-                  ? "Notices you post will appear here."
-                  : "When the university or your department posts a notice, it will appear here."
+              q
+                ? "Try a word from the subject, or clear the search to see everything."
+                : unreadOnly
+                  ? "You have read everything addressed to you."
+                  : mine
+                    ? "Notices you post will appear here."
+                    : "When the university or your department posts a notice, it will appear here."
             }
           />
         ) : null}

@@ -45,16 +45,6 @@ export function MessageIcon({ className }: { className?: string }) {
   );
 }
 
-export function MegaphoneIcon({ className }: { className?: string }) {
-  return (
-    <Svg className={className}>
-      <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z" />
-      <path d="M15 8a4 4 0 0 1 0 8" />
-      <path d="M18 5a8 8 0 0 1 0 14" />
-    </Svg>
-  );
-}
-
 export function BellIcon({ className }: { className?: string }) {
   return (
     <Svg className={className}>

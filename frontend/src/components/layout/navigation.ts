@@ -30,11 +30,16 @@ export const NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", group: "Discover", keywords: "home start overview" },
   // No `roles`: the board is for every signed-in role, which is the point
   // of the feature. What each person sees is scoped on the server.
+  //
+  // The LATEST notices are a section on the dashboard, where everybody meets
+  // them; this entry is the searchable history behind it. It is listed here
+  // and not only linked from that section, because a page reachable from one
+  // place is still missing from the other two surfaces this file drives.
   {
     to: "/announcements",
     label: "Announcements",
     group: "Discover",
-    keywords: "notices notice board circular news bulletin updates",
+    keywords: "notices notice board circular news bulletin updates history archive older past",
   },
   { to: "/search", label: "Search", group: "Discover", keywords: "find lookup" },
   { to: "/recommendations", label: "For you", group: "Discover", keywords: "recommended matches" },

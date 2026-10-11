@@ -82,6 +82,42 @@ sync makes that state unreachable through the application, but a row written by
 a script could still be in it, and the wrong answer is to quietly promote the
 notice to everybody.
 
+### The dashboard is where everybody meets it; the page is the history
+
+The **latest** notices are a section on the dashboard, rendered for every role
+and sitting above the role sections — a notice is addressed to you, while the
+rest of that page is about your own work. The panel comes back on
+`DashboardResponse` **outside the per-role dispatch**, because a notice is not
+something a role either has or lacks; `analytics/service.py:dashboard` has
+forgotten a role before, and this shape makes that impossible here.
+
+`/announcements` is the searchable **history** behind it, for finding the
+circular from last term. It stays in `components/layout/navigation.ts` rather
+than being linked only from the dashboard section: a page reachable from one
+place is still missing from the full menu and the command palette, which is
+the exact failure `/admin/accounts/new` had.
+
+The panel is built in a **savepoint that swallows `SQLAlchemyError`**, the
+same treatment the chat thread opened on acceptance gets. The dashboard is the
+older and more important act — every role signs in to it — and this is a new
+dependency from that old code to a new table. Without the savepoint, shipping
+the code to a database whose migration had not yet run would make every
+dashboard answer 500 for everybody: an additive feature taking down an
+existing one.
+
+On the browser side the field is **optional in the hand-written type** and
+defaulted in the component, for the deploy window: Netlify serves a new bundle
+in seconds while Render rebuilds in minutes, so this code will meet an API
+that has never heard of the field, and reading `.latest` off `undefined`
+inside render would take the whole dashboard down. A test deletes the field
+and asserts the page still renders.
+
+There is deliberately **no notice icon in the header**. Three action icons
+made an overflow worse that was already there — measured at +80px at 360,
++50 at 390, +26 at 414 and +32 at 1280, on every page in the application —
+and the dashboard section plus the navigation entry reach it without adding
+to the row.
+
 ### Delivery is a read marker, not a fan-out
 
 `announcement_reads` carries one row per person who has **opened** a notice.

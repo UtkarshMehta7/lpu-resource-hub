@@ -306,6 +306,17 @@ Current shape: 186 API operations over 148 paths, 52 tables, 34 migrations,
   `CREATABLE_ROLE`, for the same reason -- an `audience` field is how ten
   coordinators each acquire an institution-wide megaphone. A coordinator with
   no scope gets 409, never a widened audience.
+- **The DASHBOARD is where everybody meets the board**, and `/announcements`
+  is the searchable history behind it. The panel rides on `DashboardResponse`
+  OUTSIDE the per-role dispatch -- a notice is not something a role has or
+  lacks -- and is built in a savepoint that swallows SQLAlchemyError, like the
+  thread opened on acceptance: the dashboard is the older act, and a new
+  dependency from it to a new table must not be able to 500 it for every role.
+  The frontend field is OPTIONAL and defaulted in the component, for the
+  Netlify-seconds/Render-minutes window; a test deletes it and asserts the
+  page still renders. **No notice icon in the header**: the action row already
+  overflows at +80px (360), +50 (390), +26 (414) and +32 (1280) on every page,
+  and a third icon only made it worse.
 - **One post writes ONE row.** `announcement_reads` holds a marker per person
   who opened a notice and the unread count is a `NOT EXISTS` against it.
   Never deliver a notice as a notification per recipient -- that is a row per

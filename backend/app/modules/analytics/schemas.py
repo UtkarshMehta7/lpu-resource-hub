@@ -14,6 +14,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.modules.announcements.schemas import AnnouncementRead
 from app.modules.audit.schemas import AuditLogRead
 from app.modules.opportunities.schemas import OpportunityCard
 from app.modules.projects.schemas import ProjectCard
@@ -96,9 +97,27 @@ class AdminDashboard(BaseModel):
     recent_audit: list[AuditLogRead]
 
 
+class AnnouncementsPanel(BaseModel):
+    """The notice board as it appears on a dashboard.
+
+    Present for EVERY role, outside the per-role dispatch below: a notice is
+    the one thing on this platform addressed to everybody, so the panel is not
+    something a role either has or lacks. The searchable history lives at
+    /announcements; this is the "what has been said lately" everybody meets
+    when they sign in.
+    """
+
+    unread: int
+    #: Newest first. Published only -- a draft of your own is not news.
+    latest: list[AnnouncementRead]
+
+
 class DashboardResponse(BaseModel):
     role: UserRole
     onboarding_complete: bool
+    #: Every role gets one. Defaults to empty rather than None so a reader
+    #: never has to branch on whether the board exists.
+    announcements: AnnouncementsPanel = AnnouncementsPanel(unread=0, latest=[])
     student: StudentDashboard | None = None
     faculty: FacultyDashboard | None = None
     coordinator: CoordinatorDashboard | None = None

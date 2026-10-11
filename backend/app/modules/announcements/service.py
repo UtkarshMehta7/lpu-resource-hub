@@ -225,6 +225,36 @@ def list_announcements(
     )
 
 
+def recent_for_dashboard(
+    db: Session, viewer: User, *, limit: int = 4
+) -> tuple[list[AnnouncementRead], int]:
+    """The few newest notices addressed to this person, and the unread count.
+
+    For the dashboard, which is where everybody meets the board -- so this is
+    the one surface every role sees, and the searchable history behind it is
+    for looking something up later.
+
+    Drafts are excluded even for their author: an unfinished notice of your
+    own on your own dashboard is noise, and the author reaches it from the
+    history page where it belongs.
+    """
+    rows = list(
+        db.execute(
+            select(Announcement)
+            .where(
+                Announcement.status == AnnouncementStatus.PUBLISHED,
+                policies.visibility_filter(viewer),
+            )
+            .order_by(Announcement.published_at.desc(), Announcement.id.desc())
+            .limit(limit)
+        )
+        .scalars()
+        .all()
+    )
+    extras = _load_extras(db, rows, viewer)
+    return [_read_model(row, extras) for row in rows], unread_count(db, viewer)
+
+
 def get_announcement(db: Session, announcement_id: uuid.UUID, viewer: User) -> AnnouncementRead:
     row = _load_visible(db, announcement_id, viewer)
     return _read_model(row, _load_extras(db, [row], viewer))

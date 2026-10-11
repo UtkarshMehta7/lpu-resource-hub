@@ -188,3 +188,99 @@ describe("the roles outside the provisioning chain", () => {
     );
   });
 });
+
+describe("the announcements section", () => {
+  const notice = (overrides: Record<string, unknown> = {}) => ({
+    id: "a1",
+    subject: "Invention disclosure window closes on Friday",
+    body: "Send your disclosures to the IP cell before 5 pm.",
+    audience: "institution",
+    department_id: null,
+    department_name: null,
+    posted_by: "u-admin",
+    posted_by_name: "Harpreet Kaur",
+    posted_by_role: "admin",
+    status: "published",
+    published_at: "2026-10-09T09:00:00Z",
+    links: [],
+    attachments: [],
+    unread: true,
+    created_at: "2026-10-09T08:00:00Z",
+    updated_at: "2026-10-09T09:00:00Z",
+    ...overrides,
+  });
+
+  it("shows the latest notices to a student, who may not post", async () => {
+    authState.user = { id: "u1", full_name: "Demo Student", role: "student" };
+    fetchMock.mockResolvedValue({
+      ...emptyResponse,
+      announcements: { unread: 1, latest: [notice()] },
+    });
+
+    renderDashboard();
+
+    expect(
+      await screen.findByText("Invention disclosure window closes on Friday"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1 unread")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "All announcements" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Post a notice" })).not.toBeInTheDocument();
+  });
+
+  it("offers posting to a role that may", async () => {
+    authState.user = { id: "u2", full_name: "Demo Dean", role: "dean_of_research" };
+    fetchMock.mockResolvedValue({
+      ...emptyResponse,
+      role: "dean_of_research",
+      announcements: { unread: 0, latest: [notice({ unread: false })] },
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByRole("link", { name: "Post a notice" })).toBeInTheDocument();
+    // No pill when there is nothing unread -- a "0 unread" badge is noise.
+    expect(screen.queryByText(/unread/)).not.toBeInTheDocument();
+  });
+
+  it("marks an unread notice with a word, not only a colour", async () => {
+    authState.user = { id: "u1", full_name: "Demo Student", role: "student" };
+    fetchMock.mockResolvedValue({
+      ...emptyResponse,
+      announcements: { unread: 1, latest: [notice()] },
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByText("New")).toBeInTheDocument();
+  });
+
+  it("points at the history when there is nothing to show", async () => {
+    authState.user = { id: "u1", full_name: "Demo Student", role: "student" };
+    fetchMock.mockResolvedValue({ ...emptyResponse, announcements: { unread: 0, latest: [] } });
+
+    renderDashboard();
+
+    expect(await screen.findByText(/Nothing has been announced lately/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Search older announcements" })).toBeInTheDocument();
+  });
+
+  it("survives an API that has never heard of the field", async () => {
+    // Netlify serves the new bundle in seconds; Render rebuilds in minutes.
+    // In that window this code meets an older API. Reading `.latest` off
+    // `undefined` inside render would throw and take the WHOLE dashboard
+    // down for every role -- the prior-art panel's bug on a worse page.
+    authState.user = { id: "u1", full_name: "Demo Student", role: "student" };
+    const older = { ...emptyResponse };
+    delete (older as Record<string, unknown>).announcements;
+    fetchMock.mockResolvedValue(older);
+
+    renderDashboard();
+
+    // Awaited on the section, not on "Welcome back": that heading is static
+    // and renders before the query resolves, so awaiting it would assert
+    // against the loading state and pass for the wrong reason.
+    expect(await screen.findByText(/Nothing has been announced lately/)).toBeInTheDocument();
+    // And the rest of the dashboard is still standing.
+    expect(screen.getByText(/Welcome back/)).toBeInTheDocument();
+  });
+});

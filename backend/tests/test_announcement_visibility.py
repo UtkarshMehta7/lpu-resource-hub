@@ -434,3 +434,88 @@ def test_search_respects_visibility(
     ).json()
 
     assert response["items"] == []
+
+
+# ----------------------------------------------------- the dashboard panel
+
+
+def dashboard(client: TestClient, viewer: SeededUser) -> dict:
+    response = client.get("/api/v1/me/dashboard", headers=auth(viewer))
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+@pytest.mark.parametrize("role_name", ["student", "faculty", "coordinator", "admin"])
+def test_every_role_gets_the_panel(client: TestClient, world: World, role_name: str) -> None:
+    """Outside the per-role dispatch, because a notice is for everybody.
+
+    The dashboard is where people actually meet the board, so a role that
+    did not get the panel would never see a notice at all.
+    """
+    institution_notice(client, world)
+    viewer: SeededUser = getattr(world, role_name)
+
+    panel = dashboard(client, viewer)["announcements"]
+
+    assert panel["unread"] == 1
+    assert len(panel["latest"]) == 1
+
+
+def test_a_custodian_and_a_dean_get_it_too(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """The two roles outside the provisioning chain, which have been
+    forgotten on the dashboard before."""
+    institution_notice(client, world)
+    custodian = seed_user(UserRole.FACILITY_CUSTODIAN, department_id=world.department_id)
+    dean = seed_user(UserRole.DEAN_OF_RESEARCH)
+
+    assert len(dashboard(client, custodian)["announcements"]["latest"]) == 1
+    assert len(dashboard(client, dean)["announcements"]["latest"]) == 1
+
+
+def test_the_panel_is_scoped_like_the_board(
+    client: TestClient, world: World, seed_user: Callable[..., SeededUser]
+) -> None:
+    """It must not become a way round the department scope."""
+    other_department_id = second_department(client, world)
+    outsider = seed_user(UserRole.STUDENT, department_id=other_department_id)
+    institution_notice(client, world)
+    department_notice(client, world)
+
+    assert len(dashboard(client, world.student)["announcements"]["latest"]) == 2
+    assert len(dashboard(client, outsider)["announcements"]["latest"]) == 1
+
+
+def test_the_panel_holds_only_published_notices(client: TestClient, world: World) -> None:
+    """Including the author's own draft: an unfinished notice of your own on
+    your own dashboard is noise, and it is reachable from the history."""
+    post_draft(client, world.coordinator)
+
+    panel = dashboard(client, world.coordinator)["announcements"]
+
+    assert panel["latest"] == []
+    assert panel["unread"] == 0
+
+
+def test_the_panel_is_newest_first_and_short(client: TestClient, world: World) -> None:
+    """A dashboard section, not the whole board -- the history is for that."""
+    subjects = [f"Notice number {index}" for index in range(6)]
+    for subject in subjects:
+        notice = post_draft(client, world.admin, subject=subject)
+        publish(client, world.admin, notice["id"])
+
+    panel = dashboard(client, world.student)["announcements"]
+
+    assert [item["subject"] for item in panel["latest"]] == subjects[:-5:-1]
+    # Every one of them is still counted, even though only a few are shown.
+    assert panel["unread"] == len(subjects)
+
+
+def test_reading_one_lowers_the_dashboard_count(client: TestClient, world: World) -> None:
+    notice_id = institution_notice(client, world)
+    assert dashboard(client, world.student)["announcements"]["unread"] == 1
+
+    client.post(f"/api/v1/announcements/{notice_id}/read", headers=auth(world.student))
+
+    assert dashboard(client, world.student)["announcements"]["unread"] == 0

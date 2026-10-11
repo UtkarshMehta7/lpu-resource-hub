@@ -420,6 +420,29 @@ def _demo_registration_number(email: str) -> str:
     return str(_DEMO_NUMBER_BASE + block + int(digits or 0))
 
 
+def _announcing_coordinator(coordinators: list[User]) -> User | None:
+    """A coordinator who can actually post a departmental notice.
+
+    `_coordinator_for` answers "who oversees this department", and falls back
+    to the first in the list when nobody does -- fine for its own callers,
+    wrong here. On a database where the demo registration numbers had
+    collided, that fallback was `demo.coordinator01`, who had been overwritten
+    to a STUDENT, so the one departmental notice in the demo was silently
+    dropped and the board showed only institution-wide ones.
+
+    So this asks for the two things a departmental notice actually needs: the
+    role that may post, and a scope to address. Same question `reach_of` asks,
+    which is why the notice it returns a poster for always lands.
+    """
+    for coordinator in coordinators:
+        if (
+            coordinator.role is UserRole.RESEARCH_COORDINATOR
+            and coordinator.coordinator_scope_id is not None
+        ):
+            return coordinator
+    return None
+
+
 def _coordinator_for(coordinators: list[User], department: Department) -> User | None:
     """The coordinator whose scope is this department, if the demo has one."""
     for coordinator in coordinators:
@@ -942,7 +965,7 @@ def seed(db: Session, password_hash: str) -> SeedSummary:
         summary,
         admin=admin,
         dean=dean,
-        coordinator=_coordinator_for(coordinators, departments[0]),
+        coordinator=_announcing_coordinator(coordinators),
     )
     _seed_projects(db, summary, faculty, rng)
 
