@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 174 API operations over 140 paths, 48 tables, 33 migrations,
-37 ADRs, 28 backend modules, 1215 backend tests, 316 frontend tests,
+Current shape: 186 API operations over 148 paths, 52 tables, 34 migrations,
+38 ADRs, 29 backend modules, 1319 backend tests, 345 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -289,6 +289,64 @@ Current shape: 174 API operations over 140 paths, 48 tables, 33 migrations,
   project actually being in trouble, asked of the same `assess` the board
   uses. The notification reads "asked you to look at", not "is waiting on" --
   identical wording inverts who owes whom.
+- **An ANNOUNCEMENT is the one thing said to everybody** (ADR 0038), and it
+  is the only channel on the platform with an audience rather than a
+  recipient. Every `NotificationType` is personal and *caused* -- something
+  happened to you -- so nothing could tell the institution that the disclosure
+  window closes on Friday. **Reading needs no permission**: all six roles read
+  the same board, and there is no role filter in the module. Posting is
+  `ANNOUNCEMENT_POST`, held by coordinator, dean and admin -- granted on the
+  coordinator's own rung, because `ROLE_HIERARCHY` would otherwise hand it to
+  every faculty member. It is the ONE thing a dean writes; ADR 0028 keeps them
+  read-only over *records*, and a notice is not a record.
+- **An announcement's reach is DERIVED from the poster, never named in the
+  request.** `AnnouncementCreate` has no `audience` field and must not grow
+  one: `policies.reach_of` gives an institution-wide role the institution and
+  a coordinator their own `coordinator_scope_id`. The same discipline as
+  `CREATABLE_ROLE`, for the same reason -- an `audience` field is how ten
+  coordinators each acquire an institution-wide megaphone. A coordinator with
+  no scope gets 409, never a widened audience.
+- **The DASHBOARD is where everybody meets the board**, and `/announcements`
+  is the searchable history behind it. The panel rides on `DashboardResponse`
+  OUTSIDE the per-role dispatch -- a notice is not something a role has or
+  lacks -- and is built in a savepoint that swallows SQLAlchemyError, like the
+  thread opened on acceptance: the dashboard is the older act, and a new
+  dependency from it to a new table must not be able to 500 it for every role.
+  The frontend field is OPTIONAL and defaulted in the component, for the
+  Netlify-seconds/Render-minutes window; a test deletes it and asserts the
+  page still renders. **No notice icon in the header**: the action row already
+  overflows at +80px (360), +50 (390), +26 (414) and +32 (1280) on every page,
+  and a third icon only made it worse.
+- **One post writes ONE row.** `announcement_reads` holds a marker per person
+  who opened a notice and the unread count is a `NOT EXISTS` against it.
+  Never deliver a notice as a notification per recipient -- that is a row per
+  account per post, on a 0.5 GB quota, for a thing read once. Derived on read,
+  like milestone risk (ADR 0026).
+- **A published announcement cannot be edited by ANYONE, its author
+  included** -- 409 whoever asks, and 403 for somebody else's, in that order
+  (the patent pipeline's rule). One helper, `_assert_may_edit`, answers for
+  all three write paths, because written out three times they ordered the two
+  checks differently and the authorship test ran first: an admin patching
+  somebody else's published notice was told it belonged to another person,
+  implying that person could still make the change. They cannot. **Status
+  before ownership**, always. **A draft is its author's alone, admins
+  included**: the form says nobody else can see it, so the filter must agree,
+  the same answer a thread gives a non-participant. An admin may WITHDRAW
+  another person's notice and never rewrite it: changing what somebody is recorded as having
+  announced is a worse power than taking it down. The draft stage is
+  load-bearing, not decoration -- an upload is multipart against a saved row,
+  so attachments need a notice that exists but nobody can see yet.
+  `posted_by_name` and `posted_by_role` are frozen at post time, and
+  `posted_by` is SET NULL: "from the Dean of Research" is part of what was
+  said, and a later promotion must not retitle last term's notice.
+- **An announcement's attachment is as private as the notice.** The download
+  re-runs `policies.visibility_filter` and scopes the attachment id to the
+  notice in the path; there is no public path to the bytes. Hence the frontend
+  fetches through the API client and renders images from a blob -- an
+  `<img src>` sends no Authorization header, and the route answers
+  `Content-Disposition: attachment` with `nosniff`. Links are rows, `http(s)`
+  only: a `javascript:` URL on a notice the whole institution reads is a
+  stored script with an audience.
 - **Nudges never name their recipient.** `POST /nudges` takes a kind and an
   entity; the service resolves who hears about it from the thing being
   chased. A recipient field would make it a way to message anyone in the
@@ -444,7 +502,7 @@ Current shape: 174 API operations over 140 paths, 48 tables, 33 migrations,
   drives the top bar, the grouped "All pages" menu and the command palette, so
   a role can never reach a page through one and not another. Add a page there
   or it is unreachable from two of the three.
-- **Cmd/Ctrl+K (or "/") opens the command palette.** 28 destinations, six fit
+- **Cmd/Ctrl+K (or "/") opens the command palette.** 31 destinations, six fit
   on the bar; the palette is how people actually get around. It only offers
   pages the signed-in role can reach.
 - Loading shows `SkeletonList`, not the word "Loading".

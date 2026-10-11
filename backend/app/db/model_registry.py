@@ -6,6 +6,12 @@ needed to keep future migrations stable.
 """
 
 from app.modules.admin.models import AdminPromotion, Department, School  # noqa: F401
+from app.modules.announcements.models import (  # noqa: F401
+    Announcement,
+    AnnouncementAttachment,
+    AnnouncementLink,
+    AnnouncementReceipt,
+)
 from app.modules.applications.models import Application, ApplicationEvent  # noqa: F401
 from app.modules.audit.models import AuditLog  # noqa: F401
 from app.modules.auth.models import RefreshToken  # noqa: F401

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonList } from "@/components/ui/Skeleton";
+import { DashboardAnnouncements } from "@/features/announcements/DashboardAnnouncements";
 import { useAuth } from "@/features/auth/authContext";
 import { buildsResearchProfile, roleLabel } from "@/features/auth/roleLabels";
 
@@ -54,6 +55,11 @@ export function DashboardPage() {
           </Link>
         </div>
       ) : null}
+
+      {/* Above the role sections, and outside the per-role dispatch: a
+          notice is addressed to everybody, while the rest of this page is
+          about the reader's own work (ADR 0038). */}
+      {data ? <DashboardAnnouncements panel={data.announcements} /> : null}
 
       {data?.student ? <StudentSections data={data.student} /> : null}
       {data?.faculty ? <FacultySections data={data.faculty} /> : null}

@@ -95,13 +95,41 @@ def test_a_custodian_holds_only_facility_powers() -> None:
         assert forbidden not in held
 
 
-def test_a_dean_reads_and_changes_nothing() -> None:
+def test_a_dean_changes_no_record() -> None:
+    """Three grants, and not one of them edits a record.
+
+    This test used to be called "reads and changes nothing", which was exact
+    until ADR 0038. A dean now posts an ANNOUNCEMENT -- the one thing the role
+    writes -- and a notice is not a record: it creates no publication, patent,
+    project or profile, and alters none. The role exists so somebody senior
+    can see the whole institution, and being unable to tell it anything was
+    the other half of that job missing.
+
+    PROJECT_REVIEW is tightly scoped: it lets a dean decide work that CROSSES
+    departments and nothing else (ADR 0032), enforced in projects/policies.py
+    rather than by the permission. Holding it says a person may review *a*
+    project, never every project.
+    """
     held = ROLE_PERMISSIONS[UserRole.DEAN_OF_RESEARCH]
-    # Two, and the second is tightly scoped: PROJECT_REVIEW lets a dean decide
-    # work that CROSSES departments and nothing else (ADR 0032), enforced in
-    # projects/policies.py rather than by the permission. Holding it says a
-    # person may review *a* project, never every project.
-    assert held == {Permission.ANALYTICS_READ, Permission.PROJECT_REVIEW}
+
+    assert held == {
+        Permission.ANALYTICS_READ,
+        Permission.PROJECT_REVIEW,
+        Permission.ANNOUNCEMENT_POST,
+    }
+    # The record-writing grants, named so this cannot drift into one by a
+    # later "the dean may as well also..." change.
+    for forbidden in (
+        Permission.PUBLICATION_CREATE,
+        Permission.PATENT_CREATE,
+        Permission.PATENT_VERIFY,
+        Permission.PROJECT_CREATE,
+        Permission.PROFILE_VERIFY,
+        Permission.PUBLICATION_DEDUPLICATE,
+        Permission.USER_CREATE,
+        Permission.USER_DELETE,
+    ):
+        assert forbidden not in held
 
 
 def test_neither_new_role_can_remove_anybody() -> None:

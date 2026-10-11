@@ -28,6 +28,19 @@ export const NAV_GROUPS: NavGroup[] = ["Discover", "My work", "Review", "Adminis
 export const NAV: NavItem[] = [
   // Discover -- finding people, work and money.
   { to: "/dashboard", label: "Dashboard", group: "Discover", keywords: "home start overview" },
+  // No `roles`: the board is for every signed-in role, which is the point
+  // of the feature. What each person sees is scoped on the server.
+  //
+  // The LATEST notices are a section on the dashboard, where everybody meets
+  // them; this entry is the searchable history behind it. It is listed here
+  // and not only linked from that section, because a page reachable from one
+  // place is still missing from the other two surfaces this file drives.
+  {
+    to: "/announcements",
+    label: "Announcements",
+    group: "Discover",
+    keywords: "notices notice board circular news bulletin updates history archive older past",
+  },
   { to: "/search", label: "Search", group: "Discover", keywords: "find lookup" },
   { to: "/recommendations", label: "For you", group: "Discover", keywords: "recommended matches" },
   { to: "/researchers", label: "Researchers", group: "Discover", keywords: "faculty directory" },
@@ -63,6 +76,20 @@ export const NAV: NavItem[] = [
   { to: "/me/saved", label: "Saved", group: "My work", keywords: "bookmarks starred" },
   { to: "/me/notifications", label: "Notifications", group: "My work", keywords: "alerts bell" },
   { to: "/profile", label: "Profile", group: "My work", keywords: "me account skills" },
+  {
+    to: "/announcements/mine",
+    label: "My announcements",
+    group: "My work",
+    roles: ["research_coordinator", "dean_of_research", "admin"],
+    keywords: "notices posted drafts board",
+  },
+  {
+    to: "/announcements/new",
+    label: "Post announcement",
+    group: "My work",
+    roles: ["research_coordinator", "dean_of_research", "admin"],
+    keywords: "notice circular new write broadcast tell everyone",
+  },
   {
     to: "/people",
     label: "My people",

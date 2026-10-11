@@ -1,6 +1,7 @@
 import type { ResearcherCard } from "@/features/directory/api";
 import type { OpportunityCard } from "@/features/opportunities/api";
 import type { ProjectCard } from "@/features/projects/api";
+import type { Announcement } from "@/features/announcements/api";
 import { apiClient } from "@/lib/api/client";
 
 export interface DeadlineItem {
@@ -62,9 +63,33 @@ export interface AdminDashboard {
   recent_audit: { id: string; action: string; entity_type: string; created_at: string }[];
 }
 
+/**
+ * The notice board as it appears on a dashboard.
+ *
+ * Not optional and not per-role: a notice is the one thing on this platform
+ * addressed to everybody, so every dashboard carries this (ADR 0038). The
+ * server degrades it to an empty panel rather than failing the dashboard, so
+ * `latest: []` means "nothing announced lately" and nothing more.
+ */
+export interface AnnouncementsPanel {
+  unread: number;
+  latest: Announcement[];
+}
+
 export interface DashboardResponse {
   role: string;
   onboarding_complete: boolean;
+  /**
+   * Optional on purpose, and it must stay that way.
+   *
+   * Netlify serves a new bundle from the CDN in seconds while Render
+   * rebuilds its image in minutes. Between the two, this code talks to an
+   * API that has never heard of this field and gets `undefined` back --
+   * and reading `.latest` off it inside render would throw and take the
+   * WHOLE dashboard down for every role, not just this section. The same
+   * failure the prior-art panel had, on a far more important page.
+   */
+  announcements?: AnnouncementsPanel;
   student: StudentDashboard | null;
   faculty: FacultyDashboard | null;
   coordinator: CoordinatorDashboard | null;

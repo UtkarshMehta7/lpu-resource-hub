@@ -24,6 +24,9 @@ import { ProjectDetailPage } from "@/features/projects/ProjectDetailPage";
 import { ProjectFormPage } from "@/features/projects/ProjectFormPage";
 import { ProjectsPage } from "@/features/projects/ProjectsPage";
 import { ReviewQueuePage } from "@/features/projects/ReviewQueuePage";
+import { AnnouncementDetailPage } from "@/features/announcements/AnnouncementDetailPage";
+import { AnnouncementFormPage } from "@/features/announcements/AnnouncementFormPage";
+import { AnnouncementsPage } from "@/features/announcements/AnnouncementsPage";
 import { FundingDetailPage } from "@/features/funding/FundingDetailPage";
 import { FundingFormPage } from "@/features/funding/FundingFormPage";
 import { FundingPage } from "@/features/funding/FundingPage";
@@ -109,6 +112,10 @@ export const router = createBrowserRouter([
           { path: "facilities/:facilityId", element: <FacilityDetailPage /> },
           { path: "equipment/:equipmentId", element: <EquipmentDetailPage /> },
           { path: "me/bookings", element: <MyBookingsPage /> },
+          // The notice board. No RoleRoute: every signed-in role reads it,
+          // which is the feature. The server scopes WHAT they see.
+          { path: "announcements", element: <AnnouncementsPage /> },
+          { path: "announcements/:announcementId", element: <AnnouncementDetailPage /> },
           { path: "funding", element: <FundingPage /> },
           { path: "funding/:fundingId", element: <FundingDetailPage /> },
           { path: "me/notifications", element: <NotificationsPage /> },
@@ -130,6 +137,17 @@ export const router = createBrowserRouter([
               // A dean decides cross-department work, so the review queue is
               // theirs too; the server filters it to what they may decide.
               { path: "coordinator/review-queue", element: <ReviewQueuePage /> },
+            ],
+          },
+          {
+            // Posting a notice. The dean belongs here and in no other writing
+            // group: ADR 0028 keeps them read-only over records, and a notice
+            // is not a record.
+            element: <RoleRoute allow={["research_coordinator", "dean_of_research", "admin"]} />,
+            children: [
+              { path: "announcements/mine", element: <AnnouncementsPage mine /> },
+              { path: "announcements/new", element: <AnnouncementFormPage /> },
+              { path: "announcements/:announcementId/edit", element: <AnnouncementFormPage /> },
             ],
           },
           {

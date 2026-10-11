@@ -5,11 +5,18 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
+from app.core.permissions import ROLE_PERMISSIONS, Permission
 from app.modules.admin.models import Department, School
+from app.modules.announcements.models import (
+    Announcement,
+    AnnouncementAudience,
+    AnnouncementLink,
+    AnnouncementStatus,
+)
 from app.modules.facilities.models import Equipment, Facility
 from app.modules.profiles.models import (
     ResearcherProfile,
@@ -20,11 +27,14 @@ from app.modules.taxonomy.models import ResearchArea, Skill, TagAlias
 from app.modules.users.models import User, UserRole
 from scripts.seed_demo_data import (
     COORDINATOR_COUNT,
+    DEMO_ANNOUNCEMENTS,
     DEMO_EQUIPMENT,
     DEMO_FACILITIES,
     FACULTY_COUNT,
     STUDENT_COUNT,
+    SeedSummary,
     _demo_registration_number,
+    _seed_announcements,
     seed,
 )
 
@@ -193,3 +203,148 @@ def test_the_seeded_custodian_actually_holds_a_facility(db: Session) -> None:
     # Same department as the facility it looks after -- the rule the API
     # enforces on assignment, so the seed must not contradict it.
     assert custodian.department_id == held[0].department_id
+
+
+def test_the_board_is_not_empty_on_a_fresh_install(db: Session) -> None:
+    """The failure this seeding exists to prevent.
+
+    An empty notice board demonstrates the feature not at all -- the same
+    hole the facility catalogue, the booking queue and the at-risk board each
+    had before their seed data arrived.
+    """
+    summary = seed(db, PLACEHOLDER_HASH)
+
+    assert summary.announcements == len(DEMO_ANNOUNCEMENTS)
+    assert _count(db, Announcement) == len(DEMO_ANNOUNCEMENTS)
+    # Published, not drafts: a draft is invisible to everybody but its author,
+    # so seeding drafts would leave the board looking empty again.
+    published = db.execute(
+        select(func.count())
+        .select_from(Announcement)
+        .where(Announcement.status == AnnouncementStatus.PUBLISHED)
+    ).scalar_one()
+    assert int(published) == len(DEMO_ANNOUNCEMENTS)
+
+
+def test_the_seeded_notices_show_both_kinds_of_reach(db: Session) -> None:
+    """Seeding them all as the admin would demonstrate the scope not at all.
+
+    The reach is derived from the poster (ADR 0038), so the demo needs a
+    notice from an institution-wide role AND one from a coordinator, or a
+    reader never sees that a department has a voice of its own.
+    """
+    seed(db, PLACEHOLDER_HASH)
+
+    audiences = {audience for (audience,) in db.execute(select(Announcement.audience)).all()}
+
+    assert audiences == {AnnouncementAudience.INSTITUTION, AnnouncementAudience.DEPARTMENT}
+
+
+def test_a_seeded_departmental_notice_names_its_department(db: Session) -> None:
+    """The CHECK requires it; this asserts the seed does not merely survive it."""
+    seed(db, PLACEHOLDER_HASH)
+
+    departmental = db.execute(
+        select(Announcement).where(Announcement.audience == AnnouncementAudience.DEPARTMENT)
+    ).scalars()
+
+    for notice in departmental:
+        assert notice.department_id is not None
+        assert notice.posted_by_role == UserRole.RESEARCH_COORDINATOR
+
+
+def test_a_seeded_notice_records_who_said_it(db: Session) -> None:
+    """`posted_by_name` and `posted_by_role` are frozen at post time.
+
+    A seed writing rows directly carries the invariants the service carries,
+    so a notice with a blank poster would be a seed bug the API could not
+    produce.
+    """
+    seed(db, PLACEHOLDER_HASH)
+
+    for notice in db.execute(select(Announcement)).scalars():
+        assert notice.posted_by is not None
+        assert notice.posted_by_name != ""
+        assert notice.published_at is not None
+
+
+def test_the_seeded_links_are_ordered_and_http(db: Session) -> None:
+    seed(db, PLACEHOLDER_HASH)
+
+    links = list(db.execute(select(AnnouncementLink)).scalars())
+
+    assert links, "at least one seeded notice carries a link"
+    for link in links:
+        assert link.url.startswith("https://")
+    # Positions are per notice and start at zero, which is what the unique
+    # constraint and the author's reading order both depend on.
+    by_notice: dict[object, list[int]] = {}
+    for link in links:
+        by_notice.setdefault(link.announcement_id, []).append(link.position)
+    for positions in by_notice.values():
+        assert sorted(positions) == list(range(len(positions)))
+
+
+def test_seeding_twice_adds_no_notices(db: Session) -> None:
+    """Idempotent on the subject, like the funding calls."""
+    seed(db, PLACEHOLDER_HASH)
+    second = seed(db, PLACEHOLDER_HASH)
+
+    assert second.announcements == 0
+    assert _count(db, Announcement) == len(DEMO_ANNOUNCEMENTS)
+
+
+def test_the_seeder_refuses_a_poster_who_may_not_post(
+    db: Session, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The bug this guard was written for, reproduced.
+
+    In a database where the demo registration numbers had collided,
+    `demo.coordinator01` was a STUDENT -- the role-overwrite AGENTS.md
+    records against `seed_presentation_data.py`. Deciding the audience
+    locally wrote that notice as institution-wide with a student's name on
+    it: a row the API cannot produce, because a student holds no
+    ANNOUNCEMENT_POST at all.
+
+    The seeder now asks `policies.reach_of` -- the same function the service
+    calls -- and skips a poster who may not post, loudly. A script writing
+    straight to the database carries the invariants the services carry.
+    """
+    seed(db, PLACEHOLDER_HASH)
+    db.execute(text("DELETE FROM announcements"))
+    db.flush()
+    # Demote the coordinator the way the number collision did.
+    coordinator = (
+        db.execute(select(User).where(User.role == UserRole.RESEARCH_COORDINATOR)).scalars().first()
+    )
+    assert coordinator is not None
+    coordinator.role = UserRole.STUDENT
+    db.flush()
+    summary = SeedSummary()
+
+    _seed_announcements(
+        db,
+        summary,
+        admin=db.execute(select(User).where(User.role == UserRole.ADMIN)).scalars().first(),
+        dean=db.execute(select(User).where(User.role == UserRole.DEAN_OF_RESEARCH))
+        .scalars()
+        .first(),
+        coordinator=coordinator,
+    )
+
+    # The two institution-wide notices still land; the departmental one does
+    # not, and nothing was promoted to institution-wide to make it fit.
+    assert summary.announcements == len(DEMO_ANNOUNCEMENTS) - 1
+    assert "cannot post one" in capsys.readouterr().out
+    posted_roles = {role for (role,) in db.execute(select(Announcement.posted_by_role)).all()}
+    assert UserRole.STUDENT not in posted_roles
+
+
+def test_no_seeded_notice_could_have_been_written_by_a_role_that_cannot_post(
+    db: Session,
+) -> None:
+    """The general form of the rule, so it holds for notices added later."""
+    seed(db, PLACEHOLDER_HASH)
+
+    for (role,) in db.execute(select(Announcement.posted_by_role)).all():
+        assert Permission.ANNOUNCEMENT_POST in ROLE_PERMISSIONS[role]

@@ -8,9 +8,11 @@ browse item by item.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Select, func, or_, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.ml.features import ScoreWeights
@@ -18,6 +20,7 @@ from app.modules.admin.models import Department, School
 from app.modules.analytics import insights
 from app.modules.analytics.schemas import (
     AdminDashboard,
+    AnnouncementsPanel,
     CoordinatorDashboard,
     CustodianDashboard,
     DashboardResponse,
@@ -26,6 +29,7 @@ from app.modules.analytics.schemas import (
     FacultyDashboard,
     StudentDashboard,
 )
+from app.modules.announcements import service as announcements_service
 from app.modules.applications.models import Application, ApplicationStatus
 from app.modules.audit.models import AuditLog
 from app.modules.audit.schemas import AuditLogRead
@@ -48,6 +52,8 @@ from app.modules.reports.models import ContentReport, ReportStatus
 from app.modules.researchers.search_schemas import ResearcherCard
 from app.modules.researchers.service import list_verification_queue, to_queue_item
 from app.modules.users.models import CoordinatorScopeType, User, UserRole
+
+logger = logging.getLogger(__name__)
 
 RECOMMENDATION_PREVIEW = 3
 DEADLINE_WINDOW_DAYS = 30
@@ -400,8 +406,36 @@ def _custodian_section(db: Session, user: User) -> CustodianDashboard:
     )
 
 
+def _announcements_panel(db: Session, user: User) -> AnnouncementsPanel:
+    """The board, for every role, and never at the dashboard's expense.
+
+    Runs in a SAVEPOINT and swallows SQLAlchemyError, like the chat threads
+    opened on acceptance. The dashboard is the older and more important act:
+    every role signs in to it, and this is a new dependency from that old
+    code to a new table. Shipping the code before its migration reached a
+    database would otherwise make every dashboard answer 500 for everybody --
+    an additive feature taking down an existing one, which is exactly the
+    failure AGENTS.md records against the acceptance path.
+
+    An empty panel is the degraded state, and it reads as "nothing announced
+    lately" rather than as an error, which is the right thing for a reader
+    who cannot act on the difference.
+    """
+    try:
+        with db.begin_nested():
+            latest, unread = announcements_service.recent_for_dashboard(db, user)
+    except SQLAlchemyError:
+        logger.warning("dashboard: the announcements panel could not be built", exc_info=True)
+        return AnnouncementsPanel(unread=0, latest=[])
+    return AnnouncementsPanel(unread=unread, latest=latest)
+
+
 def dashboard(db: Session, user: User, weights: ScoreWeights) -> DashboardResponse:
     response = DashboardResponse(role=user.role, onboarding_complete=user.onboarding_complete)
+    # Outside the per-role dispatch below, deliberately: a notice is the one
+    # thing addressed to everybody, so the panel is not something a role
+    # either has or lacks (ADR 0038).
+    response.announcements = _announcements_panel(db, user)
     if user.role is UserRole.STUDENT:
         response.student = _student_section(db, user, weights)
     if user.role in (UserRole.FACULTY, UserRole.RESEARCH_COORDINATOR):
