@@ -482,6 +482,17 @@ Current shape: 186 API operations over 148 paths, 52 tables, 34 migrations,
   scope so a missing one is visible instead of silent.
 
 ## UI conventions (white + LPU orange, tokens in frontend/src/index.css)
+- **The header has to fit a phone, and only Playwright can tell you.** The
+  mark plus four action icons needed more than 360px, so EVERY page scrolled
+  sideways: +80px at 360, +50 at 390, +26 at 414, and +32 at 1280 where the
+  nav bar and the long product name appear together. jsdom applies no media
+  queries and measures no layout, so 367 component tests saw none of it --
+  `e2e/flows.spec.ts` now asserts no horizontal overflow at 360, which is the
+  only place it can be caught. The mark shortens in three steps rather than
+  reflowing: crest + PROTOTYPE below `sm`, + both names from `sm`, + the long
+  product name from `2xl`. **The PROTOTYPE label survives every width** -- it
+  is what says this is not an official LPU system -- and both names stay in
+  the link's `title` and `aria-label` throughout.
 - **A `<select>` whose value is not among its options shows the FIRST one.**
   `ROLE_OPTIONS` on the accounts page was a second hand-written list beside
   `ROLE_LABELS`, and it fell behind when the custodian and dean arrived: every
