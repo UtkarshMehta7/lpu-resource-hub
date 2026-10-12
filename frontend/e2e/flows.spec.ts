@@ -143,7 +143,16 @@ test("admin changes a role and sees platform stats", async ({ browser }) => {
   await page.goto("/dashboard");
   await expect(page.getByRole("heading", { name: "Platform" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
-  await expect(page.getByText("departments")).toBeVisible();
+  // Scoped to the Platform section and exact, because the word is no longer
+  // unique on this page: the dashboard now carries the announcements section
+  // (ADR 0038), and a seeded notice reads "...departments to confirm their
+  // figures by Friday". A bare getByText matched both and Playwright's
+  // strict mode rightly refused to choose -- the same loose-matcher trap
+  // AGENTS.md records against getByLabel.
+  const platform = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Platform" }) });
+  await expect(platform.getByText("departments", { exact: true })).toBeVisible();
 
   await page.goto("/admin/users");
   // The admin's own row is disabled, so take the first row they may change
