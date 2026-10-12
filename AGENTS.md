@@ -43,7 +43,7 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 186 API operations over 148 paths, 52 tables, 34 migrations,
-38 ADRs, 29 backend modules, 1319 backend tests, 345 frontend tests,
+38 ADRs, 29 backend modules, 1319 backend tests, 367 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -498,11 +498,29 @@ Current shape: 186 API operations over 148 paths, 52 tables, 34 migrations,
   nowhere, so it was absent from the top bar, the full menu and the command
   palette, and people reported the feature as missing. A link on a page is
   not a substitute for an entry here.
+- **A person's OWN work needs entries too, not just the browse pages.**
+  `/projects/mine`, `/projects/new`, `/opportunities/mine`, `/opportunities/new`,
+  `/publications/mine`, `/publications/new`, `/patents/mine`, `/patents/new`
+  and `/me/applications` all existed as routes and were absent from
+  `navigation.ts`, so the only way to them was to land on the general page
+  first and notice a button. Reported exactly as `/admin/accounts/new` was:
+  as the feature not existing. A faculty member could not find "my projects",
+  "my posted opportunities" or "add a publication"; a student could not find
+  the applications they had sent.
+- **A project page has to answer "can I join this?".** You apply to an
+  OPPORTUNITY and the only link between the two runs the other way
+  (`Opportunity.project_id`), so somebody reading about a project had nowhere
+  to go -- they had to return to the board and recognise the opening by name.
+  `ProjectOpenings` lists the project's OPEN openings under the team, and the
+  frontend's `OpportunityFilters` finally carries the `project_id` the
+  backend has always accepted. An error there is shown to everyone, not
+  hidden like an empty list: silence reads as "no openings" and somebody who
+  would have applied moves on.
 - **`components/layout/navigation.ts` is the single list of destinations.** It
   drives the top bar, the grouped "All pages" menu and the command palette, so
   a role can never reach a page through one and not another. Add a page there
   or it is unreachable from two of the three.
-- **Cmd/Ctrl+K (or "/") opens the command palette.** 31 destinations, six fit
+- **Cmd/Ctrl+K (or "/") opens the command palette.** 48 destinations, six fit
   on the bar; the palette is how people actually get around. It only offers
   pages the signed-in role can reach.
 - Loading shows `SkeletonList`, not the word "Loading".

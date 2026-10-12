@@ -11,6 +11,7 @@ import { ReportButton } from "@/features/reports/ReportButton";
 import { TeamThreadButton } from "@/features/messages/TeamThreadButton";
 import { MilestoneSection } from "@/features/milestones/MilestoneList";
 import { NudgeButton } from "@/features/nudges/NudgeButton";
+import { ProjectOpenings } from "@/features/opportunities/ProjectOpenings";
 import { SaveButton } from "@/features/saved/SaveButton";
 import { PublicationsSection } from "@/features/publications/PublicationList";
 import { toApiError } from "@/lib/api/errors";
@@ -267,6 +268,12 @@ export function ProjectDetailPage() {
           </ul>
         )}
       </section>
+
+      {/* Straight after the team, because it answers the question reading
+          about the team raises: "can I join this?". Somebody who wanted to
+          had nowhere to go from here -- you apply to an OPPORTUNITY, and
+          the only link between the two ran the other way. */}
+      <ProjectOpenings projectId={project.id} isOwner={isOwner} />
 
       {/* The plan sits between the team and the output: it is what the team
           is working towards, and the publications are what came of it. */}

@@ -72,6 +72,81 @@ export const NAV: NavItem[] = [
     roles: ["student", "faculty", "research_coordinator"],
     keywords: "collaboration invites",
   },
+  // A person's OWN work, which was reachable only by landing on the general
+  // page first and noticing a button there. The routes all existed; they
+  // were missing from this file, which is to say missing from the top bar,
+  // the "All pages" menu and the command palette at once -- exactly what
+  // happened to /admin/accounts/new, and reported the same way: as the
+  // feature not existing.
+  {
+    to: "/projects/mine",
+    label: "My projects",
+    group: "My work",
+    // Students belong here too: `mine` means owned OR joined, so this is
+    // where somebody accepted onto a team finds it again.
+    roles: ["student", "faculty", "research_coordinator"],
+    keywords: "own projects joined team research work",
+  },
+  {
+    to: "/projects/new",
+    label: "New project",
+    group: "My work",
+    roles: ["faculty", "research_coordinator"],
+    keywords: "start create propose research",
+  },
+  {
+    to: "/opportunities/mine",
+    label: "My opportunities",
+    group: "My work",
+    roles: ["faculty", "research_coordinator"],
+    keywords: "posted openings positions applicants mine",
+  },
+  {
+    to: "/opportunities/new",
+    label: "Post an opportunity",
+    group: "My work",
+    roles: ["faculty", "research_coordinator"],
+    keywords: "new opening position advertise recruit assistant",
+  },
+  {
+    to: "/me/applications",
+    label: "My applications",
+    group: "My work",
+    // Everyone who may apply (Permission.APPLICATION_SUBMIT). Faculty apply
+    // to COLLABORATION openings, so this is not students only.
+    roles: ["student", "faculty", "research_coordinator"],
+    keywords: "applied applications status tracking opportunities",
+  },
+  {
+    to: "/publications/mine",
+    label: "My publications",
+    group: "My work",
+    roles: ["faculty", "research_coordinator"],
+    keywords: "own papers authored mine doi",
+  },
+  {
+    to: "/publications/new",
+    label: "Add a publication",
+    group: "My work",
+    roles: ["faculty", "research_coordinator"],
+    keywords: "new paper record doi journal conference start writing",
+  },
+  {
+    to: "/patents/mine",
+    label: "My patents",
+    group: "My work",
+    // A student may record a patent (Permission.PATENT_CREATE), which is
+    // deliberate -- student inventors are ordinary here.
+    roles: ["student", "faculty", "research_coordinator", "admin"],
+    keywords: "own inventions disclosed filed mine ipr",
+  },
+  {
+    to: "/patents/new",
+    label: "Record a patent",
+    group: "My work",
+    roles: ["student", "faculty", "research_coordinator", "admin"],
+    keywords: "new invention disclosure ipr file idf",
+  },
   { to: "/me/bookings", label: "My bookings", group: "My work", keywords: "slots reservations" },
   { to: "/me/saved", label: "Saved", group: "My work", keywords: "bookmarks starred" },
   { to: "/me/notifications", label: "Notifications", group: "My work", keywords: "alerts bell" },
