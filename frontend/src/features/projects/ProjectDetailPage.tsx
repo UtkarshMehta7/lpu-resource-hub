@@ -16,6 +16,8 @@ import { SaveButton } from "@/features/saved/SaveButton";
 import { PublicationsSection } from "@/features/publications/PublicationList";
 import { toApiError } from "@/lib/api/errors";
 
+import { AddMemberPanel } from "./AddMemberPanel";
+
 import {
   deleteProject,
   fetchProject,
@@ -267,6 +269,17 @@ export function ProjectDetailPage() {
             ))}
           </ul>
         )}
+        {/* Two ways onto a team, and only one of them was reachable. Accepting
+            an application is how a stranger joins; this is how the lead adds
+            somebody they already work with, and the endpoint for it had been
+            built and left uncalled since projects shipped. */}
+        {isOwner ? (
+          <AddMemberPanel
+            projectId={project.id}
+            memberIds={project.members.map((member) => member.user_id)}
+            onAdded={() => void refresh()}
+          />
+        ) : null}
       </section>
 
       {/* Straight after the team, because it answers the question reading

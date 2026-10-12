@@ -101,6 +101,26 @@ Two further repairs fall out of the same run:
   with the row. Writing the application alone left a demonstration in which
   somebody was accepted onto a project they were not a member of.
 
+### 5. The other way onto a team was unreachable too
+
+`POST /projects/{id}/members` has existed since projects were built, fully
+enforced (`assert_owner`, and `record_membership` so the chat is synced), and
+**nothing in the interface ever called it**. The frontend had `removeMember`
+and no `addMember`. So the only way onto a team was to apply to an opening and
+be accepted — no use at all for the colleague or the student a lead already
+works with.
+
+`AddMemberPanel` sits under the team for the lead: search, a role, add. It is
+the `/admin/accounts/new` shape again — **enforcing a permission is not the
+same as making it reachable**, and this is the second time that exact gap has
+been found here.
+
+Candidates come from the directory's own endpoints, so a student who has not
+opted in to being discovered is not surfaced. That is the opt-in doing its job
+rather than a gap: they can still apply, which is the other route. Somebody
+already on the team is filtered out, so the picker cannot offer what the
+submit would refuse — the rule the facility-custodian candidate list holds.
+
 ## Consequences
 
 - No new endpoint, no new permission, no migration. The gap was never in the

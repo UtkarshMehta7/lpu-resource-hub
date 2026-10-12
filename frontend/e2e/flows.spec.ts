@@ -85,6 +85,28 @@ test("coordinator reviews the project and approves it", async ({ browser }) => {
   await expect(page.locator("li", { hasText: PROJECT })).toHaveCount(0);
 });
 
+test("faculty adds a colleague to the team directly", async ({ browser }) => {
+  // The other way onto a team. Accepting an application is how a stranger
+  // joins; this is how the lead adds somebody they already work with, and
+  // POST /projects/{id}/members had been built and left uncalled since
+  // projects shipped.
+  const page = await sessionFor(browser, FACULTY);
+  await page.goto("/projects/mine");
+  await page.getByRole("link", { name: PROJECT }).click();
+
+  const team = page.locator("section").filter({ has: page.getByRole("heading", { name: "Team" }) });
+  await team.getByRole("button", { name: "Add someone to the team" }).click();
+
+  // A researcher rather than a student: students carry a discoverability
+  // opt-in (`is_discoverable`), so which of them this search can see depends
+  // on the seed, and an assertion must not.
+  await page.getByLabel("Role on this project").fill("Co-investigator");
+  await page.getByLabel("Find a person").fill("12500202");
+  await team.getByRole("button", { name: "Add" }).click();
+
+  await expect(team.getByText("Co-investigator")).toBeVisible();
+});
+
 test("faculty posts an opening from the project's own hiring section", async ({ browser }) => {
   const page = await sessionFor(browser, FACULTY);
   await page.goto("/projects/mine");

@@ -121,6 +121,26 @@ export async function fetchReviewQueue(): Promise<ProjectCard[]> {
   return response.data;
 }
 
+/**
+ * Put somebody on the team directly, without an application.
+ *
+ * `POST /projects/{id}/members` has existed since projects were built and
+ * nothing in the interface called it, so the only way onto a team was to
+ * apply to an opening and be accepted -- no use at all for a colleague the
+ * lead already works with. Enforcing a permission is not the same as making
+ * it reachable; this is the `/admin/accounts/new` shape again.
+ */
+export async function addMember(
+  projectId: string,
+  userId: string,
+  memberRole: string,
+): Promise<void> {
+  await apiClient.post(`/api/v1/projects/${projectId}/members`, {
+    user_id: userId,
+    member_role: memberRole,
+  });
+}
+
 export async function removeMember(projectId: string, userId: string): Promise<void> {
   await apiClient.delete(`/api/v1/projects/${projectId}/members/${userId}`);
 }

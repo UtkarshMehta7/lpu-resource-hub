@@ -43,8 +43,8 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 196 API operations over 157 paths, 54 tables, 35 migrations,
-40 ADRs, 30 backend modules, 1371 backend tests, 391 frontend tests,
-15 Playwright flows.
+40 ADRs, 30 backend modules, 1371 backend tests, 398 frontend tests,
+16 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
 - Nobody self-registers. `POST /auth/register` does not exist and must not
@@ -574,6 +574,18 @@ Current shape: 196 API operations over 157 paths, 54 tables, 35 migrations,
   REPAIRS rows it did not create rather than skipping them -- `_tag_project`'s
   rule again. A seeded acceptance also joins the team, through
   `record_membership`, never a bare insert.
+- **There are TWO ways onto a project team and only one was reachable**
+  (ADR 0040). `POST /projects/{id}/members` shipped with projects, fully
+  enforced, and nothing in the interface ever called it -- the frontend had
+  `removeMember` and no `addMember` -- so the only way onto a team was to
+  apply to an opening and be accepted, which is no use for the colleague a
+  lead already works with. `AddMemberPanel` under the team is the way in.
+  The `/admin/accounts/new` shape a second time: **enforcing a permission is
+  not the same as making it reachable.** Its candidates come from the
+  directory's own endpoints, so a student who has not opted in to being
+  discovered is not offered -- the opt-in working, not a gap -- and anybody
+  already on the team is filtered out, so the picker cannot offer what the
+  submit would refuse.
 - **`components/layout/navigation.ts` is the single list of destinations.** It
   drives the top bar, the grouped "All pages" menu and the command palette, so
   a role can never reach a page through one and not another. Add a page there
