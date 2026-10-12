@@ -81,6 +81,10 @@ function notice(overrides: Partial<Announcement> = {}): Announcement {
   };
 }
 
+function pageOf(items: Announcement[]) {
+  return { items, page: 1, page_size: 20, total: items.length };
+}
+
 function signedInAs(role: Role, id = "u-me") {
   useAuthMock.mockReturnValue({ user: { id, role, full_name: "Somebody" } });
 }
@@ -407,5 +411,59 @@ describe("reachability", () => {
     for (const query of ["announce", "notice", "circular", "bulletin"]) {
       expect(searchNavigation(items, query).map((item) => item.to)).toContain("/announcements");
     }
+  });
+});
+
+describe("a notice raised from an opening", () => {
+  it("is marked on the board, so hiring does not read as circulars", async () => {
+    signedInAs("student");
+    fetchAnnouncements.mockResolvedValue(
+      pageOf([
+        notice({
+          subject: "Opening: Research assistant for soil sensors",
+          source_opportunity_id: "op-1",
+        }),
+      ]),
+    );
+
+    renderBoard();
+
+    expect(await screen.findByText(/Opening: Research assistant/)).toBeInTheDocument();
+    expect(screen.getByText("Opening")).toBeInTheDocument();
+  });
+
+  it("leaves a hand-written notice unmarked", async () => {
+    signedInAs("student");
+    fetchAnnouncements.mockResolvedValue(pageOf([notice()]));
+
+    renderBoard();
+
+    expect(await screen.findByText(/disclosure window/i)).toBeInTheDocument();
+    expect(screen.queryByText("Opening")).not.toBeInTheDocument();
+  });
+
+  it("carries the reader to the position rather than its title alone", async () => {
+    signedInAs("student");
+    fetchAnnouncement.mockResolvedValue(notice({ source_opportunity_id: "op-1" }));
+
+    renderDetail();
+
+    expect(await screen.findByRole("link", { name: "Open the position" })).toHaveAttribute(
+      "href",
+      "/opportunities/op-1",
+    );
+  });
+
+  it("renders when the API is older than the page and omits the field", async () => {
+    // Netlify deploys in seconds, Render in minutes.
+    signedInAs("student");
+    const { source_opportunity_id, ...withoutField } = notice();
+    void source_opportunity_id;
+    fetchAnnouncement.mockResolvedValue(withoutField);
+
+    renderDetail();
+
+    expect(await screen.findByText(/disclosures to the IP cell/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open the position" })).not.toBeInTheDocument();
   });
 });

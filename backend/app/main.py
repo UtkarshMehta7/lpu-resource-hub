@@ -37,6 +37,7 @@ from app.modules.admin.router import org_router as admin_org_router
 from app.modules.admin.router import public_org_router
 from app.modules.admin.router import router as admin_router
 from app.modules.analytics.router import router as analytics_router
+from app.modules.announcements.handlers import register as register_announcement_handlers
 from app.modules.announcements.router import router as announcements_router
 from app.modules.applications.router import router as applications_router
 from app.modules.audit.router import router as audit_router
@@ -114,6 +115,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Handlers turn domain events into notifications (Step 12). Registered
     # here, once per app, rather than at import time.
     register_notification_handlers()
+    # A published opening goes on the board (ADR 0041), as a second listener
+    # on an event that already existed rather than a call from one module
+    # into another.
+    register_announcement_handlers()
 
     # Load the embedding model off the request path: without this the first
     # semantic search pays several seconds of model load (measured ~9s cold,

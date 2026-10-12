@@ -147,6 +147,7 @@ def _read_model(row: Announcement, extras: _Extras) -> AnnouncementRead:
         published_at=row.published_at,
         links=extras.links.get(row.id, []),
         attachments=extras.attachments.get(row.id, []),
+        source_opportunity_id=row.source_opportunity_id,
         unread=row.id in extras.unread,
         created_at=row.created_at,
         updated_at=row.updated_at,

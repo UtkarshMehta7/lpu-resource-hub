@@ -119,6 +119,18 @@ class Announcement(Base):
     )
     #: Likewise frozen: the board says who spoke, not who they are now.
     posted_by_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: Set when the notice was raised FROM an opening rather than written
+    #: (ADR 0041). UNIQUE, so publishing an opening twice cannot put it on the
+    #: board twice -- a duplicate is impossible in the database rather than
+    #: guarded in a service somebody can forget, the rule `collaborations`
+    #: holds. CASCADE because a notice about an opening that no longer exists
+    #: is not a notice about anything.
+    source_opportunity_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("opportunities.id", ondelete="CASCADE"),
+        nullable=True,
+        unique=True,
+    )
     status: Mapped[AnnouncementStatus] = mapped_column(
         Enum(
             AnnouncementStatus,

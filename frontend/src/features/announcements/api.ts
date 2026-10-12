@@ -39,6 +39,12 @@ export interface Announcement {
   published_at: string | null;
   links: AnnouncementLink[];
   attachments: AnnouncementAttachment[];
+  /**
+   * Set when the notice was raised from an opening rather than written
+   * (ADR 0041). Optional and defaulted at every use: Netlify deploys in
+   * seconds and Render in minutes, so a new page meets the old API first.
+   */
+  source_opportunity_id?: string | null;
   unread: boolean;
   created_at: string;
   updated_at: string;

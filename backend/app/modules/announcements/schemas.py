@@ -82,6 +82,10 @@ class AnnouncementRead(BaseModel):
     published_at: datetime | None
     links: list[AnnouncementLinkRead]
     attachments: list[AnnouncementAttachmentRead]
+    #: Set when the notice was raised from an opening rather than written
+    #: (ADR 0041), which is what lets the board link to the thing it is about
+    #: and say what kind of notice it is. None on a hand-written notice.
+    source_opportunity_id: uuid.UUID | None = None
     #: False for the author's own drafts, which nobody else can have read.
     unread: bool
     created_at: datetime

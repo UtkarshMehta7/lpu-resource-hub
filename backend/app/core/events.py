@@ -36,6 +36,9 @@ class EventName(StrEnum):
     PROJECT_REVIEWED = "project.reviewed"
     PROFILE_VERIFIED = "profile.verified"
     OPPORTUNITY_PUBLISHED = "opportunity.published"
+    #: Closed by its poster, or filled by the last acceptance. Both mean the
+    #: same thing to anybody reading about it: there is no longer a way in.
+    OPPORTUNITY_CLOSED = "opportunity.closed"
     MESSAGE_SENT = "message.sent"
 
 
