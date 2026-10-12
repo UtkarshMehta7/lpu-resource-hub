@@ -389,9 +389,27 @@ def close_opportunity(
             after={"status": OpportunityStatus.CLOSED.value},
             ip=ip,
         )
+    _announce_closed(db, user.id, opportunity.id)
     db.commit()
     db.refresh(opportunity)
     return to_read(db, user, opportunity)
+
+
+def _announce_closed(db: Session, actor_id: uuid.UUID | None, opportunity_id: uuid.UUID) -> None:
+    """Tell whoever is listening that this opening is no longer a way in.
+
+    Closed by its poster and filled by the last acceptance mean the same thing
+    to anybody reading about it, so both raise the one event. The board takes
+    its notice down on it (ADR 0041); nothing here knows that.
+    """
+    EVENT_BUS.publish(
+        db,
+        Event(
+            name=EventName.OPPORTUNITY_CLOSED,
+            actor_id=actor_id,
+            payload={"opportunity_id": opportunity_id},
+        ),
+    )
 
 
 def mark_filled_if_full(db: Session, opportunity: Opportunity) -> None:
@@ -402,6 +420,8 @@ def mark_filled_if_full(db: Session, opportunity: Opportunity) -> None:
     ):
         assert_transition(opportunity.status, OpportunityStatus.FILLED, "system")
         opportunity.status = OpportunityStatus.FILLED
+        db.flush()
+        _announce_closed(db, None, opportunity.id)
 
 
 def list_opportunities(

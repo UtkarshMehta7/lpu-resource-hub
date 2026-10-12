@@ -150,6 +150,24 @@ test("faculty posts an opening from the project's own hiring section", async ({ 
   await expect(posted.getByText("No applications yet.")).toBeVisible();
 });
 
+test("the opening reaches the department's notice board by itself", async ({ browser }) => {
+  // ADR 0041. demo.faculty01 and demo.student01 are always in the same
+  // department -- both seed loops index from 1 over the same list -- so the
+  // department-scoped notice is one this student is addressed by.
+  const page = await sessionFor(browser, STUDENT);
+  await page.goto("/announcements");
+  await page.getByRole("searchbox", { name: "Search" }).fill(OPPORTUNITY);
+
+  const notice = page.getByRole("link", { name: new RegExp(`Opening: ${OPPORTUNITY}`) });
+  await expect(notice).toBeVisible();
+  await notice.click();
+
+  // The notice carries the way to the thing it is about, rather than leaving
+  // the reader to find it on the board by name.
+  await page.getByRole("link", { name: "Open the position" }).click();
+  await expect(page.getByRole("heading", { name: OPPORTUNITY })).toBeVisible();
+});
+
 test("student finds the opportunity, applies and tracks the application", async ({ browser }) => {
   const page = await sessionFor(browser, STUDENT);
   // From the PROJECT, which is where somebody reading about the work asks

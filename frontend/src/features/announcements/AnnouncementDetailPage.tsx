@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -276,6 +276,20 @@ export function AnnouncementDetailPage() {
 
       <div className="rounded-card border border-line bg-surface px-4 py-4">
         <p className="whitespace-pre-wrap text-sm">{data.body}</p>
+        {/* The notice is about an opening, so the way to it belongs on the
+            notice. Without this a reader has the title and has to go and find
+            it on the board by name -- the same walk the project page used to
+            make somebody do. */}
+        {data.source_opportunity_id ? (
+          <ButtonLink
+            to={`/opportunities/${data.source_opportunity_id}`}
+            variant="secondary"
+            size="sm"
+            className="mt-4"
+          >
+            Open the position
+          </ButtonLink>
+        ) : null}
       </div>
 
       <Links notice={data} />

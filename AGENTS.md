@@ -42,9 +42,9 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 196 API operations over 157 paths, 54 tables, 35 migrations,
-40 ADRs, 30 backend modules, 1371 backend tests, 398 frontend tests,
-16 Playwright flows.
+Current shape: 196 API operations over 157 paths, 54 tables, 36 migrations,
+41 ADRs, 30 backend modules, 1388 backend tests, 402 frontend tests,
+17 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
 - Nobody self-registers. `POST /auth/register` does not exist and must not
@@ -347,6 +347,24 @@ Current shape: 196 API operations over 157 paths, 54 tables, 35 migrations,
   `Content-Disposition: attachment` with `nosniff`. Links are rows, `http(s)`
   only: a `javascript:` URL on a notice the whole institution reads is a
   stored script with an audience.
+- **A PUBLISHED OPENING goes on the board automatically** (ADR 0041, amending
+  0038), and the three things that make that safe are all load-bearing.
+  `ANNOUNCEMENT_POST` is withheld from faculty on purpose, and most openings
+  are faculty's -- so (1) the reach is the OPENING's department
+  (`Opportunity.department_id`), never `policies.reach_of`, which is what stops
+  publishing an opening becoming the institution-wide megaphone ADR 0038
+  exists to prevent; (2) subject and body are DERIVED, so this is not a route
+  for saying an arbitrary thing to a department; (3)
+  `announcements.source_opportunity_id` is UNIQUE, so a second notice for one
+  opening is impossible in the database rather than guarded in a handler.
+  Wired as a SECOND subscriber on `OPPORTUNITY_PUBLISHED`, an event that
+  already existed -- the opportunities module does not know announcements
+  exist. `OPPORTUNITY_CLOSED` (raised by `close_opportunity` AND
+  `mark_filled_if_full`, because both mean "no longer a way in") withdraws it:
+  a board advertising a closed opening is worse than one that never mentioned
+  it. All of it in a savepoint that swallows `SQLAlchemyError` -- posting the
+  opening is the older act. Note `TRANSITIONS` has no `CLOSED -> OPEN`, so an
+  opening is published exactly once in its life.
 - **A personal REQUEST names its recipient, and it is the only thing that
   does** (ADR 0039) -- the deliberate opposite of the nudge rule below, for
   the case a nudge cannot serve: "my supervisor has not signed my form" is
@@ -599,6 +617,21 @@ Current shape: 196 API operations over 157 paths, 54 tables, 35 migrations,
 - **A new module's models must go in `app/db/model_registry.py`** or
   autogenerate produces an **empty migration** and says nothing is wrong. It
   did exactly that for `publication_duplicates` the first time.
+- **A SCRIPT must load that registry too, and nothing says so until a foreign
+  key crosses modules.** A script imports the handful of models it needs, but
+  SQLAlchemy resolves FKs against the WHOLE of `Base.metadata`: the first
+  flush sorts the tables and cannot find one nobody imported. The error names
+  the column rather than the missing import
+  (`NoReferencedTableError: ... 'announcements.source_opportunity_id' could
+  not find table 'opportunities'`), and it surfaces at a CI step with nothing
+  to do with the change -- ADR 0041 turned the E2E job red at "seed fictional
+  demo data". `seed_demo_data.py` had been fine for months only because it
+  happens to import `Department`, the other end of announcements' one existing
+  cross-module FK. `scripts/__init__.py` now imports the registry for every
+  script. **The guard for it must run in a SUBPROCESS**
+  (`tests/test_script_model_metadata.py`): asserted in-process it passes
+  either way, because `conftest.py` has already imported the whole
+  application and with it every model.
 - **A nested path loses to a path parameter registered before it.**
   `/publications/duplicates` was swallowed by `/publications/{publication_id}`
   and "duplicates" was parsed as a UUID, because FastAPI matches in

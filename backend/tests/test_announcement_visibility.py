@@ -39,16 +39,40 @@ def world(client: TestClient, seed_user: Callable[..., SeededUser]) -> World:
     return build_world(client, seed_user)
 
 
+def _written_by_a_person(items: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Drop notices the platform raised from an opening (ADR 0041).
+
+    `build_world` publishes an opening, and a published opening now puts
+    itself on its department's board -- so every world starts with one notice
+    already on it. This file is about the board as a place people WRITE to;
+    what an opening does there has its own file
+    (`test_opening_announcements.py`). Filtering is better than adding one to
+    every expected number: the numbers here say what they mean, and the next
+    thing that raises a notice does not move them all again.
+    """
+    return [item for item in items if item.get("source_opportunity_id") is None]
+
+
 def board_ids(client: TestClient, viewer: SeededUser) -> list[str]:
     response = client.get("/api/v1/announcements", headers=auth(viewer), params={"page_size": 100})
     assert response.status_code == 200, response.text
-    return [item["id"] for item in response.json()["items"]]
+    return [item["id"] for item in _written_by_a_person(response.json()["items"])]
 
 
 def unread(client: TestClient, viewer: SeededUser) -> int:
-    response = client.get("/api/v1/announcements/unread-count", headers=auth(viewer))
+    """Unread notices somebody wrote.
+
+    Counted from the board rather than from `/unread-count`, which counts
+    everything addressed to you -- as it should, since the reader's badge is
+    not interested in where a notice came from.
+    """
+    response = client.get(
+        "/api/v1/announcements",
+        headers=auth(viewer),
+        params={"unread_only": True, "page_size": 100},
+    )
     assert response.status_code == 200, response.text
-    return int(response.json()["unread"])
+    return len(_written_by_a_person(response.json()["items"]))
 
 
 def institution_notice(client: TestClient, world: World) -> str:

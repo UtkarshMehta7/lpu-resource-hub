@@ -53,6 +53,10 @@ function NoticeCard({ notice }: { notice: Announcement }) {
                 {STATUS_LABEL[notice.status]}
               </StatusPill>
             )}
+            {/* A notice raised from an opening is a different kind of thing
+                from a circular, and a board that does not say so reads as one
+                the hiring has flooded. */}
+            {notice.source_opportunity_id ? <StatusPill tone="info">Opening</StatusPill> : null}
             <StatusPill tone="neutral">{audienceLabel(notice)}</StatusPill>
           </div>
         </div>
