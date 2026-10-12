@@ -120,3 +120,79 @@ describe("searchNavigation", () => {
     expect(studentResults.map((item) => item.label)).not.toContain("Accounts");
   });
 });
+
+describe("a person's own work is reachable", () => {
+  /**
+   * The routes below all existed and were absent from this list, so they were
+   * missing from the top bar, the "All pages" menu and the command palette at
+   * once. Reported exactly as /admin/accounts/new was: as the feature not
+   * existing at all. A link on a page is not a substitute for an entry here.
+   */
+  it("gives a faculty member their own projects, openings and publications", () => {
+    const paths = navigationFor("faculty").map((item) => item.to);
+
+    expect(paths).toContain("/projects/mine");
+    expect(paths).toContain("/projects/new");
+    expect(paths).toContain("/opportunities/mine");
+    expect(paths).toContain("/opportunities/new");
+    expect(paths).toContain("/publications/mine");
+    expect(paths).toContain("/publications/new");
+    expect(paths).toContain("/patents/mine");
+    expect(paths).toContain("/patents/new");
+  });
+
+  it("gives a student the projects they joined and the applications they sent", () => {
+    const paths = navigationFor("student").map((item) => item.to);
+
+    // `mine` means owned OR joined, which is how somebody accepted onto a
+    // team finds that project again.
+    expect(paths).toContain("/projects/mine");
+    expect(paths).toContain("/me/applications");
+    // Students invent too (Permission.PATENT_CREATE).
+    expect(paths).toContain("/patents/new");
+  });
+
+  it("does not offer a student the things only a researcher may create", () => {
+    const paths = navigationFor("student").map((item) => item.to);
+
+    expect(paths).not.toContain("/projects/new");
+    expect(paths).not.toContain("/opportunities/new");
+    expect(paths).not.toContain("/publications/new");
+  });
+
+  it("does not offer creating work to the two read-only roles", () => {
+    // ADR 0028 makes both deliberately read-only over records.
+    for (const role of ["dean_of_research", "facility_custodian"] as const) {
+      const paths = navigationFor(role).map((item) => item.to);
+
+      expect(paths).not.toContain("/projects/new");
+      expect(paths).not.toContain("/publications/new");
+      expect(paths).not.toContain("/patents/new");
+      expect(paths).not.toContain("/me/applications");
+    }
+  });
+
+  it("finds them by the words people type", () => {
+    const faculty = navigationFor("faculty");
+
+    for (const [query, expected] of [
+      ["my projects", "/projects/mine"],
+      ["posted", "/opportunities/mine"],
+      ["applicants", "/opportunities/mine"],
+      ["new paper", "/publications/new"],
+      ["invention", "/patents/new"],
+    ] as const) {
+      expect(searchNavigation(faculty, query).map((item) => item.to)).toContain(expected);
+    }
+  });
+
+  it("every destination it lists is one the role may actually reach", () => {
+    // The list drives three surfaces; an entry a role cannot use would be a
+    // dead button in all three.
+    for (const role of ["student", "faculty", "research_coordinator"] as const) {
+      for (const item of navigationFor(role)) {
+        expect(item.roles === undefined || item.roles.includes(role)).toBe(true);
+      }
+    }
+  });
+});

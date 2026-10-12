@@ -43,6 +43,13 @@ export interface OpportunityInput {
 export interface OpportunityFilters {
   q?: string;
   type?: OpportunityType;
+  /**
+   * The backend has accepted this since opportunities were built and the
+   * mirror never carried it, so the project page could not ask "what is
+   * open on this project" -- the drift these hand-written types are prone
+   * to.
+   */
+  project_id?: string;
   status?: OpportunityStatus;
   department_id?: string;
   skill_id?: string;
