@@ -545,6 +545,17 @@ Current shape: 186 API operations over 148 paths, 52 tables, 34 migrations,
   not a permission bug. `tests/test_bootstrap_walkthrough.py` is the guard.
 - **`getByLabel` substring-matches.** "Search" matched the brand link;
   "Name" matched a "Rename X" button. Use `{ exact: true }` or a role.
+- **A bare `getByText` breaks when the PAGE gains content, not when your
+  feature changes.** The E2E flow asserted `getByText("departments")` on the
+  admin dashboard; the announcements section arrived with a seeded notice
+  reading "...departments to confirm their figures by Friday", two elements
+  matched and strict mode refused to choose. Scope an assertion to the
+  section that owns it (`locator("section").filter({ has: heading })`) and
+  pass `{ exact: true }`, so added content on the same page cannot confuse
+  it. This one reached `main` because **the E2E job is opt-in on pull
+  requests via the `e2e` label and unconditional on push** -- a PR can be
+  fully green and the same commit red once merged. Add the label to any PR
+  that touches a page an E2E flow visits.
 - **The frontend TS types are hand-written mirrors of the Pydantic schemas**
   and have drifted twice. When adding a backend field, update
   `frontend/src/features/*/types.ts` in the same change.
