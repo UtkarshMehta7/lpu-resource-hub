@@ -85,10 +85,24 @@ test("coordinator reviews the project and approves it", async ({ browser }) => {
   await expect(page.locator("li", { hasText: PROJECT })).toHaveCount(0);
 });
 
-test("faculty posts an opportunity on the approved project", async ({ browser }) => {
+test("faculty posts an opening from the project's own hiring section", async ({ browser }) => {
   const page = await sessionFor(browser, FACULTY);
-  await page.goto("/opportunities/new");
-  await page.getByLabel("Project").selectOption({ label: PROJECT });
+  await page.goto("/projects/mine");
+  await page.getByRole("link", { name: PROJECT }).click();
+
+  // The section is "Hiring" for the lead and "Open positions" for everybody
+  // else, because the lead's list holds drafts and closed openings too.
+  const hiring = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Hiring" }) });
+  await expect(hiring).toBeVisible();
+  await hiring.getByRole("link", { name: "Post an opening" }).click();
+
+  // The link carries ?project_id=, so the form arrives knowing which project
+  // it is hiring for. Without it the lead has to find their own project again
+  // in a dropdown, and the wrong choice files the opening against the wrong
+  // team. jsdom cannot catch this: the value comes from the URL.
+  await expect(page.getByLabel("Project")).not.toHaveValue("");
   await page.getByLabel("Title").fill(OPPORTUNITY);
   await page.getByLabel("Positions").fill("1");
   const deadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -102,13 +116,31 @@ test("faculty posts an opportunity on the approved project", async ({ browser })
   await page.getByRole("button", { name: "Publish" }).click();
   await page.getByRole("button", { name: "Publish" }).last().click();
   await expect(page.getByText("Open", { exact: false }).first()).toBeVisible();
+
+  // Back on the project, the lead can see it and that nobody has applied --
+  // the two things the project page could not previously tell them.
+  await page.goto("/projects/mine");
+  await page.getByRole("link", { name: PROJECT }).click();
+  const posted = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Hiring" }) });
+  await expect(posted.getByRole("link", { name: OPPORTUNITY })).toBeVisible();
+  await expect(posted.getByText("No applications yet.")).toBeVisible();
 });
 
 test("student finds the opportunity, applies and tracks the application", async ({ browser }) => {
   const page = await sessionFor(browser, STUDENT);
-  await page.goto("/opportunities");
-  await page.getByRole("searchbox", { name: "Search" }).fill(OPPORTUNITY);
-  await page.getByRole("link", { name: OPPORTUNITY }).click();
+  // From the PROJECT, which is where somebody reading about the work asks
+  // whether they can join it. The board still works; this is the route that
+  // did not exist.
+  await page.goto("/projects");
+  await page.getByRole("searchbox", { name: "Search" }).fill(PROJECT);
+  await page.getByRole("link", { name: PROJECT }).first().click();
+  const openings = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Open positions" }) });
+  await expect(openings).toBeVisible();
+  await openings.getByRole("link", { name: OPPORTUNITY }).click();
 
   await page.getByLabel(/good fit/i).fill("I have built and calibrated soil sensors before.");
   await page.getByRole("button", { name: "Submit application" }).click();

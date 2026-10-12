@@ -375,6 +375,10 @@ def test_accept_adds_member_fills_and_audits(client: TestClient, world: World) -
         f"/api/v1/projects/{world.project_id}/members", headers=_auth(world.owner)
     ).json()
     assert [m["user_id"] for m in members] == [str(world.student.id)]
+    # The role is derived from the opening's type and shown beside the name on
+    # the project page, next to roles people typed themselves. Lower-cased it
+    # read "research assistant" under "Research assistant".
+    assert members[0]["member_role"][:1].isupper()
 
     assert _set_status(client, world.owner, second, "under_review") == 200
     assert _set_status(client, world.owner, second, "accepted") == 409  # no positions left
@@ -462,3 +466,52 @@ def test_a_full_opening_takes_no_more_applications(client: TestClient, world: Wo
 
     assert refused.status_code == 409, refused.text
     assert "positions" in refused.json()["error"]["message"].lower()
+
+
+def test_application_counts_are_the_posters_alone(client: TestClient, world: World) -> None:
+    """The project's hiring section tells a lead their queue, and nobody else.
+
+    Before this a lead reading their own project could not tell that anybody
+    was waiting without opening every opening in turn. A student reading the
+    same page is deciding whether to apply, and a queue length forms no part
+    of that decision -- so the field is filled from the VIEWER, like
+    `my_application_id`, never from anything in the request.
+    """
+    opportunity_id = _opportunity(client, world, positions=3)
+    first = _apply(client, world.student, opportunity_id)
+    _apply(client, world.student_2, opportunity_id)
+    assert _set_status(client, world.owner, first, "under_review") == 200
+    assert _set_status(client, world.owner, first, "rejected", note="Not this time") == 200
+
+    def card(user: SeededUser) -> dict[str, object]:
+        response = client.get(
+            "/api/v1/opportunities", headers=_auth(user), params={"project_id": world.project_id}
+        )
+        assert response.status_code == 200, response.text
+        items = [item for item in response.json()["items"] if item["id"] == opportunity_id]
+        assert len(items) == 1
+        return dict(items[0])
+
+    posted = card(world.owner)
+    assert posted["application_count"] == 2
+    # One is decided, so only the other is still waiting on a decision.
+    assert posted["pending_application_count"] == 1
+
+    for reader in (world.student, world.student_2, world.coordinator_a, world.admin):
+        seen = card(reader)
+        assert seen["application_count"] is None, reader.user_id
+        assert seen["pending_application_count"] is None, reader.user_id
+
+
+def test_a_poster_with_no_applications_is_told_zero_not_nothing(
+    client: TestClient, world: World
+) -> None:
+    """Zero is an answer; a missing field is not. "No applications yet" and
+    "we could not tell you" must not render the same."""
+    opportunity_id = _opportunity(client, world)
+    response = client.get(
+        "/api/v1/opportunities", headers=_auth(world.owner), params={"project_id": world.project_id}
+    )
+    card = next(item for item in response.json()["items"] if item["id"] == opportunity_id)
+    assert card["application_count"] == 0
+    assert card["pending_application_count"] == 0

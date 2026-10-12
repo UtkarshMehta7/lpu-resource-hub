@@ -62,6 +62,12 @@ class OpportunityCard(BaseModel):
     accepted_count: int
     deadline: date
     skills: list[SkillTag]
+    # Only ever filled in for the person who POSTED the opening; None for
+    # every other reader. How many people have applied is the lead's queue,
+    # not a figure a student weighing up whether to apply is owed -- and the
+    # project page had no way to tell a lead that anybody was waiting.
+    application_count: int | None = None
+    pending_application_count: int | None = None
 
 
 class OpportunityRead(OpportunityCard):

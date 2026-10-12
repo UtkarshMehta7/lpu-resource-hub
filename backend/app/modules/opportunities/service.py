@@ -96,6 +96,13 @@ def load_visible(db: Session, viewer: User, opportunity_id: uuid.UUID) -> Opport
     return opportunity
 
 
+#: Applications that are over -- the lead owes them nothing further. The
+#: complement is what "waiting on you" means on the project's hiring section.
+DECIDED_APPLICATION_STATUSES = frozenset(
+    {ApplicationStatus.ACCEPTED, ApplicationStatus.REJECTED, ApplicationStatus.WITHDRAWN}
+)
+
+
 def accepted_count(db: Session, opportunity_id: uuid.UUID) -> int:
     return db.execute(
         select(func.count()).where(
@@ -187,6 +194,33 @@ def _to_cards(db: Session, viewer: User, rows: Sequence[Opportunity]) -> list[Op
             .group_by(Application.opportunity_id)
         ).all()
     }
+    # Counts for the openings this viewer POSTED, and nobody else's. A lead
+    # reading their own project could not tell that four people were waiting
+    # on them without opening every opening in turn; a student reading the
+    # same page is deciding whether to apply, and a queue length is not part
+    # of that decision. Same discipline as `my_application_id`: a per-viewer
+    # field, filled from the viewer rather than from a flag in the request.
+    own_ids = [o.id for o in rows if o.created_by == viewer.id]
+    applications: dict[uuid.UUID, tuple[int, int]] = {}
+    if own_ids:
+        applications = {
+            oid: (total, waiting)
+            for oid, total, waiting in db.execute(
+                select(
+                    Application.opportunity_id,
+                    func.count(),
+                    func.count().filter(Application.status.notin_(DECIDED_APPLICATION_STATUSES)),
+                )
+                .where(Application.opportunity_id.in_(own_ids))
+                .group_by(Application.opportunity_id)
+            ).all()
+        }
+
+    def counts(o: Opportunity) -> tuple[int | None, int | None]:
+        if o.created_by != viewer.id:
+            return None, None
+        return applications.get(o.id, (0, 0))
+
     return [
         OpportunityCard(
             id=o.id,
@@ -203,6 +237,8 @@ def _to_cards(db: Session, viewer: User, rows: Sequence[Opportunity]) -> list[Op
             accepted_count=accepted.get(o.id, 0),
             deadline=o.deadline,
             skills=skills[o.id],
+            application_count=counts(o)[0],
+            pending_application_count=counts(o)[1],
         )
         for o in rows
     ]

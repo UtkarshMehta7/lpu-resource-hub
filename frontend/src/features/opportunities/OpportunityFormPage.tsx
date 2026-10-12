@@ -1,8 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
 import { TagPicker, type TagOption } from "@/components/ui/TagPicker";
@@ -67,6 +67,12 @@ function OpportunityForm({ existing }: { existing: Opportunity | null }) {
     () => existing?.skills.map(({ id, name }) => ({ id, name })) ?? [],
   );
   const isCoordinator = user?.role === "research_coordinator";
+  // Arriving from a project's hiring section, which carries the project it is
+  // hiring for. Without this a lead who pressed "Post an opening" on their own
+  // project page had to find that same project again in a dropdown -- and
+  // choosing the wrong one files the opening against the wrong team.
+  const [searchParams] = useSearchParams();
+  const presetProjectId = searchParams.get("project_id") ?? "";
 
   const { data: projects } = useQuery({
     queryKey: ["projects", { mine: true, status: "active" }],
@@ -77,6 +83,7 @@ function OpportunityForm({ existing }: { existing: Opportunity | null }) {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
@@ -84,12 +91,24 @@ function OpportunityForm({ existing }: { existing: Opportunity | null }) {
       title: existing?.title ?? "",
       description: existing?.description ?? "",
       opportunity_type: existing?.opportunity_type ?? "research_assistant",
-      project_id: existing?.project_id ?? "",
+      project_id: existing?.project_id ?? presetProjectId,
       eligibility: existing?.eligibility ?? "",
       positions: existing?.positions ?? 1,
       deadline: existing?.deadline ?? "",
     },
   });
+
+  // The options arrive after the form mounts, and a `<select>` whose value is
+  // not among its options shows the FIRST one -- so the preset from the URL
+  // was silently discarded and the field came back empty. Set it once the
+  // project it names is actually in the list, and only then: a project the
+  // caller cannot post against must not be preselected into the form.
+  useEffect(() => {
+    if (!presetProjectId || !projects) return;
+    if (projects.items.some((p) => p.id === presetProjectId)) {
+      setValue("project_id", presetProjectId);
+    }
+  }, [presetProjectId, projects, setValue]);
 
   const findSkills = useCallback(
     async (q: string) => (await searchSkills(q || undefined)).map(({ id, name }) => ({ id, name })),
