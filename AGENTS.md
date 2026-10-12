@@ -44,7 +44,7 @@ admin console, and the deployment configuration.
 
 Current shape: 196 API operations over 157 paths, 54 tables, 36 migrations,
 41 ADRs, 30 backend modules, 1379 backend tests, 402 frontend tests,
-16 Playwright flows.
+17 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
 - Nobody self-registers. `POST /auth/register` does not exist and must not
