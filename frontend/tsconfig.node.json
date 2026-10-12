@@ -2,7 +2,11 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "ES2023",
-    "lib": ["ES2023"],
+    // DOM, because a Playwright `page.evaluate` callback is serialised and
+    // run IN THE BROWSER even though it is written in a Node-side file. The
+    // flows measure layout that way -- jsdom applies no media queries and
+    // measures nothing, so a responsive regression can only be caught here.
+    "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "types": ["node"],
     "skipLibCheck": true,

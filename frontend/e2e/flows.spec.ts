@@ -417,3 +417,29 @@ test("coordinator reads scoped analytics; admin reads the audit log", async ({ b
   await admin.goto("/admin/settings");
   await expect(admin.getByText(/recommendation weights/i)).toBeVisible();
 });
+
+test("no page scrolls sideways on a phone", async ({ browser }) => {
+  // The header's mark and its four action icons together needed more than a
+  // 360px screen has, so EVERY page scrolled horizontally -- 80px at 360, 50
+  // at 390, 26 at 414. Nothing in the component tests could see it: jsdom
+  // applies no media queries and measures no layout, so this is the only
+  // place the regression can be caught.
+  const page = await sessionFor(browser, FACULTY);
+  await page.setViewportSize({ width: 360, height: 800 });
+
+  for (const path of ["/dashboard", "/projects", "/opportunities", "/announcements"]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, `${path} overflows by ${overflow}px at 360`).toBeLessThanOrEqual(0);
+  }
+
+  // The prototype label is the one part of the mark that must survive the
+  // narrowest screen: it is what says this is not an official LPU system.
+  // Scoped to the header -- the footer carries the same disclaimer, and a
+  // bare getByText matches both.
+  await expect(page.locator("header").getByText("Prototype")).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 900 });
+});
