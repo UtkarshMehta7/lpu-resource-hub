@@ -60,6 +60,7 @@ from app.modules.projects.router import router as projects_router
 from app.modules.publications.router import router as publications_router
 from app.modules.recommendations.router import router as recommendations_router
 from app.modules.reports.router import router as reports_router
+from app.modules.requests.router import router as requests_router
 from app.modules.researchers.router import router as researchers_router
 from app.modules.search.router import router as search_router
 from app.modules.taxonomy.router import router as taxonomy_router
@@ -191,6 +192,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(messages_router, prefix=API_V1_PREFIX)
     app.include_router(recommendations_router, prefix=API_V1_PREFIX)
     app.include_router(reports_router, prefix=API_V1_PREFIX)
+    app.include_router(requests_router, prefix=API_V1_PREFIX)
     app.include_router(analytics_router, prefix=API_V1_PREFIX)
     app.include_router(announcements_router, prefix=API_V1_PREFIX)
     app.include_router(facilities_router, prefix=API_V1_PREFIX)

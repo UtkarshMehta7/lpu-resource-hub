@@ -47,6 +47,9 @@ import { ConversationsPage } from "@/features/messages/ConversationsPage";
 import { ThreadPage } from "@/features/messages/ThreadPage";
 import { PeoplePage } from "@/features/admin/PeoplePage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { RequestDetailPage } from "@/features/requests/RequestDetailPage";
+import { RequestFormPage } from "@/features/requests/RequestFormPage";
+import { RequestsPage } from "@/features/requests/RequestsPage";
 import { DuplicateQueuePage } from "@/features/deduplication/DuplicateQueuePage";
 import { ModerationQueuePage } from "@/features/reports/ModerationQueuePage";
 import { SavedPage } from "@/features/saved/SavedPage";
@@ -99,6 +102,13 @@ export const router = createBrowserRouter([
           { path: "opportunities/:opportunityId/edit", element: <OpportunityFormPage /> },
           { path: "opportunities/:opportunityId/applicants", element: <ApplicantsPage /> },
           { path: "me/applications", element: <MyApplicationsPage /> },
+          // Personal requests. No RoleRoute: an administrator may read the
+          // ones put to THEM, and the routing table decides who they may
+          // address, which is not a thing a route can express (ADR 0039).
+          { path: "me/requests", element: <RequestsPage /> },
+          { path: "requests/inbox", element: <RequestsPage inbox /> },
+          { path: "requests/new", element: <RequestFormPage /> },
+          { path: "requests/:requestId", element: <RequestDetailPage /> },
           { path: "collaborations", element: <CollaborationsPage /> },
           // Any signed-in role can have threads: they only exist where a
           // relationship already does (ADR 0022).

@@ -66,11 +66,14 @@ export const NAV: NavItem[] = [
   // My work -- the things that are mine and waiting on me.
   { to: "/messages", label: "Messages", group: "My work", keywords: "chat conversations threads" },
   {
+    // "Requests" until personal requests arrived (ADR 0039), at which point
+    // one menu had two unrelated things under the same word. Named for what
+    // it is now.
     to: "/collaborations",
-    label: "Requests",
+    label: "Collaboration requests",
     group: "My work",
     roles: ["student", "faculty", "research_coordinator"],
-    keywords: "collaboration invites",
+    keywords: "collaboration invites work together co-author",
   },
   // A person's OWN work, which was reachable only by landing on the general
   // page first and noticing a button there. The routes all existed; they
@@ -107,6 +110,30 @@ export const NAV: NavItem[] = [
     group: "My work",
     roles: ["faculty", "research_coordinator"],
     keywords: "new opening position advertise recruit assistant",
+  },
+  // Personal requests travel UPWARD to a named person (ADR 0039). Everyone
+  // reads the ones put to them, so the inbox has no `roles`; making one is
+  // offered to everybody but an administrator, who is at the top of the
+  // chain and addresses nobody -- the page says so rather than vanishing.
+  {
+    to: "/me/requests",
+    label: "My requests",
+    group: "My work",
+    keywords: "asked escalation permission approval help sent upward",
+  },
+  {
+    to: "/requests/inbox",
+    label: "Requests to you",
+    group: "My work",
+    roles: ["faculty", "research_coordinator", "dean_of_research", "admin"],
+    keywords: "inbox asked of me escalations approvals waiting",
+  },
+  {
+    to: "/requests/new",
+    label: "Make a request",
+    group: "My work",
+    roles: ["student", "faculty", "facility_custodian", "research_coordinator", "dean_of_research"],
+    keywords: "ask escalate permission approval supervisor coordinator dean",
   },
   {
     to: "/me/applications",

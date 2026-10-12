@@ -61,6 +61,7 @@ The planned solution: researcher profiles with expertise tags and publications, 
 | Institutional research report for a full academic year, on screen and exportable to PDF and CSV, with six new analytics metrics and every figure carrying its definition ([reporting](docs/reporting.md), [analytics](docs/analytics.md)) | Done |
 | A project's chat exists from the moment it is created and its membership follows the team — however somebody joined, including by being accepted into an opportunity — and teams share PDFs, Word documents, images and archives up to 5 MB, typed from their bytes and downloadable only by a participant ([ADR 0033](docs/adr/0033-files-in-a-conversation.md)) | Done |
 | A notice board the whole institution reads: an administrator or the Dean of Research addresses everybody, a research coordinator their own department, with text, labelled links and attached files — and an unread count that costs one row per notice rather than one per account ([ADR 0038](docs/adr/0038-the-institution-can-say-one-thing-to-everybody.md)) | Done |
+| A person may put a request to a NAMED person above them — a student to their faculty or coordinator, faculty and custodians upward from there — with supporting documents, a reason required to decline, and nobody but the two of them able to read it ([ADR 0039](docs/adr/0039-a-request-names-the-person-it-is-for.md)) | Done |
 
 ## Technology stack
 
@@ -379,6 +380,12 @@ dead button.
 | `GET /api/v1/analytics/institutional-report/export?format=pdf\|csv` | coordinator, admin | The same aggregation as a file, so the numbers cannot differ from the screen. |
 | `GET /api/v1/analytics/academic-years` | coordinator, admin | Real years to choose from, rather than a free-text box inviting typos. |
 | `POST /api/v1/nudges` | any signed-in user | Remind whoever must act that something of **yours** is still waiting. The sender never names the recipient; one nudge per thing per day. |
+| `GET /api/v1/requests/recipients` | any signed-in user | Who you may put a request to — upward only, and inside your own department unless they answer to the institution. Built by the same filter the submit enforces. An empty list is a real answer: an administrator addresses nobody. |
+| `POST /api/v1/requests` | any signed-in user with somebody above them | Names the recipient, which nothing else on the platform does. `REQUEST_RECIPIENT_ROLES` plus the department check is what makes that safe. |
+| `GET /api/v1/me/requests`, `GET /api/v1/requests/inbox` | any signed-in user | Sent and received. `?status=` filters both. |
+| `GET /api/v1/requests/inbox/count` | any signed-in user | What you still owe an answer on; taking one up does not clear it. |
+| `POST /api/v1/requests/{id}/status` | the party whose move it is | One transition table for both sides. Declining **requires** a reason. A move nobody has is 409; one that is the other party's is 403. |
+| `POST/DELETE/GET /api/v1/requests/{id}/attachments[/{aid}]` | the sender writes, both parties read | Typed from their **bytes**; the download re-runs the request's own visibility check, so there is no public path to them. |
 | `GET /api/v1/announcements` | any signed-in user | The notice board — what the university and your own department have announced, newest first. Filters `q`, `unread_only`, `mine`. Every role reads it; the server scopes what each one sees. |
 | `GET /api/v1/announcements/unread-count` | any signed-in user | Drives the header badge. A `NOT EXISTS` against the read markers, so a post costs one row however large the institution. |
 | `POST /api/v1/announcements` | coordinator, dean, admin (`announcement:post`) | Writes a **draft**. There is no `audience` field: an admin or dean addresses the institution, a coordinator their own department, derived from the caller. |

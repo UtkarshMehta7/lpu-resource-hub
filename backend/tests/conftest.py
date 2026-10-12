@@ -106,6 +106,7 @@ def db_settings(migrated_test_database_url: str) -> Settings:
 
 
 TABLES_TO_CLEAN = (
+    "request_attachments, personal_requests, "
     "announcement_reads, announcement_attachments, announcement_links, announcements, "
     "publication_duplicates, nudges, milestone_dependencies, milestones, "
     "profile_imports, entity_embeddings, "

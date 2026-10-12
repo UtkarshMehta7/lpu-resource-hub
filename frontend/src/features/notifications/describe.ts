@@ -106,6 +106,28 @@ export function describeNotification(notification: AppNotification): Notificatio
           [str(payload, "registration_number"), first].filter(Boolean).join(" · ") || undefined,
       };
     }
+    case "request_received":
+      // The one notification whose recipient the SENDER chose. The routing
+      // table and the department check stand behind it (ADR 0039), which is
+      // why the sender's role is named here: "a student has asked you" and
+      // "a coordinator has asked you" are different things to read.
+      return {
+        text: `${str(payload, "from_name")} put a request to you`,
+        to: `/requests/${str(payload, "request_id")}`,
+        detail: str(payload, "subject") || undefined,
+      };
+    case "request_decided": {
+      const decided = str(payload, "status");
+      return {
+        text:
+          decided === "resolved"
+            ? `${str(payload, "by_name")} resolved your request`
+            : `${str(payload, "by_name")} declined your request`,
+        to: `/requests/${str(payload, "request_id")}`,
+        // Declining always carries a reason, so this is never a bare "no".
+        detail: str(payload, "note") || str(payload, "subject") || undefined,
+      };
+    }
     case "nudge_received": {
       const kind = str(payload, "kind");
       const destination: Record<string, string> = {
