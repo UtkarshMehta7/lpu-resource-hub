@@ -42,8 +42,8 @@ department placement (ADR 0018), the provisioning hierarchy (ADR 0019), the
 admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
-Current shape: 186 API operations over 148 paths, 52 tables, 34 migrations,
-38 ADRs, 29 backend modules, 1319 backend tests, 367 frontend tests,
+Current shape: 196 API operations over 157 paths, 54 tables, 35 migrations,
+39 ADRs, 30 backend modules, 1369 backend tests, 382 frontend tests,
 14 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -347,6 +347,28 @@ Current shape: 186 API operations over 148 paths, 52 tables, 34 migrations,
   `Content-Disposition: attachment` with `nosniff`. Links are rows, `http(s)`
   only: a `javascript:` URL on a notice the whole institution reads is a
   stored script with an audience.
+- **A personal REQUEST names its recipient, and it is the only thing that
+  does** (ADR 0039) -- the deliberate opposite of the nudge rule below, for
+  the case a nudge cannot serve: "my supervisor has not signed my form" is
+  addressed to a person and there is no entity to resolve them from. Two
+  things make the field safe. `REQUEST_RECIPIENT_ROLES` lets a sender address
+  only roles ABOVE their own (an admin addresses nobody -- a request from the
+  top is an instruction), and `policies.addressable_filter` adds the
+  DEPARTMENT check, without which naming any faculty member in the university
+  would work and this really would be the general messaging route nudges
+  refused to be. The same filter builds the candidate list AND checks the
+  submit, so the picker can never offer somebody the submit would refuse.
+- **One TRANSITIONS table, two actors.** The recipient takes it up, resolves
+  or declines; the sender may only WITHDRAW, which is kept distinct from
+  declined because "I no longer need this" and "the answer is no" are
+  different outcomes. Reopening a decided request exists for nobody: asking
+  again is a NEW request with its own date. A move that does not exist is 409
+  whoever asks, somebody else's is 403, in that order -- or a sender is told
+  that resolving their own request is merely somebody else's to do.
+  `next_statuses` is computed per reader and the frontend holds no copy of
+  the table. **Declining requires a reason** in the schema, the service and a
+  CHECK. **Two people and no third**: a request is 404 to everyone else,
+  administrators included.
 - **Nudges never name their recipient.** `POST /nudges` takes a kind and an
   entity; the service resolves who hears about it from the thing being
   chased. A recipient field would make it a way to message anyone in the
@@ -531,7 +553,7 @@ Current shape: 186 API operations over 148 paths, 52 tables, 34 migrations,
   drives the top bar, the grouped "All pages" menu and the command palette, so
   a role can never reach a page through one and not another. Add a page there
   or it is unreachable from two of the three.
-- **Cmd/Ctrl+K (or "/") opens the command palette.** 48 destinations, six fit
+- **Cmd/Ctrl+K (or "/") opens the command palette.** 51 destinations, six fit
   on the bar; the palette is how people actually get around. It only offers
   pages the signed-in role can reach.
 - Loading shows `SkeletonList`, not the word "Loading".
