@@ -43,7 +43,7 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 196 API operations over 157 paths, 54 tables, 36 migrations,
-41 ADRs, 30 backend modules, 1379 backend tests, 402 frontend tests,
+41 ADRs, 30 backend modules, 1388 backend tests, 402 frontend tests,
 17 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
@@ -617,6 +617,21 @@ Current shape: 196 API operations over 157 paths, 54 tables, 36 migrations,
 - **A new module's models must go in `app/db/model_registry.py`** or
   autogenerate produces an **empty migration** and says nothing is wrong. It
   did exactly that for `publication_duplicates` the first time.
+- **A SCRIPT must load that registry too, and nothing says so until a foreign
+  key crosses modules.** A script imports the handful of models it needs, but
+  SQLAlchemy resolves FKs against the WHOLE of `Base.metadata`: the first
+  flush sorts the tables and cannot find one nobody imported. The error names
+  the column rather than the missing import
+  (`NoReferencedTableError: ... 'announcements.source_opportunity_id' could
+  not find table 'opportunities'`), and it surfaces at a CI step with nothing
+  to do with the change -- ADR 0041 turned the E2E job red at "seed fictional
+  demo data". `seed_demo_data.py` had been fine for months only because it
+  happens to import `Department`, the other end of announcements' one existing
+  cross-module FK. `scripts/__init__.py` now imports the registry for every
+  script. **The guard for it must run in a SUBPROCESS**
+  (`tests/test_script_model_metadata.py`): asserted in-process it passes
+  either way, because `conftest.py` has already imported the whole
+  application and with it every model.
 - **A nested path loses to a path parameter registered before it.**
   `/publications/duplicates` was swallowed by `/publications/{publication_id}`
   and "duplicates" was parsed as a UUID, because FastAPI matches in
