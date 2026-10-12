@@ -43,8 +43,8 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 196 API operations over 157 paths, 54 tables, 35 migrations,
-39 ADRs, 30 backend modules, 1369 backend tests, 382 frontend tests,
-14 Playwright flows.
+40 ADRs, 30 backend modules, 1371 backend tests, 391 frontend tests,
+15 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
 - Nobody self-registers. `POST /auth/register` does not exist and must not
