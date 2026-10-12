@@ -144,6 +144,30 @@ def test_publishing_an_opening_puts_it_on_the_board(client: TestClient, stage: S
     assert notices[0]["posted_by_role"] == "faculty"
 
 
+def test_the_badge_and_the_dashboard_count_an_openings_notice(
+    client: TestClient, stage: Stage
+) -> None:
+    """A reader's badge is not interested in where a notice came from.
+
+    The dashboard is where everybody meets the board (ADR 0038), so a notice
+    that reached the history page and not the panel would be one most people
+    never saw.
+    """
+    opportunity_id = _opening(client, stage)
+    client.post(f"/api/v1/opportunities/{opportunity_id}/publish", headers=_auth(stage.owner))
+
+    badge = client.get("/api/v1/announcements/unread-count", headers=_auth(stage.student))
+    assert badge.json()["unread"] == 1
+    panel = client.get("/api/v1/me/dashboard", headers=_auth(stage.student)).json()["announcements"]
+    assert panel["unread"] == 1
+    assert [item["source_opportunity_id"] for item in panel["latest"]] == [opportunity_id]
+
+    # Taken down with the opening, from the panel as well as the board.
+    client.post(f"/api/v1/opportunities/{opportunity_id}/close", headers=_auth(stage.owner))
+    panel = client.get("/api/v1/me/dashboard", headers=_auth(stage.student)).json()["announcements"]
+    assert panel == {"unread": 0, "latest": []}
+
+
 def test_the_reach_is_the_openings_department_not_the_posters_rank(
     client: TestClient, stage: Stage
 ) -> None:

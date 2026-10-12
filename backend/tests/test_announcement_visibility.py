@@ -36,43 +36,59 @@ def client(db_settings: Settings, clean_db: None) -> Iterator[TestClient]:
 
 @pytest.fixture
 def world(client: TestClient, seed_user: Callable[..., SeededUser]) -> World:
-    return build_world(client, seed_user)
+    """A world whose board starts EMPTY.
 
+    `build_world` publishes an opening, and a published opening puts itself
+    on its department's board (ADR 0041) -- so every world would otherwise
+    start with one notice nobody here wrote, and every count below would be
+    one higher than it says. This file is about the board as a place people
+    WRITE to; what an opening does there, the panel and the badge included,
+    is `test_opening_announcements.py`'s.
 
-def _written_by_a_person(items: list[dict[str, object]]) -> list[dict[str, object]]:
-    """Drop notices the platform raised from an opening (ADR 0041).
-
-    `build_world` publishes an opening, and a published opening now puts
-    itself on its department's board -- so every world starts with one notice
-    already on it. This file is about the board as a place people WRITE to;
-    what an opening does there has its own file
-    (`test_opening_announcements.py`). Filtering is better than adding one to
-    every expected number: the numbers here say what they mean, and the next
-    thing that raises a notice does not move them all again.
+    Withdrawn once, here, through the API an administrator really has, rather
+    than filtered out of every assertion: the dashboard panel is counted on
+    the server, where no filter in a test can reach.
     """
-    return [item for item in items if item.get("source_opportunity_id") is None]
+    built = build_world(client, seed_user)
+    raised = [
+        item["id"]
+        for item in client.get(
+            "/api/v1/announcements", headers=auth(built.admin), params={"page_size": 100}
+        ).json()["items"]
+        if item["source_opportunity_id"] is not None
+    ]
+    assert len(raised) == 1, raised
+    withdrawn = client.post(
+        f"/api/v1/announcements/{raised[0]}/withdraw", headers=auth(built.admin)
+    )
+    assert withdrawn.status_code == 200, withdrawn.text
+    return built
 
 
 def board_ids(client: TestClient, viewer: SeededUser) -> list[str]:
     response = client.get("/api/v1/announcements", headers=auth(viewer), params={"page_size": 100})
     assert response.status_code == 200, response.text
-    return [item["id"] for item in _written_by_a_person(response.json()["items"])]
+    return [item["id"] for item in response.json()["items"]]
 
 
 def unread(client: TestClient, viewer: SeededUser) -> int:
-    """Unread notices somebody wrote.
+    """The unread count, asked of BOTH places that answer it.
 
-    Counted from the board rather than from `/unread-count`, which counts
-    everything addressed to you -- as it should, since the reader's badge is
-    not interested in where a notice came from.
+    The badge (`/unread-count`) and the board's "Unread" filter must never
+    disagree. They did: the filter forgot that only a published notice can be
+    unread, and listed the author's own drafts under "Unread".
     """
-    response = client.get(
+    badge = client.get("/api/v1/announcements/unread-count", headers=auth(viewer))
+    assert badge.status_code == 200, badge.text
+    board = client.get(
         "/api/v1/announcements",
         headers=auth(viewer),
         params={"unread_only": True, "page_size": 100},
     )
-    assert response.status_code == 200, response.text
-    return len(_written_by_a_person(response.json()["items"]))
+    assert board.status_code == 200, board.text
+    count = int(badge.json()["unread"])
+    assert board.json()["total"] == count, board.json()
+    return count
 
 
 def institution_notice(client: TestClient, world: World) -> str:
@@ -394,6 +410,9 @@ def test_withdrawing_a_notice_removes_it_from_the_count(client: TestClient, worl
     client.post(f"/api/v1/announcements/{notice_id}/withdraw", headers=auth(world.admin))
 
     assert unread(client, world.student) == 0
+    # An administrator still SEES a withdrawn notice, and it is still unread
+    # for nobody -- the board's "Unread" filter included.
+    assert unread(client, world.admin) == 0
 
 
 def test_unread_only_filters_the_board(client: TestClient, world: World) -> None:

@@ -188,6 +188,11 @@ def list_announcements(
     if mine:
         conditions.append(Announcement.posted_by == viewer.id)
     if unread_only:
+        # Only a PUBLISHED notice can be unread -- the rule `unread_count` and
+        # each row's `unread` flag already hold. Without it the filter listed
+        # the author's own drafts, and withdrawn notices to an administrator,
+        # under "Unread" while every row it returned said it was not.
+        conditions.append(Announcement.status == AnnouncementStatus.PUBLISHED)
         conditions.append(
             ~select(AnnouncementReceipt.announcement_id)
             .where(
