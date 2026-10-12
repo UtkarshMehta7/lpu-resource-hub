@@ -264,7 +264,7 @@ def change_status(
                     db,
                     project_id=opportunity.project_id,
                     user_id=application.applicant_id,
-                    member_role=opportunity.opportunity_type.value.replace("_", " "),
+                    member_role=opportunity.opportunity_type.value.replace("_", " ").capitalize(),
                 )
         opportunity_service.mark_filled_if_full(db, opportunity)
 

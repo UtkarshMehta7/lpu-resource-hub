@@ -778,13 +778,61 @@ def _seed_opportunities(
     faculty: list[User],
     summary: Summary,
 ) -> None:
+    """The school's openings, each hung off one of its ACTIVE projects.
+
+    `project_id` is not decoration -- it is the ONLY link between a project
+    and the way into it, and it runs in this direction only. `ProjectOpenings`
+    lists a project's open positions by querying `?project_id=`, and accepting
+    an application adds the applicant to the team only when the opening names
+    a project (`applications/service.py`: `add_to_project` is a no-op without
+    it). Seeded detached, as these were, every project page said nothing about
+    joining and every acceptance left the new member off the team: the feature
+    was built and the demo data hid it.
+
+    The creator is the project's OWNER, because only `opportunity.created_by`
+    may decide an application, and the person adding somebody to a team should
+    be the person whose team it is.
+
+    Rows that already exist are REPAIRED rather than skipped, the same reason
+    `_tag_project` runs for projects it did not create: a seeder that passes
+    over what is already there can never fix what it got wrong before.
+    """
+    projects = list(
+        db.execute(
+            select(Project)
+            .where(
+                Project.title.in_([title for title, _, _ in plan.projects]),
+                Project.status == ProjectStatus.ACTIVE,
+            )
+            .order_by(Project.title)
+        )
+        .scalars()
+        .all()
+    )
     for index, (title, kind, days) in enumerate(plan.openings):
+        project = projects[index % len(projects)] if projects else None
         existing = db.execute(
             select(Opportunity).where(Opportunity.title == title)
         ).scalar_one_or_none()
+        places = 3 + (index % 2)
         if existing is not None:
+            if project is not None and existing.project_id is None:
+                existing.project_id = project.id
+                # Kept in step deliberately: an opening whose creator does not
+                # own the project it feeds is one whose acceptances nobody can
+                # make. created_by on a demo opening is not a role, so there is
+                # no privilege being handed out here.
+                existing.created_by = project.owner_id
+            # An opening seeded with one place and then filled by the seeded
+            # acceptance answers "All places taken" to every student who finds
+            # it. Widening is safe in a way narrowing would not be: it can
+            # only ever leave MORE room than somebody has already been given.
+            if existing.positions < places:
+                existing.positions = places
+                if existing.status is OpportunityStatus.FILLED:
+                    existing.status = OpportunityStatus.OPEN
             continue
-        creator = faculty[index % len(faculty)]
+        creator_id = project.owner_id if project is not None else faculty[index % len(faculty)].id
         db.add(
             Opportunity(
                 title=title,
@@ -793,10 +841,16 @@ def _seed_opportunities(
                     "Suitable for students who have completed the second year."
                 ),
                 opportunity_type=kind,
-                created_by=creator.id,
+                created_by=creator_id,
+                project_id=project.id if project is not None else None,
                 department_id=department.id,
                 eligibility="Open to enrolled students in any year.",
-                positions=1 + (index % 2),
+                # Enough places that the seeded acceptances below do not fill
+                # every opening. An opening with one place and one accepted
+                # applicant reads "All places taken" to every student who
+                # finds it -- a board where nothing can be applied for
+                # demonstrates the feature exactly as well as an empty one.
+                positions=places,
                 deadline=TODAY + timedelta(days=days),
                 status=OpportunityStatus.OPEN,
             )
@@ -1497,11 +1551,54 @@ def main() -> int:
 # queue. Everything below is still fictional and still idempotent.
 
 
+def _join_on_acceptance(
+    db: Session, opening: Opportunity, *, applicant_id: uuid.UUID, accepted: bool
+) -> None:
+    """Put an ACCEPTED applicant on the opening's project team.
+
+    This is what the real path does -- `applications/service.py` calls
+    `record_membership` when a lead accepts with `add_to_project` -- so a
+    seeded acceptance that writes only the application row leaves a
+    demonstration in which somebody was accepted onto a project they are not
+    a member of.
+
+    Through `record_membership`, never a bare insert, so the team thread is
+    synced with the row (ADR 0033): three paths once made somebody a member
+    and only two joined them to the chat.
+    """
+    from app.modules.projects import service as projects_service
+
+    if not accepted or opening.project_id is None:
+        return
+    already = db.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == opening.project_id,
+            ProjectMember.user_id == applicant_id,
+        )
+    ).scalar_one_or_none()
+    if already is not None:
+        return
+    projects_service.record_membership(
+        db,
+        project_id=opening.project_id,
+        user_id=applicant_id,
+        member_role=opening.opportunity_type.value.replace("_", " ").capitalize(),
+    )
+
+
 def _seed_applications(db: Session, summary: Summary) -> None:
     """Applications across the openings, at different stages.
 
     The status timeline is the point of the applicant view, and a timeline
     with one entry does not show it.
+
+    An ACCEPTED applicant is also put on the opening's project team, because
+    that is what the real path does: `applications/service.py` calls
+    `record_membership` on acceptance. Writing the application alone leaves a
+    demonstration where somebody was accepted onto a project they are not a
+    member of -- the end state the feature produces is the thing worth
+    showing. Through `record_membership`, never a bare insert, so the team
+    chat is synced with it (ADR 0033).
     """
     from app.modules.applications.models import Application, ApplicationStatus
 
@@ -1541,21 +1638,36 @@ def _seed_applications(db: Session, summary: Summary) -> None:
                 )
             ).scalar_one_or_none()
             if existing is not None:
+                # Not a skip: an application accepted before openings named a
+                # project left its applicant off the team, and only a run that
+                # looks at what is already there can put them on it.
+                _join_on_acceptance(
+                    db,
+                    opening,
+                    applicant_id=existing.applicant_id,
+                    accepted=existing.status is ApplicationStatus.ACCEPTED,
+                )
                 continue
             status = stages[(index + offset) % len(stages)]
             decided = status in {ApplicationStatus.ACCEPTED, ApplicationStatus.REJECTED}
-            db.add(
-                Application(
-                    opportunity_id=opening.id,
-                    applicant_id=applicant.id,
-                    statement=statements[(index + offset) % len(statements)],
-                    status=status,
-                    decided_by=opening.created_by if decided else None,
-                    decided_at=NOW - timedelta(days=1) if decided else None,
-                    note="Strong fit for the fieldwork." if decided else None,
-                )
+            application = Application(
+                opportunity_id=opening.id,
+                applicant_id=applicant.id,
+                statement=statements[(index + offset) % len(statements)],
+                status=status,
+                decided_by=opening.created_by if decided else None,
+                decided_at=NOW - timedelta(days=1) if decided else None,
+                note="Strong fit for the fieldwork." if decided else None,
             )
+            db.add(application)
             summary.applications += 1
+            db.flush()
+            _join_on_acceptance(
+                db,
+                opening,
+                applicant_id=applicant.id,
+                accepted=status is ApplicationStatus.ACCEPTED,
+            )
     db.flush()
 
 

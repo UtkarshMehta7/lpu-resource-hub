@@ -19,6 +19,13 @@ export interface OpportunityCard {
   accepted_count: number;
   deadline: string;
   skills: { id: string; name: string; is_required: boolean }[];
+  /**
+   * Only present for openings the signed-in user POSTED; absent for everyone
+   * else. Optional and defaulted at every use, because Netlify deploys in
+   * seconds and Render in minutes: a new page meets the old API first.
+   */
+  application_count?: number | null;
+  pending_application_count?: number | null;
 }
 
 export interface Opportunity extends OpportunityCard {

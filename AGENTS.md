@@ -43,8 +43,8 @@ admin console, and the deployment configuration.
 **Do not restart the roadmap or rebuild working modules.**
 
 Current shape: 196 API operations over 157 paths, 54 tables, 35 migrations,
-39 ADRs, 30 backend modules, 1369 backend tests, 382 frontend tests,
-14 Playwright flows.
+40 ADRs, 30 backend modules, 1371 backend tests, 398 frontend tests,
+16 Playwright flows.
 
 ## Accounts and provisioning (the part most often got wrong)
 - Nobody self-registers. `POST /auth/register` does not exist and must not
@@ -544,11 +544,48 @@ Current shape: 196 API operations over 157 paths, 54 tables, 35 migrations,
   OPPORTUNITY and the only link between the two runs the other way
   (`Opportunity.project_id`), so somebody reading about a project had nowhere
   to go -- they had to return to the board and recognise the opening by name.
-  `ProjectOpenings` lists the project's OPEN openings under the team, and the
+  `ProjectOpenings` lists the project's openings under the team, and the
   frontend's `OpportunityFilters` finally carries the `project_id` the
   backend has always accepted. An error there is shown to everyone, not
   hidden like an empty list: silence reads as "no openings" and somebody who
   would have applied moves on.
+- **HIRING on a project is run from the project page, both sides of it**
+  (ADR 0040), from one component and one request that answers the two readers
+  differently. The **lead** sees EVERY opening on their project, drafts
+  included -- an opening is created as a DRAFT, so a view filtered to `open`
+  meant posting one and watching the section go on saying there were none.
+  Everybody else sees only the OPEN ones. The heading differs with the list:
+  "Hiring" for the lead, "Open positions" for a reader, because the lead's
+  list holds openings that are neither. `application_count` and
+  `pending_application_count` on `OpportunityCard` are filled ONLY for the
+  person who posted the opening and are `None` for every other reader --
+  derived from the viewer like `my_application_id`, never from the request.
+  Zero is sent as `0`, because "nobody has applied" and "we cannot tell you"
+  must not render the same. "Post an opening" carries
+  `?project_id=`, or a lead has to find their own project again in a dropdown.
+- **The three things that hid team-building for months were data, not model**
+  (ADR 0040). `Opportunity.project_id` is the ONLY link from a project to the
+  way into it, and `add_to_project` is a NO-OP without it -- so openings
+  seeded detached meant every project page said nothing about joining AND
+  every acceptance left the new member off the team. `_seed_opportunities`
+  now hangs each school's openings off one of its ACTIVE projects with the
+  project's OWNER as creator (only `created_by` may decide an application),
+  widens places so the seeded acceptance cannot fill every opening, and
+  REPAIRS rows it did not create rather than skipping them -- `_tag_project`'s
+  rule again. A seeded acceptance also joins the team, through
+  `record_membership`, never a bare insert.
+- **There are TWO ways onto a project team and only one was reachable**
+  (ADR 0040). `POST /projects/{id}/members` shipped with projects, fully
+  enforced, and nothing in the interface ever called it -- the frontend had
+  `removeMember` and no `addMember` -- so the only way onto a team was to
+  apply to an opening and be accepted, which is no use for the colleague a
+  lead already works with. `AddMemberPanel` under the team is the way in.
+  The `/admin/accounts/new` shape a second time: **enforcing a permission is
+  not the same as making it reachable.** Its candidates come from the
+  directory's own endpoints, so a student who has not opted in to being
+  discovered is not offered -- the opt-in working, not a gap -- and anybody
+  already on the team is filtered out, so the picker cannot offer what the
+  submit would refuse.
 - **`components/layout/navigation.ts` is the single list of destinations.** It
   drives the top bar, the grouped "All pages" menu and the command palette, so
   a role can never reach a page through one and not another. Add a page there

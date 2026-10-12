@@ -153,7 +153,7 @@ describe("openings on a project", () => {
 
     renderSection({ isOwner: true });
 
-    expect(await screen.findByRole("heading", { name: "Open positions" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Hiring" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Post an opening" })).toBeInTheDocument();
   });
 
@@ -188,5 +188,116 @@ describe("openings on a project", () => {
     renderSection({ isOwner: true });
 
     expect(await screen.findByText(/could not be loaded/)).toBeInTheDocument();
+  });
+});
+
+describe("hiring, from the lead's side of the same section", () => {
+  it("asks for EVERY opening on the project, drafts included", async () => {
+    // An opening is created as a draft. Filtering the lead's own view to
+    // `open` meant posting one from here and watching the section go on
+    // saying there were none.
+    signedInAs("faculty");
+    fetchOpportunities.mockResolvedValue(page([opening()]));
+
+    renderSection({ isOwner: true });
+
+    await waitFor(() => expect(fetchOpportunities).toHaveBeenCalledWith({ project_id: "p1" }));
+  });
+
+  it("shows the lead the state of each opening", async () => {
+    signedInAs("faculty");
+    fetchOpportunities.mockResolvedValue(page([opening({ status: "draft" })]));
+
+    renderSection({ isOwner: true });
+
+    expect(await screen.findByText("Draft")).toBeInTheDocument();
+  });
+
+  it("tells the lead how many applied and how many wait on them", async () => {
+    signedInAs("faculty");
+    fetchOpportunities.mockResolvedValue(
+      page([opening({ application_count: 4, pending_application_count: 2 })]),
+    );
+
+    renderSection({ isOwner: true });
+
+    expect(await screen.findByText(/4 applications/)).toBeInTheDocument();
+    expect(screen.getAllByText(/2 waiting on/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "Review applicants" })).toHaveAttribute(
+      "href",
+      "/opportunities/o1/applicants",
+    );
+  });
+
+  it("says plainly when nobody has applied", async () => {
+    signedInAs("faculty");
+    fetchOpportunities.mockResolvedValue(
+      page([opening({ application_count: 0, pending_application_count: 0 })]),
+    );
+
+    renderSection({ isOwner: true });
+
+    expect(await screen.findByText("No applications yet.")).toBeInTheDocument();
+  });
+
+  it("never shows a reader who is not the lead how many applied", async () => {
+    // The counts are the lead's queue. A student is deciding whether to
+    // apply, and how long the queue is forms no part of that.
+    signedInAs("student");
+    fetchOpportunities.mockResolvedValue(
+      page([opening({ application_count: 9, pending_application_count: 9 })]),
+    );
+
+    renderSection();
+
+    expect(await screen.findByText(/Field assistant/)).toBeInTheDocument();
+    expect(screen.queryByText(/9 applications/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Review applicants" })).not.toBeInTheDocument();
+  });
+
+  it("carries the project into the form, so the lead does not pick it again", async () => {
+    signedInAs("faculty");
+
+    renderSection({ isOwner: true });
+
+    expect(await screen.findByRole("link", { name: "Post an opening" })).toHaveAttribute(
+      "href",
+      "/opportunities/new?project_id=p1",
+    );
+  });
+
+  it("renders when the API is older than the page and sends no counts", async () => {
+    // Netlify deploys in seconds and Render in minutes, so a new page meets
+    // the old API first. Same guard the dashboard's announcements panel has.
+    signedInAs("faculty");
+    const { application_count, pending_application_count, ...withoutCounts } = opening();
+    void application_count;
+    void pending_application_count;
+    fetchOpportunities.mockResolvedValue(page([withoutCounts]));
+
+    renderSection({ isOwner: true });
+
+    expect(await screen.findByText(/Field assistant/)).toBeInTheDocument();
+    expect(screen.getByText("No applications yet.")).toBeInTheDocument();
+  });
+});
+
+describe("what the section is called", () => {
+  it("is Hiring for the lead, whose list holds drafts and closed openings", async () => {
+    signedInAs("faculty");
+    fetchOpportunities.mockResolvedValue(page([opening({ status: "closed" })]));
+
+    renderSection({ isOwner: true });
+
+    expect(await screen.findByRole("heading", { name: "Hiring" })).toBeInTheDocument();
+  });
+
+  it("is Open positions for everybody else, whose list only ever is", async () => {
+    signedInAs("student");
+    fetchOpportunities.mockResolvedValue(page([opening()]));
+
+    renderSection();
+
+    expect(await screen.findByRole("heading", { name: "Open positions" })).toBeInTheDocument();
   });
 });
